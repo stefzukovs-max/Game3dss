@@ -102,7 +102,7 @@ export class HUD {
     this.el.abBox.classList.toggle('ready', ready);
     this.el.abBox.classList.toggle('active', p.abilityActive > 0);
     this.el.abSweep.style.height = ready ? '0%' : `${clamp(p.abilityCd / cdTotal, 0, 1) * 100}%`;
-    this.el.abName.textContent = ready ? ab.nameEn : Math.ceil(p.abilityCd) + 's';
+    this.el.abName.textContent = ready ? ab.name : Math.ceil(p.abilityCd) + 's';
     this.el.nadeCount.textContent = p.grenades;
     this.el.nadeBox.classList.toggle('empty', p.grenades <= 0);
 

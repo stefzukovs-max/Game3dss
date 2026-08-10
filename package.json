@@ -1,8 +1,8 @@
 {
-  "name": "morro-do-cruzeiro",
+  "name": "cross-hill",
   "version": "1.0.0",
   "private": true,
-  "description": "Morro do Cruzeiro - a browser-based third-person shooter set on a Brazilian favela hillside",
+  "description": "Cross Hill - a browser-based third-person shooter set on a Brazilian favela hillside",
   "type": "module",
   "scripts": {
     "start": "node server.js",

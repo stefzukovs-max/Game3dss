@@ -51,7 +51,7 @@ export class AbilitySystem {
         actor.abilityActive = ab.duration;
         audio.tone(880, 0.14, 0.2, 'triangle');
         audio.tone(1320, 0.2, 0.16, 'triangle', 0.1);
-        this.game.hud.banner(ab.nameEn.toUpperCase(), 'hostiles marked');
+        this.game.hud.banner(ab.name.toUpperCase(), 'hostiles marked');
         break;
 
       case 'focus':
@@ -218,7 +218,7 @@ export class AbilitySystem {
     this.scene.add(mesh);
 
     const fuse = kind === 'frag'
-      ? (actor.char?.passive.name === 'Pirotecnia' ? 1.8 : 2.5)
+      ? (actor.char?.passive.id === 'pyro' ? 1.8 : 2.5)
       : 99; // molotov & flash trigger on impact / short timer
 
     this.projectiles.push({
@@ -319,7 +319,7 @@ export class AbilitySystem {
 
     if (p.kind === 'frag') {
       const radius = 7.5;
-      const mul = p.owner?.char?.passive.name === 'Pirotecnia' ? 1.35 : 1;
+      const mul = p.owner?.char?.passive.id === 'pyro' ? 1.35 : 1;
       game.combat.puff(pos, 'flash', { size0: 3.4, size1: 6.5, life: 0.2 });
       for (let i = 0; i < 12; i++) {
         game.combat.puff(pos, 'spark', {
@@ -358,7 +358,7 @@ export class AbilitySystem {
         if (d > 18) continue;
         const centre = _v.set(u.pos.x, u.pos.y + 1.4, u.pos.z);
         if (game.world.collision.losBlocked(pos, centre)) continue;
-        if (u.char?.passive.name === 'Blindado') continue;
+        if (u.char?.passive.id === 'hardened') continue;
         // facing matters: looking away costs you much less
         let facing = 1;
         const toB = _v2.subVectors(pos, u.pos).normalize();

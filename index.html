@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>Morro do Cruzeiro — Favela Shooter</title>
-<meta name="description" content="A browser-based third-person shooter set on a Brazilian hillside. Comando do Morro vs Batalhão Tático." />
+<title>Cross Hill — Favela Shooter</title>
+<meta name="description" content="A browser-based third-person shooter set on a Brazilian hillside. The Hillside Crew vs the Tactical Battalion." />
 <link rel="stylesheet" href="styles.css" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='27' font-size='27'>🎯</text></svg>" />
 <script type="importmap">
@@ -54,7 +54,7 @@
     </div>
     <div id="map-wrap">
       <canvas id="minimap" width="184" height="184"></canvas>
-      <div id="zone-name">O Morro</div>
+      <div id="zone-name">The Hill</div>
     </div>
   </div>
 
@@ -135,7 +135,7 @@
 <div id="rotate-gate" class="hidden">
   <div class="rot-icon">⟳</div>
   <h3>ROTATE YOUR DEVICE</h3>
-  <p>Morro do Cruzeiro plays in landscape.</p>
+  <p>Cross Hill plays in landscape.</p>
 </div>
 
 <!-- ═══════════════════════ OVERLAY / MENUS ═══════════════════════ -->
@@ -143,7 +143,7 @@
 
   <!-- ── loading ── -->
   <section id="scr-load" class="screen">
-    <h1 class="logo">MORRO<span>DO</span>CRUZEIRO</h1>
+    <h1 class="logo">HILL<span>OF THE</span>CROSS</h1>
     <div class="loadbar"><i id="loadfill"></i></div>
     <p id="loadmsg">Building the hillside…</p>
   </section>
@@ -151,13 +151,13 @@
   <!-- ── main menu / operator select ── -->
   <section id="scr-menu" class="screen wide hidden">
     <div class="menu-head">
-      <h1 class="logo small">MORRO<span>DO</span>CRUZEIRO</h1>
+      <h1 class="logo small">HILL<span>OF THE</span>CROSS</h1>
       <div class="faction-tabs">
         <button class="ftab on" data-f="gang">
-          <b>COMANDO DO MORRO</b><span>Hold the hill</span>
+          <b>THE HILLSIDE CREW</b><span>Hold the hill</span>
         </button>
         <button class="ftab" data-f="police">
-          <b>BATALHÃO TÁTICO</b><span>Take the hill</span>
+          <b>TACTICAL BATTALION</b><span>Take the hill</span>
         </button>
       </div>
     </div>
@@ -174,8 +174,8 @@
         <label>DIFFICULTY</label>
         <div class="seg" id="seg-diff">
           <button data-v="0">Rookie</button>
-          <button data-v="1" class="on">Soldado</button>
-          <button data-v="2">Veterano</button>
+          <button data-v="1" class="on">Soldier</button>
+          <button data-v="2">Veteran</button>
           <button data-v="3">Inferno</button>
         </div>
       </div>

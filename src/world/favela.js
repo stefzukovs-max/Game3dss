@@ -5,31 +5,31 @@ import { buildTextureLibrary, FAVELA_COLORS } from './textures.js';
 
 /**
  * ══════════════════════════════════════════════════════════════════
- *  MAP — "MORRO DO CRUZEIRO"
+ *  MAP — "CROSS HILL"
  * ══════════════════════════════════════════════════════════════════
  *
  *  A hillside in five terraces. Police push UP from the plaza (+Z, low);
  *  the crew holds DOWN from the cross at the summit (-Z, high).
  *
  *  ┌──────────────────────────────────────────────────────────┐  -78
- *  │  T4  O CRUZEIRO      [cross · mirante · LAJE GRANDE]     │   gang spawn
+ *  │  T4  THE CROSS       [cross · lookout · THE BIG ROOF]    │   crew spawn
  *  ├──────────────────────────────────────────────────────────┤  -42
- *  │  T3  AS LAJES        [CAIXA D'ÁGUA · O BAILE · rooftops] │
+ *  │  T3  THE ROOFTOPS    [WATER TOWER · DANCEHALL · roofs] │
  *  ├──────────────────────────────────────────────────────────┤  -16
- *  │  T2  O ESCADÃO       [IGREJINHA + bell tower · alleys]   │
+ *  │  T2  THE GRAND STAIR [CHAPEL + bell tower · alleys]   │
  *  ├──────────────────────────────────────────────────────────┤   +6
- *  │  T1  O MERCADO       [MERCADINHO · O CAMPO (pitch)]      │
+ *  │  T1  THE MARKET      [CORNER SHOP · THE CAGE (pitch)]      │
  *  ├──────────────────────────────────────────────────────────┤  +30
- *  │  T0  A PRAÇA         [CORETO · viaturas · kombi stop]    │  police spawn
+ *  │  T0  THE PLAZA       [BANDSTAND · squad cars · van stop]    │  police spawn
  *  └──────────────────────────────────────────────────────────┘  +66
  *
  *  THREE LANES, so neither side can be held from one angle:
  *
- *    WEST  x < -22   "OS BECOS"    tight alleys, blind corners, short stairs.
+ *    WEST  x < -22   "THE ALLEYS"  tight alleys, blind corners, short stairs.
  *                                  Fastest, most dangerous, no sightlines.
- *    MID   -22..22   "O ESCADÃO"   the grand staircase spine. Most direct,
+ *    MID   -22..22   "GRAND STAIR" the staircase spine. Most direct,
  *                                  most exposed; the chapel tower watches it.
- *    EAST  x > 22    "A LADEIRA"   the vehicle road — long, gentle ramps and
+ *    EAST  x > 22    "RAMP ROAD"   the vehicle road — long, gentle ramps and
  *                                  the open football cage. Long sightlines,
  *                                  rewards rifles.
  *
@@ -42,19 +42,19 @@ import { buildTextureLibrary, FAVELA_COLORS } from './textures.js';
  */
 
 export const TERRACES = [
-  { y: 0.0,  z0: 30,  z1: 66,  id: 'praca',    name: 'A Praça' },
-  { y: 3.5,  z0: 6,   z1: 30,  id: 'mercado',  name: 'O Mercado' },
-  { y: 7.0,  z0: -16, z1: 6,   id: 'escadao',  name: 'O Escadão' },
-  { y: 10.5, z0: -42, z1: -16, id: 'lajes',    name: 'As Lajes' },
-  { y: 14.5, z0: -78, z1: -42, id: 'cruzeiro', name: 'O Cruzeiro' },
+  { y: 0.0,  z0: 30,  z1: 66,  id: 'plaza',   name: 'The Plaza' },
+  { y: 3.5,  z0: 6,   z1: 30,  id: 'market',  name: 'The Market' },
+  { y: 7.0,  z0: -16, z1: 6,   id: 'stairs',  name: 'The Grand Stair' },
+  { y: 10.5, z0: -42, z1: -16, id: 'roofs',   name: 'The Rooftops' },
+  { y: 14.5, z0: -78, z1: -42, id: 'summit',  name: 'The Cross' },
 ];
 
 export const WORLD = { x0: -70, x1: 70, z0: -78, z1: 66 };
 
 export const LANES = {
-  west: { id: 'west', name: 'Os Becos', x: -44, x0: -70, x1: -22 },
-  mid:  { id: 'mid',  name: 'O Escadão', x: 0,  x0: -22, x1: 22 },
-  east: { id: 'east', name: 'A Ladeira', x: 44, x0: 22,  x1: 70 },
+  west: { id: 'west', name: 'The Alleys',    x: -44, x0: -70, x1: -22 },
+  mid:  { id: 'mid',  name: 'The Grand Stair', x: 0, x0: -22, x1: 22 },
+  east: { id: 'east', name: 'The Ramp Road', x: 44,  x0: 22,  x1: 70 },
 };
 
 const FLOOR_H = 2.75;
@@ -72,7 +72,7 @@ export const CLIMBS = [
 
   { to: 2, lane: 'west', x: -38, kind: 'stair' },
   { to: 2, lane: 'mid',  x: 0,   kind: 'grand' },
-  { to: 2, lane: 'east', x: 62,  kind: 'ramp'  },   // swings wide around O Campo
+  { to: 2, lane: 'east', x: 62,  kind: 'ramp'  },   // swings wide around The Cage
 
   { to: 3, lane: 'west', x: -50, kind: 'stair' },
   { to: 3, lane: 'west', x: -28, kind: 'stair' },
@@ -87,22 +87,22 @@ export const CLIMBS = [
 
 /** Named areas for HUD callouts and minimap labels. */
 export const ZONES = [
-  { id: 'praca',      name: 'A Praça',        x: 0,   z: 48,  r: 30 },
-  { id: 'coreto',     name: 'O Coreto',       x: -6,  z: 46,  r: 11 },
-  { id: 'kombi',      name: 'Ponto de Kombi', x: 40,  z: 54,  r: 12 },
-  { id: 'mercadinho', name: 'O Mercadinho',   x: -30, z: 22,  r: 12 },
-  { id: 'campo',      name: 'O Campo',        x: 42,  z: 14,  r: 15 },
-  { id: 'mercado',    name: 'O Mercado',      x: 0,   z: 18,  r: 26 },
-  { id: 'igrejinha',  name: 'A Igrejinha',    x: -20, z: -4,  r: 13 },
-  { id: 'escadao',    name: 'O Escadão',      x: 0,   z: -4,  r: 16 },
-  { id: 'becos',      name: 'Os Becos',       x: -46, z: -6,  r: 22 },
-  { id: 'ladeira',    name: 'A Ladeira',      x: 48,  z: -6,  r: 20 },
-  { id: 'caixa',      name: "Caixa d'Água",   x: -2,  z: -30, r: 14 },
-  { id: 'baile',      name: 'O Baile',        x: 40,  z: -30, r: 15 },
-  { id: 'lajes',      name: 'As Lajes',       x: -40, z: -30, r: 20 },
-  { id: 'cruzeiro',   name: 'O Cruzeiro',     x: 0,   z: -56, r: 18 },
-  { id: 'laje',       name: 'A Laje Grande',  x: -34, z: -58, r: 18 },
-  { id: 'mirante',    name: 'O Mirante',      x: 38,  z: -58, r: 18 },
+  { id: 'plaza',     name: 'The Plaza',       x: 0,   z: 48,  r: 30 },
+  { id: 'bandstand', name: 'The Bandstand',   x: -6,  z: 46,  r: 11 },
+  { id: 'vanstop',   name: 'The Van Stop',    x: 40,  z: 54,  r: 12 },
+  { id: 'shop',      name: 'The Corner Shop', x: -30, z: 22,  r: 12 },
+  { id: 'cage',      name: 'The Cage',        x: 42,  z: 14,  r: 15 },
+  { id: 'market',    name: 'The Market',      x: 0,   z: 18,  r: 26 },
+  { id: 'chapel',    name: 'The Chapel',      x: -20, z: -4,  r: 13 },
+  { id: 'stairs',    name: 'The Grand Stair', x: 0,   z: -4,  r: 16 },
+  { id: 'alleys',    name: 'The Alleys',      x: -46, z: -6,  r: 22 },
+  { id: 'ramp',      name: 'The Ramp Road',   x: 48,  z: -6,  r: 20 },
+  { id: 'watertower', name: 'The Water Tower', x: -2, z: -30, r: 14 },
+  { id: 'dancehall', name: 'The Dancehall',   x: 40,  z: -30, r: 15 },
+  { id: 'roofs',     name: 'The Rooftops',    x: -40, z: -30, r: 20 },
+  { id: 'cross',     name: 'The Cross',       x: 0,   z: -56, r: 18 },
+  { id: 'bigroof',   name: 'The Big Roof',    x: -34, z: -58, r: 18 },
+  { id: 'lookout',   name: 'The Lookout',     x: 38,  z: -58, r: 18 },
 ];
 
 export function zoneAt(x, z) {
@@ -111,7 +111,7 @@ export function zoneAt(x, z) {
     const d = Math.hypot(x - zn.x, z - zn.z);
     if (d < zn.r && d < bd) { bd = d; best = zn; }
   }
-  return best?.name ?? 'O Morro';
+  return best?.name ?? 'The Hill';
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -257,8 +257,8 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}) {
   B.material('cross', col(0xe8e4d8));
   B.material('speaker', col(0x1a1a1c));
   B.material('bulb', col(0xffe9a8, { emissive: 0xffcc55 }));
-  B.material('kombi', col(0xe8e2d0));
-  B.material('kombiTrim', col(0x3f8f7f));
+  B.material('van', col(0xe8e2d0));
+  B.material('vanTrim', col(0x3f8f7f));
   ['cloth0', 'cloth1', 'cloth2', 'cloth3'].forEach((k, i) =>
     B.material(k, col([0xe94f37, 0x3ac4c4, 0xf5d547, 0xf1f1e6][i], { side: THREE.DoubleSide })));
   ['awning0', 'awning1', 'awning2'].forEach((k, i) =>
@@ -273,12 +273,12 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}) {
   reserveLanes(B);
 
   onProgress(0.28, 'Raising the landmarks…');
-  buildPraca(B, rng, meta);
-  buildMercado(B, rng, meta);
-  buildIgrejinha(B, rng, meta);
-  buildCaixaDagua(B, rng, meta);
-  buildBaile(B, rng, meta);
-  buildCruzeiro(B, rng, meta);
+  buildPlaza(B, rng, meta);
+  buildMarket(B, rng, meta);
+  buildChapel(B, rng, meta);
+  buildWaterTower(B, rng, meta);
+  buildDancehall(B, rng, meta);
+  buildSummit(B, rng, meta);
 
   onProgress(0.5, 'Stacking the houses…');
   for (let i = 1; i < TERRACES.length; i++) infillTerrace(B, rng, i, meta);
@@ -317,7 +317,7 @@ function buildTerrain(B, rng) {
     // Only deep enough to reach past the terrace below - any more and the
     // exposed side becomes a huge blank retaining wall filling the view.
     const h = 6.5;
-    const mat = t.id === 'praca' ? 'asphalt' : t.id === 'mercado' ? 'concrete' : 'dirt';
+    const mat = t.id === 'plaza' ? 'asphalt' : t.id === 'market' ? 'concrete' : 'dirt';
     B.box(mat, cx, t.y - h / 2, cz, w, h, d, { texScale: 0.2, tag: 'ground' });
     // faced in block so the drop between terraces reads as built, not carved
     B.box('brick', cx, t.y - 1.9, t.z1 - 0.06, w, 3.8, 0.14, { solid: false, texScale: 0.45 });
@@ -370,11 +370,11 @@ function reserveLanes(B) {
   }
 }
 
-/* ══════════════ LANDMARK: A PRAÇA (police staging) ══════════════ */
-function buildPraca(B, rng, meta) {
+/* ══════════════ LANDMARK: THE PLAZA (police staging) ══════════════ */
+function buildPlaza(B, rng, meta) {
   const t = TERRACES[0];
-  B.reserve(-6, 46, 22, 22, 'coreto');
-  B.reserve(40, 54, 20, 16, 'kombi');
+  B.reserve(-6, 46, 22, 22, 'bandstand');
+  B.reserve(40, 54, 20, 16, 'vanstop');
 
   // road markings up the middle of the plaza
   for (let z = t.z0 + 4; z < t.z1 - 4; z += 6) {
@@ -382,7 +382,7 @@ function buildPraca(B, rng, meta) {
   }
   B.floorQuad('paintYellow', 0, 0.03, t.z0 + 3, WORLD.x1 - WORLD.x0 - 20, 0.5);
 
-  // ── O CORETO: octagonal bandstand, the plaza's cover hub ──
+  // ── THE BANDSTAND: octagonal, the plaza's cover hub ──
   const cx = -6, cz = 46;
   B.cylinder('concrete', cx, 0.35, cz, 7.4, 7.8, 0.7, 8, { solid: true, tag: 'ground' });
   B.cylinder('concreteDark', cx, 0.78, cz, 6.6, 6.9, 0.18, 8, {});
@@ -396,24 +396,24 @@ function buildPraca(B, rng, meta) {
   }
   B.cylinder('corrugated', cx, 4.3, cz, 1.2, 7.6, 1.0, 8, { solid: true, tag: 'roof' });
   B.cylinder('metalDark', cx, 5.1, cz, 0.12, 0.12, 0.9, 6, {});
-  meta.landmarks.push({ name: 'O Coreto', x: cx, z: cz });
+  meta.landmarks.push({ name: 'The Bandstand', x: cx, z: cz });
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2;
     meta.cover.push(new THREE.Vector3(cx + Math.cos(a) * 8.4, 0, cz + Math.sin(a) * 8.4));
   }
 
-  // ── viaturas nosed in at the foot of the hill ──
+  // ── squad cars nosed in at the foot of the hill ──
   const spots = [[-34, 36, 0.15], [-14, 34, -0.1], [10, 36, 0.2], [34, 35, -0.25]];
   spots.forEach(([vx, vz, r], i) => buildPoliceVehicle(B, rng, vx, 0, vz, r, i % 2 === 0));
 
-  // ── kombi stop shelter ──
+  // ── minibus stop shelter ──
   const kx = 40, kz = 54;
   B.box('concrete', kx, 0.06, kz, 14, 0.12, 5, { texScale: 0.4, tag: 'ground' });
   for (const ox of [-6, 6]) B.box('metalDark', kx + ox, 1.4, kz - 2, 0.16, 2.8, 0.16, { texScale: 1, tag: 'pole' });
   B.box('corrugated', kx, 2.9, kz - 1.4, 13, 0.18, 3.4, { texScale: 0.6, tag: 'roof' });
   B.box('paint', kx, 0.55, kz - 2.6, 11, 0.5, 0.4, { texScale: 1, tag: 'bench' });
-  buildKombi(B, rng, kx + 2, 0, kz + 4.5, -0.2);
-  meta.landmarks.push({ name: 'Ponto de Kombi', x: kx, z: kz });
+  buildVan(B, rng, kx + 2, 0, kz + 4.5, -0.2);
+  meta.landmarks.push({ name: 'The Van Stop', x: kx, z: kz });
 
   // sandbag line the squad forms up behind - never across a staircase mouth
   for (let i = 0; i < 16; i++) {
@@ -439,13 +439,13 @@ function buildPraca(B, rng, meta) {
   }
 }
 
-/* ══════════════ LANDMARK: O MERCADO + O CAMPO ══════════════ */
-function buildMercado(B, rng, meta) {
+/* ══════════════ LANDMARK: THE MARKET + THE CAGE ══════════════ */
+function buildMarket(B, rng, meta) {
   const t = TERRACES[1];
 
-  // ── O MERCADINHO: painted corner shop, roof reachable, west-mid anchor ──
+  // ── THE CORNER SHOP: painted, roof reachable, west-mid anchor ──
   const mx = -30, mz = 22;
-  B.reserve(mx, mz, 20, 16, 'mercadinho');
+  B.reserve(mx, mz, 20, 16, 'shop');
   buildHouse(B, rng, mx, t.y, mz, 13, 10, 2, meta, 1, { forceStair: true, wall: 'plaster0' });
   // big awning + produce crates out front
   B.box('awning0', mx, t.y + 3.0, mz + 6.4, 13.5, 0.16, 3.2, { solid: false, texScale: 1 });
@@ -455,11 +455,11 @@ function buildMercado(B, rng, meta) {
       { texScale: 1, rotY: rng() * 0.6, tag: 'prop' });
   }
   B.quad('graf1', mx, t.y + 3.6, mz + 5.05, 11, 2.6, 0);
-  meta.landmarks.push({ name: 'O Mercadinho', x: mx, z: mz });
+  meta.landmarks.push({ name: 'The Corner Shop', x: mx, z: mz });
 
-  // ── O CAMPO: caged concrete pitch, the wide east flank ──
+  // ── THE CAGE: caged concrete pitch, the wide east flank ──
   const px = 42, pz = 14, pw = 30, pd = 14;
-  B.reserve(px, pz, pw + 6, pd + 6, 'campo');
+  B.reserve(px, pz, pw + 6, pd + 6, 'cage');
   B.box('pitch', px, t.y + 0.04, pz, pw, 0.08, pd, { texScale: 0.3, tag: 'ground' });
   // pitch markings
   B.floorQuad('pitchLine', px, t.y + 0.1, pz, pw - 2, 0.2);
@@ -497,15 +497,15 @@ function buildMercado(B, rng, meta) {
     B.box('concreteDark', px, t.y + 0.3 + i * 0.55, pz - pd / 2 - 1.4 - i * 1.3,
       pw, 0.6 + i * 1.1, 1.3, { texScale: 0.6, tag: 'bleacher' });
   }
-  meta.landmarks.push({ name: 'O Campo', x: px, z: pz });
+  meta.landmarks.push({ name: 'The Cage', x: px, z: pz });
   meta.cover.push(new THREE.Vector3(px - pw / 2 - 2, t.y, pz), new THREE.Vector3(px + pw / 2 + 2, t.y, pz));
 }
 
-/* ══════════════ LANDMARK: A IGREJINHA (chapel + bell tower) ══════════════ */
-function buildIgrejinha(B, rng, meta) {
+/* ══════════════ LANDMARK: THE CHAPEL (nave + bell tower) ══════════════ */
+function buildChapel(B, rng, meta) {
   const t = TERRACES[2];
   const cx = -20, cz = -4;
-  B.reserve(cx, cz, 20, 20, 'igrejinha');
+  B.reserve(cx, cz, 20, 20, 'chapel');
 
   // nave
   B.box('chapel', cx, t.y + 2.6, cz, 9, 5.2, 13, { texScale: 0.4, tag: 'building' });
@@ -518,7 +518,7 @@ function buildIgrejinha(B, rng, meta) {
     B.quad('window', cx + 4.55, t.y + 3.0, cz + z, 1.0, 2.0, Math.PI / 2);
   }
 
-  // ── bell tower: the single best angle onto the Escadão, three ways up ──
+  // ── bell tower: the single best angle onto the grand stair, three ways up ──
   const tx = cx + 0.0, tz = cz - 8.2, th = 12.5;
   B.box('chapel', tx, t.y + th / 2, tz, 4.6, th, 4.6, { texScale: 0.45, tag: 'building' });
   // internal switchback stairs wrapped on the outside so it's contestable
@@ -538,7 +538,7 @@ function buildIgrejinha(B, rng, meta) {
   B.box('cross', tx, by + 4.4, tz, 0.22, 1.8, 0.22, { solid: false, texScale: 1 });
   B.box('cross', tx, by + 4.8, tz, 1.0, 0.22, 0.22, { solid: false, texScale: 1 });
 
-  meta.landmarks.push({ name: 'A Igrejinha', x: cx, z: cz });
+  meta.landmarks.push({ name: 'The Chapel', x: cx, z: cz });
   meta.cover.push(new THREE.Vector3(cx + 6, t.y, cz + 5), new THREE.Vector3(cx - 6, t.y, cz - 3));
 }
 
@@ -556,11 +556,11 @@ function buildSpiralStair(B, x, baseY, z, r, height) {
   }
 }
 
-/* ══════════════ LANDMARK: CAIXA D'ÁGUA ══════════════ */
-function buildCaixaDagua(B, rng, meta) {
+/* ══════════════ LANDMARK: THE WATER TOWER ══════════════ */
+function buildWaterTower(B, rng, meta) {
   const t = TERRACES[3];
   const cx = -2, cz = -30;
-  B.reserve(cx, cz, 22, 22, 'caixa');
+  B.reserve(cx, cz, 22, 22, 'watertower');
 
   // plinth building underneath (pump house) - fightable interior footprint
   B.box('concrete', cx, t.y + 1.9, cz, 9, 3.8, 9, { texScale: 0.4, tag: 'building' });
@@ -588,7 +588,7 @@ function buildCaixaDagua(B, rng, meta) {
   // faded painted lettering on the tank reads as a real landmark from anywhere
   B.quad('paint', cx, tankY + 2.9, cz + 4.05, 5.0, 1.2, 0);
 
-  meta.landmarks.push({ name: "Caixa d'Água", x: cx, z: cz });
+  meta.landmarks.push({ name: 'The Water Tower', x: cx, z: cz });
   meta.cover.push(new THREE.Vector3(cx + 6, t.y, cz), new THREE.Vector3(cx - 6, t.y, cz));
 }
 
@@ -606,11 +606,11 @@ function buildStraightRun(B, x, yLow, zStart, yHigh, dir, width = 3.2) {
   }
 }
 
-/* ══════════════ LANDMARK: O BAILE (the party slab) ══════════════ */
-function buildBaile(B, rng, meta) {
+/* ══════════════ LANDMARK: THE DANCEHALL (the party slab) ══════════════ */
+function buildDancehall(B, rng, meta) {
   const t = TERRACES[3];
   const cx = 40, cz = -30;
-  B.reserve(cx, cz, 26, 22, 'baile');
+  B.reserve(cx, cz, 26, 22, 'dancehall');
 
   // raised dance slab
   B.box('concrete', cx, t.y + 0.3, cz, 20, 0.6, 15, { texScale: 0.35, tag: 'ground' });
@@ -644,14 +644,14 @@ function buildBaile(B, rng, meta) {
       B.cylinder('bulb', cx + k * 2.2, t.y + 4.85, z, 0.09, 0.09, 0.16, 6, {});
     }
   }
-  meta.landmarks.push({ name: 'O Baile', x: cx, z: cz });
+  meta.landmarks.push({ name: 'The Dancehall', x: cx, z: cz });
 }
 
-/* ══════════════ LANDMARK: O CRUZEIRO (summit) ══════════════ */
-function buildCruzeiro(B, rng, meta) {
+/* ══════════════ LANDMARK: THE CROSS (summit) ══════════════ */
+function buildSummit(B, rng, meta) {
   const t = TERRACES[4];
   const cx = 0, cz = -56;
-  B.reserve(cx, cz, 26, 24, 'cruzeiro');
+  B.reserve(cx, cz, 26, 24, 'cross');
 
   // stepped plinth - high ground with a 360° approach
   for (let i = 0; i < 4; i++) {
@@ -662,19 +662,19 @@ function buildCruzeiro(B, rng, meta) {
   const by = t.y + 2.4;
   B.box('cross', cx, by + 4.2, cz, 1.1, 8.4, 1.1, { texScale: 0.6, tag: 'monument' });
   B.box('cross', cx, by + 6.2, cz, 5.0, 1.1, 1.1, { texScale: 0.6, tag: 'monument' });
-  meta.landmarks.push({ name: 'O Cruzeiro', x: cx, z: cz });
+  meta.landmarks.push({ name: 'The Cross', x: cx, z: cz });
 
-  // ── A LAJE GRANDE: the crew's rooftop HQ, west summit ──
+  // ── THE BIG ROOF: the crew's rooftop HQ, west summit ──
   const hx = -34, hz = -58;
-  B.reserve(hx, hz, 26, 22, 'laje');
+  B.reserve(hx, hz, 26, 22, 'bigroof');
   buildHouse(B, rng, hx, t.y, hz, 16, 13, 3, meta, 4, { forceStair: true, wall: 'plaster3' });
   buildHouse(B, rng, hx + 13, t.y, hz + 8, 9, 8, 2, meta, 4);
   buildHouse(B, rng, hx - 12, t.y, hz - 5, 10, 9, 2, meta, 4, { forceStair: true });
-  meta.landmarks.push({ name: 'A Laje Grande', x: hx, z: hz });
+  meta.landmarks.push({ name: 'The Big Roof', x: hx, z: hz });
 
-  // ── O MIRANTE: east summit viewpoint over the whole hill ──
+  // ── THE LOOKOUT: east summit viewpoint over the whole hill ──
   const vx = 38, vz = -58;
-  B.reserve(vx, vz, 24, 20, 'mirante');
+  B.reserve(vx, vz, 24, 20, 'lookout');
   B.box('concrete', vx, t.y + 0.35, vz, 18, 0.7, 14, { texScale: 0.4, tag: 'ground' });
   for (let x = -8.5; x <= 8.5; x += 1.7) {
     B.box('paint', vx + x, t.y + 1.25, vz + 7.2, 0.16, 1.1, 0.16, { solid: false, texScale: 1 });
@@ -684,7 +684,7 @@ function buildCruzeiro(B, rng, meta) {
   for (const ox of [-6, 6]) B.box('woodDark', vx + ox, t.y + 2.0, vz - 4, 0.3, 3.2, 0.3, { texScale: 1, tag: 'pole' });
   B.box('awning1', vx, t.y + 3.7, vz - 4, 14, 0.2, 5, { solid: false, texScale: 1 });
   for (const oz of [-1.5, -6.5]) B.box('wood', vx, t.y + 1.05, vz + oz, 8, 0.4, 0.6, { texScale: 1, tag: 'bench' });
-  meta.landmarks.push({ name: 'O Mirante', x: vx, z: vz });
+  meta.landmarks.push({ name: 'The Lookout', x: vx, z: vz });
 
   // a wall of stacked houses across the back so the summit has depth
   for (let x = WORLD.x0 + 12; x < WORLD.x1 - 12; x += 13) {
@@ -905,7 +905,7 @@ function buildStair(B, rng, x, yLow, yHigh, zTop, grand) {
   const run = steps * tread;
 
   if (grand) {
-    // central divider - the thing that makes the Escadão survivable
+    // central divider - the thing that makes the grand stair survivable
     for (let i = 0; i < steps; i += 1) {
       const top = riser * (i + 1);
       const z = zTop + tread * (steps - i) - tread / 2;
@@ -1080,14 +1080,14 @@ function buildPoliceVehicle(B, rng, x, y, z, rotY, isVan) {
   }
 }
 
-function buildKombi(B, rng, x, y, z, rotY) {
+function buildVan(B, rng, x, y, z, rotY) {
   const w = 2.0, len = 4.4, h = 2.0;
   const cos = Math.cos(rotY), sin = Math.sin(rotY);
   const at = (ox, oy, oz) => [x + ox * cos + oz * sin, y + oy, z - ox * sin + oz * cos];
   let p = at(0, h / 2 + 0.4, 0);
-  B.box('kombi', p[0], p[1], p[2], w, h, len, { rotY, texScale: 0.6, tag: 'vehicle' });
+  B.box('van', p[0], p[1], p[2], w, h, len, { rotY, texScale: 0.6, tag: 'vehicle' });
   p = at(0, 0.95, 0);
-  B.box('kombiTrim', p[0], p[1], p[2], w + 0.05, 0.45, len, { rotY, solid: false, texScale: 0.6 });
+  B.box('vanTrim', p[0], p[1], p[2], w + 0.05, 0.45, len, { rotY, solid: false, texScale: 0.6 });
   p = at(0, h + 0.05, -len / 2 + 0.55);
   B.box('glass', p[0], p[1], p[2], w - 0.2, 0.85, 0.3, { rotY, solid: false, texScale: 1 });
   for (const ox of [-w / 2, w / 2]) {

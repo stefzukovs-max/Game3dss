@@ -22,7 +22,7 @@ const out = await page.evaluate(async () => {
   const log = [];
   const { Agent } = await import('/src/entities/ai.js');
 
-  g.selected.operator = 'pipa';           // SMG primary
+  g.selected.operator = 'kite';           // SMG primary
   g.startRun();
   g._tick(1 / 60);
 

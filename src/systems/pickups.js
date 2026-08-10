@@ -74,7 +74,7 @@ export class PickupSystem {
 
   update(dt) {
     const p = this.game.player;
-    const magnet = p?.char.passive.name === 'Logística' ? 6 : 1.55;
+    const magnet = p?.char.passive.id === 'logistics' ? 6 : 1.55;
 
     for (const it of this.items) {
       it.life -= dt;

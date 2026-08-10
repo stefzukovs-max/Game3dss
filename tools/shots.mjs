@@ -14,13 +14,13 @@ await page.waitForTimeout(1200);
 
 await page.screenshot({ path: `${OUT}/ui-1-menu-gang.png` });
 
-await page.click('.op-list .op-card:nth-child(3)');           // Rainha
+await page.click('.op-list .op-card:nth-child(3)');           // Queen
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/ui-2-operator.png` });
 
 await page.click('.ftab[data-f="police"]');
 await page.waitForTimeout(400);
-await page.click('.op-list .op-card:nth-child(2)');           // Sgt. Muralha
+await page.click('.op-list .op-card:nth-child(2)');           // Sgt. Stone
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/ui-3-police.png` });
 
@@ -34,7 +34,7 @@ await page.waitForTimeout(200);
 await page.evaluate(() => {
   const g = window.__game;
   g.selected.faction = 'gang';
-  g.selected.operator = 'bagre';
+  g.selected.operator = 'boulder';
   g.startRun();
   for (let i = 0; i < 60 * 30; i++) {
     g._tick(1 / 60);
@@ -57,7 +57,7 @@ const views = [
   ['map-1-plaza', [-2, 9, 62], [-4, 3, 30]],
   ['map-2-escadao', [1, 12, 26], [0, 8, -10]],
   ['map-3-lajes', [-30, 17, -6], [-6, 12, -32]],
-  ['map-4-cruzeiro', [22, 22, -30], [0, 17, -56]],
+  ['map-4-summit', [22, 22, -30], [0, 17, -56]],
   ['map-5-overview', [-96, 78, 66], [0, 8, -18]],
   ['map-6-street', [40, 6, 24], [42, 4, 6]],
 ];

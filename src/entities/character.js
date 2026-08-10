@@ -15,7 +15,7 @@ import { makeRNG, clamp, damp, lerp, angleDelta } from '../core/utils.js';
  *     buffer under a single shared material, so a whole limb — including its
  *     sleeve, glove and any strapping — is one draw call instead of four.
  *  2. **Geometry caching.** Outfits come from a small preset table, so the
- *     merged buffers for "gang grunt #3" are built once and shared by every
+ *     merged buffers for "crew grunt #3" are built once and shared by every
  *     character wearing it. Spawning a new agent allocates nothing but a
  *     handful of Object3Ds.
  *
@@ -121,7 +121,7 @@ export const BODY_MATERIAL = new THREE.MeshLambertMaterial({ vertexColors: true 
 const SKINS = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0x6b4423, 0xa1665e];
 const HAIR = [0x1b1310, 0x2e2119, 0x4a3020, 0x14100e, 0x5a4632];
 
-const GANG_PRESETS = [
+const CREW_PRESETS = [
   { shirt: 0xf2f2f2, pants: 0x2b3a55, head: 'cap',     capColor: 0xe11d48, tank: true },
   { shirt: 0xffd23f, pants: 0x3a3a3a, head: 'bandana', bandana: 0xe11d48, shorts: true },
   { shirt: 0x2fb0a0, pants: 0x1f2937, head: 'none',    tank: true, shorts: true },
@@ -147,7 +147,7 @@ const ELITE_PRESETS = [
 export function makeOutfit(faction, rank, rng = makeRNG((Math.random() * 1e9) | 0)) {
   const table = faction === 'police'
     ? (rank === 'elite' ? ELITE_PRESETS : COP_PRESETS)
-    : GANG_PRESETS;
+    : CREW_PRESETS;
   const pi = rng.int(0, table.length - 1);
   const si = rng.int(0, SKINS.length - 1);
   const hi = rng.int(0, HAIR.length - 1);

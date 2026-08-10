@@ -5,27 +5,27 @@
 
 export const CARDS = [
   {
-    id: 'calibre', name: 'Calibre', nameEn: 'Heavier Rounds', icon: '🔩', rarity: 'common',
+    id: 'calibre', name: 'Heavier Rounds', icon: '🔩', rarity: 'common',
     desc: '+14% weapon damage.',
     apply: (p) => { p.upgrades.damage *= 1.14; },
   },
   {
-    id: 'couro', name: 'Couro', nameEn: 'Thicker Skin', icon: '❤', rarity: 'common',
+    id: 'couro', name: 'Thicker Skin', icon: '❤', rarity: 'common',
     desc: '+25% maximum health, and heal to full right now.',
     apply: (p) => { p.upgrades.health *= 1.25; p.health = p.maxHealth * p.upgrades.health; },
   },
   {
-    id: 'adrenalina', name: 'Adrenalina', nameEn: 'Adrenaline', icon: '🏃', rarity: 'common',
+    id: 'adrenaline', name: 'Adrenaline', icon: '🏃', rarity: 'common',
     desc: '+9% movement speed.',
     apply: (p) => { p.upgrades.speed *= 1.09; },
   },
   {
-    id: 'maos', name: 'Mãos Rápidas', nameEn: 'Fast Hands', icon: '🤲', rarity: 'common',
+    id: 'fasthands', name: 'Fast Hands', icon: '🤲', rarity: 'common',
     desc: '+22% reload speed and faster recoil recovery.',
     apply: (p) => { p.upgrades.reload *= 1.22; },
   },
   {
-    id: 'bornal', name: 'Bornal', nameEn: 'Deep Pockets', icon: '🎒', rarity: 'common',
+    id: 'pockets', name: 'Deep Pockets', icon: '🎒', rarity: 'common',
     desc: '+35% reserve ammo capacity, and top up now.',
     apply: (p) => {
       p.upgrades.ammo *= 1.35;
@@ -36,27 +36,27 @@ export const CARDS = [
     },
   },
   {
-    id: 'colete', name: 'Colete', nameEn: 'Plate Carrier', icon: '🛡', rarity: 'uncommon',
+    id: 'plates', name: 'Plate Carrier', icon: '🛡', rarity: 'uncommon',
     desc: '+30 armour capacity and armour slowly regenerates.',
     apply: (p) => { p.maxArmor = (p.maxArmor || 0) + 30; p.armor = p.maxArmor; p.upgrades.armorRegen += 1.6; },
   },
   {
-    id: 'foco', name: 'Foco', nameEn: 'Focus', icon: '⚡', rarity: 'uncommon',
+    id: 'focus', name: 'Focus', icon: '⚡', rarity: 'uncommon',
     desc: '−18% ability cooldown.',
     apply: (p) => { p.upgrades.cooldown *= 1.22; },
   },
   {
-    id: 'sangue', name: 'Sanguessuga', nameEn: 'Leech', icon: '🩸', rarity: 'uncommon',
+    id: 'leech', name: 'Leech', icon: '🩸', rarity: 'uncommon',
     desc: 'Heal for 7% of the damage you deal.',
     apply: (p) => { p.upgrades.lifesteal += 0.07; },
   },
   {
-    id: 'estilingue', name: 'Estilingue', nameEn: 'Bandolier', icon: '💣', rarity: 'uncommon',
+    id: 'bandolier', name: 'Bandolier', icon: '💣', rarity: 'uncommon',
     desc: '+2 grenade capacity, refilled now.',
     apply: (p) => { p.maxGrenades += 2; p.grenades = p.maxGrenades; },
   },
   {
-    id: 'precisao', name: 'Precisão', nameEn: 'Precision', icon: '🎯', rarity: 'uncommon',
+    id: 'precision', name: 'Precision', icon: '🎯', rarity: 'uncommon',
     desc: '+30% headshot damage and 20% tighter hipfire.',
     apply: (p) => {
       p.upgrades.headshot = (p.upgrades.headshot || 1) * 1.3;
@@ -66,19 +66,19 @@ export const CARDS = [
     },
   },
   {
-    id: 'segunda', name: 'Segunda Chance', nameEn: 'Second Wind', icon: '✨', rarity: 'rare',
+    id: 'secondwind', name: 'Second Wind', icon: '✨', rarity: 'rare',
     desc: 'Once per wave, survive a killing blow at 1 HP and get a moment of speed.',
     apply: (p) => { p.upgrades.secondWind = (p.upgrades.secondWind || 0) + 1; p.secondWindLeft = p.upgrades.secondWind; },
   },
   {
-    id: 'rajada', name: 'Rajada', nameEn: 'Full Auto', icon: '🔥', rarity: 'rare',
+    id: 'fullauto', name: 'Full Auto', icon: '🔥', rarity: 'rare',
     desc: '+15% fire rate on every weapon.',
     apply: (p) => {
       for (const w of Object.values(p.weapons)) w.def = { ...w.def, rpm: w.def.rpm * 1.15 };
     },
   },
   {
-    id: 'reserva', name: 'Reserva', nameEn: 'Reserve Crew', icon: '👥', rarity: 'rare',
+    id: 'reserve', name: 'Reserve Crew', icon: '👥', rarity: 'rare',
     desc: 'One extra ally fights alongside you from now on.',
     apply: (p) => { p.game.waves.alliesWanted = Math.min(6, p.game.waves.alliesWanted + 1); },
   },

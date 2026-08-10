@@ -23,7 +23,7 @@ await page.goto('http://localhost:8080/', { waitUntil: 'load' });
 await page.waitForSelector('#scr-menu:not(.hidden)', { timeout: 120000 });
 
 // pick an operator + start
-const OP = process.env.OP || 'pipa';
+const OP = process.env.OP || 'kite';
 await page.evaluate((op) => {
   const g = window.__game;
   g.selected.operator = op;

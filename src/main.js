@@ -18,8 +18,8 @@ const $ = (id) => document.getElementById(id);
 
 const DIFFICULTY = [
   { name: 'Rookie',   health: 0.80, skill: 0.70, speed: 0.92, damage: 0.55, spread: 1.55 },
-  { name: 'Soldado',  health: 1.00, skill: 1.00, speed: 1.00, damage: 0.85, spread: 1.15 },
-  { name: 'Veterano', health: 1.22, skill: 1.14, speed: 1.05, damage: 1.10, spread: 0.92 },
+  { name: 'Soldier',  health: 1.00, skill: 1.00, speed: 1.00, damage: 0.85, spread: 1.15 },
+  { name: 'Veteran',  health: 1.22, skill: 1.14, speed: 1.05, damage: 1.10, spread: 0.92 },
   { name: 'Inferno',  health: 1.55, skill: 1.30, speed: 1.12, damage: 1.45, spread: 0.76 },
 ];
 
@@ -39,7 +39,7 @@ class Game {
     this.aimingAtHostile = false;
 
     this.settings = this._loadSettings();
-    this.selected = { faction: 'gang', operator: 'pipa', difficulty: 1 };
+    this.selected = { faction: 'gang', operator: 'kite', difficulty: 1 };
 
     this._initRenderer();
     this.input = new Input(this.canvas);
@@ -179,11 +179,11 @@ class Game {
       shadows: true, blood: true, dmgnum: true, res: 100,
       quality: 'auto', assist: true, lefty: false,
     };
-    try { return { ...d, ...JSON.parse(localStorage.getItem('mdc.settings') || '{}') }; }
+    try { return { ...d, ...JSON.parse(localStorage.getItem('hillcross.settings') || '{}') }; }
     catch { return d; }
   }
   _saveSettings() {
-    try { localStorage.setItem('mdc.settings', JSON.stringify(this.settings)); } catch { /* private mode */ }
+    try { localStorage.setItem('hillcross.settings', JSON.stringify(this.settings)); } catch { /* private mode */ }
   }
 
   _applySettingsToUI() {
@@ -393,7 +393,7 @@ class Game {
       b.className = 'op-card' + (c.id === this.selected.operator ? ' on' : '');
       b.innerHTML =
         `<span class="op-face">${c.name.replace(/^(Cap\.|Sgt\.|Cb\.|Ten\.|Sd\.)\s*/, '')[0]}</span>
-         <span class="op-meta"><b>${c.name}</b><span>${c.role} · ${c.roleEn}</span></span>
+         <span class="op-meta"><b>${c.name}</b><span>${c.role}</span></span>
          <span class="op-diff">${[1, 2, 3].map((i) => `<i class="${i <= c.diff ? 'on' : ''}"></i>`).join('')}</span>`;
       b.addEventListener('click', () => {
         this.selected.operator = c.id;
@@ -417,9 +417,9 @@ class Game {
       <div class="od-top">
         <span class="od-name">${c.name}</span>
         <span class="od-tag">${c.tag}</span>
-        <span class="od-role">${c.role.toUpperCase()} · ${c.roleEn.toUpperCase()}</span>
+        <span class="od-role">${c.role.toUpperCase()}</span>
       </div>
-      <p class="od-quote">${c.quote}<small>${c.quoteEn}</small></p>
+      <p class="od-quote">${c.quote}</p>
       <p class="od-bio">${c.bio}</p>
       <div class="od-stats">
         ${bar('HEALTH', s.health, 170)}
@@ -434,12 +434,12 @@ class Game {
       </div>
       <div class="od-skill">
         <span class="ic">${c.passive.icon}</span>
-        <span class="tx"><b>${c.passive.name}<em>${c.passive.nameEn}</em></b><p>${c.passive.desc}</p></span>
+        <span class="tx"><b>${c.passive.name}</b><p>${c.passive.desc}</p></span>
         <span class="kbd">PASSIVE</span>
       </div>
       <div class="od-skill">
         <span class="ic">${c.ability.icon}</span>
-        <span class="tx"><b>${c.ability.name}<em>${c.ability.nameEn}</em></b><p>${c.ability.desc}</p></span>
+        <span class="tx"><b>${c.ability.name}</b><p>${c.ability.desc}</p></span>
         <span class="kbd">E · ${c.ability.cooldown}s</span>
       </div>`;
   }
@@ -741,7 +741,6 @@ class Game {
         `<span class="cr">${c.rarity.toUpperCase()}</span>
          <div class="ci">${c.icon}</div>
          <div class="cn">${c.name}</div>
-         <div class="ce">${c.nameEn}</div>
          <div class="cd">${c.desc}</div>`;
       b.addEventListener('click', () => {
         c.apply(this.player);

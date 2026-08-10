@@ -12,7 +12,7 @@ const shot = async (name, faction) => {
   await p.evaluate(async (fac) => {
     const g = window.__game;
     g.selected.faction = fac;
-    g.selected.operator = fac === 'gang' ? 'bagre' : 'muralha';
+    g.selected.operator = fac === 'gang' ? 'boulder' : 'stone';
     g.startRun();
     g._tick(1/60);
     g.state = 'paused';

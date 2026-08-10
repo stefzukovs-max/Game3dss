@@ -56,7 +56,7 @@ export class Player {
     // ── combat ──
     this.weapons = {};
     for (const id of char.loadout) this.weapons[id] = new WeaponState(id);
-    if (char.passive.name === 'Logística') {
+    if (char.passive.id === 'logistics') {
       for (const w of Object.values(this.weapons)) {
         w.def = { ...w.def, maxReserve: Math.round(w.def.maxReserve * 1.6) };
         w.reserve = Math.round(w.reserve * 1.6);
@@ -251,7 +251,7 @@ export class Player {
     }
 
     // jump
-    const jumpMul = this.char.passive.name === 'Telhado' ? 1.4 : 1;
+    const jumpMul = this.char.passive.id === 'rooftops' ? 1.4 : 1;
     if (input.pressed('Space') && this.onGround) {
       this.vel.y = JUMP_V * Math.sqrt(jumpMul);
       this.onGround = false;
@@ -269,7 +269,7 @@ export class Player {
     } else {
       if (wasAir && this.fallStart != null) {
         const drop = this.fallStart - this.pos.y;
-        const free = this.char.passive.name === 'Telhado' ? 9.5 : 6.5;
+        const free = this.char.passive.id === 'rooftops' ? 9.5 : 6.5;
         if (drop > free) this.damage((drop - free) * 8.5, null, 'the fall');
         if (drop > 1.5) audio.footstep(this.pos, true);
       }
@@ -283,7 +283,7 @@ export class Player {
       this.footTimer -= dt * hs;
       if (this.footTimer <= 0) {
         this.footTimer = this.sprinting ? 3.2 : 4.2;
-        if (this.char.passive.name !== 'Telhado') audio.footstep(this.pos, this.sprinting);
+        if (this.char.passive.id !== 'rooftops') audio.footstep(this.pos, this.sprinting);
       }
     }
 
@@ -300,7 +300,7 @@ export class Player {
     const focusing = this.abilityActive > 0 && this.char.ability.id === 'focus';
     this.aiming = (input.aiming || focusing) && !this.sprinting;
     this.aimBlend = damp(this.aimBlend, this.aiming ? 1 : 0,
-      this.char.passive.name === 'Porta Abaixo' ? 20 : 14, dt);
+      this.char.passive.id === 'doorDown' ? 20 : 14, dt);
 
     w.decayBloom(dt * this.control);
 
@@ -355,7 +355,7 @@ export class Player {
     if (!w.canReload) return;
     w.reloading = true;
     w.reloadStart = now();
-    const mul = this.char.passive.name === 'Comando' ? 0.8 : 1;
+    const mul = this.char.passive.id === 'command' ? 0.8 : 1;
     w.reloadEnd = w.reloadStart + w.def.reload * mul / this.upgrades.reload;
     audio.reload(this.pos);
   }
@@ -396,8 +396,8 @@ export class Player {
     const hs = Math.hypot(this.vel.x, this.vel.z);
     let spread = w.spread(this.aiming, hs, this.crouching);
 
-    // Rainha: crouched ADS is pinpoint
-    if (this.char.passive.name === 'Respiração' && this.aiming && this.crouching) spread *= 0.05;
+    // Queen: crouched ADS is pinpoint
+    if (this.char.passive.id === 'breathControl' && this.aiming && this.crouching) spread *= 0.05;
     if (this.abilityActive > 0 && this.char.ability.id === 'focus') spread = 0;
 
     const muzzle = this.muzzleWorld(_mz);
@@ -415,14 +415,13 @@ export class Player {
 
     // damage bonuses
     let mul = this.upgrades.damage * this.buffs.damage;
-    if (this.char.passive.name === 'Frieza' && this.aiming && hs < 0.4) mul *= 1.45;
-    if (this.char.passive.name === 'Respiração') mul *= 1.0;
+    if (this.char.passive.id === 'coldBlood' && this.aiming && hs < 0.4) mul *= 1.45;
     if (this.abilityActive > 0 && this.char.ability.id === 'focus') mul *= 1.35;
 
     for (const h of hits) {
       let dmg = h.damage * mul;
-      if (this.char.passive.name === 'Porta Abaixo' && h.dist < 8) dmg *= 1.35;
-      if (this.char.passive.name === 'Respiração' && h.zone === 'head') dmg *= 1.3;
+      if (this.char.passive.id === 'doorDown' && h.dist < 8) dmg *= 1.35;
+      if (this.char.passive.id === 'breathControl' && h.zone === 'head') dmg *= 1.3;
       game.applyDamage(h.target, dmg, this, h.zone, h.point);
     }
     if (hits.length) game.onPlayerHit(hits);
@@ -434,8 +433,8 @@ export class Player {
     if (!this.alive) return 0;
     let dmg = amount;
 
-    if (this.char.passive.name === 'Couro Grosso') dmg *= 0.75;
-    if (this.char.passive.name === 'Blindado' && from) {
+    if (this.char.passive.id === 'thickHide') dmg *= 0.75;
+    if (this.char.passive.id === 'hardened' && from) {
       // frontal arc only
       _d.subVectors(from.pos ?? from, this.pos).normalize();
       const fwd = _f.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
@@ -475,7 +474,7 @@ export class Player {
 
   _vitals(dt, t) {
     // out-of-combat regeneration
-    const doc = this.char.passive.name === 'Mão Boa';
+    const doc = this.char.passive.id === 'steadyHands';
     const delay = doc ? 3 : 6.5;
     const rate = doc ? 22 : 8;
     if (t - this.lastDamaged > delay && this.health > 0) {

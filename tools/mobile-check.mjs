@@ -91,15 +91,30 @@ const before = await page.evaluate(() => ({
 // left thumb down at (120, 300), push forward; right thumb drags to look
 const seq = [{ type: 'touchstart', touches: [{ id: 1, x: 120, y: 300 }] }];
 for (let i = 1; i <= 18; i++) seq.push({ type: 'touchmove', touches: [{ id: 1, x: 120, y: 300 - i * 4 }] });
+// sample peak speed rather than net displacement: the player can spawn
+// facing a wall, in which case they legitimately go nowhere while the stick
+// is working perfectly well
+await page.evaluate(() => {
+  window.__peak = 0;
+  window.__peakTimer = setInterval(() => {
+    const v = window.__game.player.vel;
+    window.__peak = Math.max(window.__peak, Math.hypot(v.x, v.z));
+  }, 16);
+});
 await touchDrive(seq);
 await page.waitForTimeout(900);
-const moved = await page.evaluate(() => ({
-  x: window.__game.player.pos.x, z: window.__game.player.pos.z,
-  mx: window.__game.input.touch.mx, my: window.__game.input.touch.my,
-  sprint: window.__game.input.keys.has('ShiftLeft'),
-}));
-ok('stick drives movement', Math.hypot(moved.x - before.x, moved.z - before.z) > 0.5,
-  `moved ${Math.hypot(moved.x - before.x, moved.z - before.z).toFixed(2)} m · axis ${moved.my.toFixed(2)} · sprint ${moved.sprint}`);
+const moved = await page.evaluate(() => {
+  clearInterval(window.__peakTimer);
+  return {
+    x: window.__game.player.pos.x, z: window.__game.player.pos.z,
+    mx: window.__game.input.touch.mx, my: window.__game.input.touch.my,
+    sprint: window.__game.input.keys.has('ShiftLeft'),
+    peak: window.__peak,
+  };
+});
+ok('stick drives movement', moved.my > 0.9 && moved.peak > 2,
+  `peak ${moved.peak.toFixed(1)} m/s · axis ${moved.my.toFixed(2)} · sprint ${moved.sprint}` +
+  ` · net ${Math.hypot(moved.x - before.x, moved.z - before.z).toFixed(2)} m`);
 
 await touchDrive([{ type: 'touchend', touches: [{ id: 1, x: 120, y: 228 }] }]);
 

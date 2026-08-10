@@ -62,7 +62,7 @@ export class WaveDirector {
 
     if (this.isBossWave) {
       const boss = { ...pool[pool.length - 1] };
-      boss.name = enemyFaction === 'police' ? 'Comandante do Batalhão' : 'Chefe do Morro';
+      boss.name = enemyFaction === 'police' ? 'Battalion Commander' : 'Hill Boss';
       boss.health *= 3.2;
       boss.armor *= 2.2;
       boss.skill = Math.min(0.95, boss.skill + 0.12);
