@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Morro do Cruzeiro — Favela Shooter</title>
+<meta name="description" content="A browser-based third-person shooter set on a Brazilian hillside. Comando do Morro vs Batalhão Tático." />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='27' font-size='27'>🎯</text></svg>" />
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<!-- ═══════════════════════ IN-GAME HUD ═══════════════════════ -->
+<div id="hud" class="hidden">
+
+  <div id="flash-overlay"></div>
+  <div id="burn-overlay"></div>
+  <div id="lowhp-vignette"></div>
+  <div id="dmg-ring"></div>
+
+  <div id="crosshair">
+    <span class="ch ch-t"></span><span class="ch ch-b"></span>
+    <span class="ch ch-l"></span><span class="ch ch-r"></span>
+    <span class="ch-dot"></span>
+    <svg id="hitmarker" viewBox="0 0 40 40"><path d="M8 8 L15 15 M32 8 L25 15 M8 32 L15 25 M32 32 L25 25"/></svg>
+  </div>
+
+  <!-- top-left: objective -->
+  <div id="objective">
+    <div id="wave-label">PREPARE</div>
+    <div id="wave-sub">Get into position</div>
+    <div id="enemies-left">HOSTILES <b id="enemies-num">0</b></div>
+    <div id="intermission" class="hidden">NEXT PUSH <b id="inter-time">20</b>s</div>
+  </div>
+
+  <!-- top-centre: boss -->
+  <div id="boss-bar" class="hidden">
+    <div id="boss-name">Comandante</div>
+    <div class="bbar"><i id="boss-fill"></i></div>
+  </div>
+
+  <!-- top-right: radar + score -->
+  <div id="topright">
+    <div id="scorebox">
+      <div id="score">0</div>
+      <div class="lbl">SCORE</div>
+      <div id="streak"></div>
+      <div id="combo"></div>
+    </div>
+    <div id="map-wrap">
+      <canvas id="minimap" width="184" height="184"></canvas>
+      <div id="zone-name">O Morro</div>
+    </div>
+  </div>
+
+  <div id="killfeed"></div>
+  <div id="popups"></div>
+  <div id="banner"></div>
+
+  <!-- bottom-left: vitals -->
+  <div id="vitals">
+    <div class="bar-row" id="hp-row">
+      <span class="bi">❤</span>
+      <div class="bar hp"><i id="hp-ghost"></i><i id="hp-fill"></i></div>
+      <span id="hp-num">100</span>
+    </div>
+    <div class="bar-row" id="ar-row">
+      <span class="bi">🛡</span>
+      <div class="bar ar"><i id="ar-fill"></i></div>
+      <span id="ar-num">0</span>
+    </div>
+    <div class="bar-row thin" id="st-row">
+      <span class="bi">⚡</span>
+      <div class="bar st"><i id="st-fill"></i></div>
+      <span class="spacer"></span>
+    </div>
+  </div>
+
+  <!-- bottom-centre: abilities -->
+  <div id="abilities">
+    <div id="ability" class="abil">
+      <div id="ab-sweep"></div>
+      <div class="ab-glyph" id="ab-icon">🪁</div>
+      <div class="key">E</div>
+      <div class="ab-label" id="ab-name">Ready</div>
+    </div>
+    <div id="grenades" class="abil small">
+      <div class="ab-glyph">💣</div>
+      <div class="key">G</div>
+      <div class="ab-label"><b id="nade-count">2</b></div>
+    </div>
+  </div>
+
+  <!-- bottom-right: weapon -->
+  <div id="weaponbox">
+    <div id="wpn-name">.38 SPECIAL</div>
+    <div id="ammo"><span id="ammo-mag">6</span><span class="sep">/</span><span id="ammo-res">42</span></div>
+    <div id="reload-hint" class="hidden">RELOAD [R]</div>
+    <div id="reload-bar"><i></i></div>
+    <div id="wpn-slots"></div>
+  </div>
+
+  <div id="interact-prompt" class="hidden"><b>F</b> <span></span></div>
+  <div id="fps"></div>
+</div>
+
+<!-- ═══════════════════════ TOUCH ═══════════════════════ -->
+<div id="touch" class="hidden">
+  <div id="stick-move" class="stick"><i></i></div>
+  <div id="touch-right">
+    <button id="btn-ability" class="tbtn small">E</button>
+    <button id="btn-nade" class="tbtn small">G</button>
+    <button id="btn-aim" class="tbtn">AIM</button>
+    <button id="btn-jump" class="tbtn">JUMP</button>
+    <button id="btn-reload" class="tbtn">RLD</button>
+    <button id="btn-swap" class="tbtn">SWAP</button>
+    <button id="btn-fire" class="tbtn fire">FIRE</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════ OVERLAY / MENUS ═══════════════════════ -->
+<div id="overlay">
+
+  <!-- ── loading ── -->
+  <section id="scr-load" class="screen">
+    <h1 class="logo">MORRO<span>DO</span>CRUZEIRO</h1>
+    <div class="loadbar"><i id="loadfill"></i></div>
+    <p id="loadmsg">Building the hillside…</p>
+  </section>
+
+  <!-- ── main menu / operator select ── -->
+  <section id="scr-menu" class="screen wide hidden">
+    <div class="menu-head">
+      <h1 class="logo small">MORRO<span>DO</span>CRUZEIRO</h1>
+      <div class="faction-tabs">
+        <button class="ftab on" data-f="gang">
+          <b>COMANDO DO MORRO</b><span>Hold the hill</span>
+        </button>
+        <button class="ftab" data-f="police">
+          <b>BATALHÃO TÁTICO</b><span>Take the hill</span>
+        </button>
+      </div>
+    </div>
+
+    <p class="faction-blurb" id="faction-blurb"></p>
+
+    <div class="op-layout">
+      <div class="op-list" id="op-list"></div>
+      <div class="op-detail" id="op-detail"></div>
+    </div>
+
+    <div class="menu-foot">
+      <div class="opt-row">
+        <label>DIFFICULTY</label>
+        <div class="seg" id="seg-diff">
+          <button data-v="0">Rookie</button>
+          <button data-v="1" class="on">Soldado</button>
+          <button data-v="2">Veterano</button>
+          <button data-v="3">Inferno</button>
+        </div>
+      </div>
+      <button id="btn-play" class="big">ENTER THE HILL</button>
+      <button id="btn-howto" class="link">Controls &amp; settings</button>
+    </div>
+    <p class="disclaimer">Fiction. Every character, crew, unit and location in this game is invented.
+      Stylised, non-realistic depiction — no real people, organisations or places.</p>
+  </section>
+
+  <!-- ── controls / settings ── -->
+  <section id="scr-opts" class="screen hidden">
+    <h2>CONTROLS</h2>
+    <div class="keys">
+      <div><b>W A S D</b> move</div><div><b>Mouse</b> look</div>
+      <div><b>LMB</b> fire</div><div><b>RMB</b> aim down sights</div>
+      <div><b>Shift</b> sprint</div><div><b>Space</b> jump</div>
+      <div><b>Ctrl / C</b> crouch</div><div><b>R</b> reload</div>
+      <div><b>E</b> operator ability</div><div><b>G</b> throw grenade</div>
+      <div><b>1–4 / wheel</b> weapons</div><div><b>Q</b> swap shoulder</div>
+      <div><b>M</b> rotate radar</div><div><b>Esc</b> pause</div>
+    </div>
+    <h2>SETTINGS</h2>
+    <div class="settings">
+      <label>Mouse sensitivity <span id="lbl-sens">1.00</span>
+        <input id="set-sens" type="range" min="0.2" max="3" step="0.05" value="1" /></label>
+      <label>Field of view <span id="lbl-fov">78</span>
+        <input id="set-fov" type="range" min="60" max="105" step="1" value="78" /></label>
+      <label>Master volume <span id="lbl-vol">70</span>
+        <input id="set-vol" type="range" min="0" max="100" step="1" value="70" /></label>
+      <label>Render scale <span id="lbl-res">100%</span>
+        <input id="set-res" type="range" min="50" max="100" step="5" value="100" /></label>
+      <div class="chk-grid">
+        <label class="chk"><input id="set-invert" type="checkbox" /> Invert vertical look</label>
+        <label class="chk"><input id="set-shadows" type="checkbox" checked /> Shadows</label>
+        <label class="chk"><input id="set-blood" type="checkbox" checked /> Impact effects</label>
+        <label class="chk"><input id="set-dmgnum" type="checkbox" checked /> Damage numbers</label>
+      </div>
+    </div>
+    <button id="btn-opts-back" class="big">BACK</button>
+  </section>
+
+  <!-- ── pause ── -->
+  <section id="scr-pause" class="screen hidden">
+    <h2>PAUSED</h2>
+    <div id="pause-stats" class="stats"></div>
+    <button id="btn-resume" class="big">RESUME</button>
+    <button id="btn-pause-opts" class="link">Controls &amp; settings</button>
+    <button id="btn-quit" class="link danger">Abandon the hill</button>
+  </section>
+
+  <!-- ── upgrade draft ── -->
+  <section id="scr-draft" class="screen wide hidden">
+    <h2 id="draft-title">RESUPPLY</h2>
+    <p class="sub" id="draft-sub">Wave cleared — take one</p>
+    <div id="draft-cards" class="cards"></div>
+    <button id="btn-draft-skip" class="link">Take nothing</button>
+  </section>
+
+  <!-- ── death ── -->
+  <section id="scr-dead" class="screen hidden">
+    <h2 class="dead">YOU WENT DOWN</h2>
+    <p id="dead-by"></p>
+    <div id="dead-stats" class="stats"></div>
+    <button id="btn-respawn" class="big">GET BACK UP <small id="resp-count"></small></button>
+    <button id="btn-dead-quit" class="link">Back to menu</button>
+  </section>
+
+  <!-- ── run over ── -->
+  <section id="scr-over" class="screen hidden">
+    <h2 id="over-title">THE HILL FELL</h2>
+    <p class="sub" id="over-sub"></p>
+    <div id="over-stats" class="stats"></div>
+    <div id="over-build" class="build-list"></div>
+    <button id="btn-again" class="big">RUN IT BACK</button>
+    <button id="btn-over-menu" class="link">Back to menu</button>
+  </section>
+
+  <!-- ── click to lock ── -->
+  <section id="scr-lock" class="screen bare hidden">
+    <div class="lockcard">
+      <h3>CLICK TO PLAY</h3>
+      <p>Your mouse will be captured. Press <b>Esc</b> to pause.</p>
+    </div>
+  </section>
+</div>
+
+<noscript><div class="nojs">This game needs JavaScript and WebGL.</div></noscript>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

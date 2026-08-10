@@ -1,0 +1,19 @@
+{
+  "name": "morro-do-cruzeiro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Morro do Cruzeiro - a browser-based third-person shooter set on a Brazilian favela hillside",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check:map": "node tools/map-check.mjs",
+    "check:sim": "node tools/sim.mjs 5",
+    "check:shooting": "node tools/test-shooting.mjs",
+    "shots": "node tools/shots.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0",
+    "three": "0.185.1"
+  }
+}

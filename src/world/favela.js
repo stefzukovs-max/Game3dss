@@ -1,0 +1,1161 @@
+import * as THREE from 'three';
+import { makeRNG, texturedBox, GeometryBatcher } from '../core/utils.js';
+import { CollisionWorld } from '../core/collision.js';
+import { buildTextureLibrary, FAVELA_COLORS } from './textures.js';
+
+/**
+ * ══════════════════════════════════════════════════════════════════
+ *  MAP — "MORRO DO CRUZEIRO"
+ * ══════════════════════════════════════════════════════════════════
+ *
+ *  A hillside in five terraces. Police push UP from the plaza (+Z, low);
+ *  the crew holds DOWN from the cross at the summit (-Z, high).
+ *
+ *  ┌──────────────────────────────────────────────────────────┐  -78
+ *  │  T4  O CRUZEIRO      [cross · mirante · LAJE GRANDE]     │   gang spawn
+ *  ├──────────────────────────────────────────────────────────┤  -42
+ *  │  T3  AS LAJES        [CAIXA D'ÁGUA · O BAILE · rooftops] │
+ *  ├──────────────────────────────────────────────────────────┤  -16
+ *  │  T2  O ESCADÃO       [IGREJINHA + bell tower · alleys]   │
+ *  ├──────────────────────────────────────────────────────────┤   +6
+ *  │  T1  O MERCADO       [MERCADINHO · O CAMPO (pitch)]      │
+ *  ├──────────────────────────────────────────────────────────┤  +30
+ *  │  T0  A PRAÇA         [CORETO · viaturas · kombi stop]    │  police spawn
+ *  └──────────────────────────────────────────────────────────┘  +66
+ *
+ *  THREE LANES, so neither side can be held from one angle:
+ *
+ *    WEST  x < -22   "OS BECOS"    tight alleys, blind corners, short stairs.
+ *                                  Fastest, most dangerous, no sightlines.
+ *    MID   -22..22   "O ESCADÃO"   the grand staircase spine. Most direct,
+ *                                  most exposed; the chapel tower watches it.
+ *    EAST  x > 22    "A LADEIRA"   the vehicle road — long, gentle ramps and
+ *                                  the open football cage. Long sightlines,
+ *                                  rewards rifles.
+ *
+ *    + ROOFTOPS      a fourth, vertical lane from T2 upward, reached by the
+ *                    external stairs. Flanks every choke but leaves you skylined.
+ *
+ *  Each terrace transition has one choke per lane (never fewer than three
+ *  ways up), and every street band runs the full width so you can rotate
+ *  laterally between lanes without going back down.
+ */
+
+export const TERRACES = [
+  { y: 0.0,  z0: 30,  z1: 66,  id: 'praca',    name: 'A Praça' },
+  { y: 3.5,  z0: 6,   z1: 30,  id: 'mercado',  name: 'O Mercado' },
+  { y: 7.0,  z0: -16, z1: 6,   id: 'escadao',  name: 'O Escadão' },
+  { y: 10.5, z0: -42, z1: -16, id: 'lajes',    name: 'As Lajes' },
+  { y: 14.5, z0: -78, z1: -42, id: 'cruzeiro', name: 'O Cruzeiro' },
+];
+
+export const WORLD = { x0: -70, x1: 70, z0: -78, z1: 66 };
+
+export const LANES = {
+  west: { id: 'west', name: 'Os Becos', x: -44, x0: -70, x1: -22 },
+  mid:  { id: 'mid',  name: 'O Escadão', x: 0,  x0: -22, x1: 22 },
+  east: { id: 'east', name: 'A Ladeira', x: 44, x0: 22,  x1: 70 },
+};
+
+const FLOOR_H = 2.75;
+const STREET_DEPTH = 8.0;
+
+/**
+ * Climbs between terraces. `kind`:
+ *   'stair' steep steps · 'grand' the wide painted staircase · 'ramp' vehicle slope
+ * Hand-placed so the three lanes never line up into one straight sprint.
+ */
+export const CLIMBS = [
+  { to: 1, lane: 'west', x: -46, kind: 'stair' },
+  { to: 1, lane: 'mid',  x: 0,   kind: 'grand' },
+  { to: 1, lane: 'east', x: 42,  kind: 'ramp'  },
+
+  { to: 2, lane: 'west', x: -38, kind: 'stair' },
+  { to: 2, lane: 'mid',  x: 0,   kind: 'grand' },
+  { to: 2, lane: 'east', x: 62,  kind: 'ramp'  },   // swings wide around O Campo
+
+  { to: 3, lane: 'west', x: -50, kind: 'stair' },
+  { to: 3, lane: 'west', x: -28, kind: 'stair' },
+  { to: 3, lane: 'mid',  x: 2,   kind: 'grand' },
+  { to: 3, lane: 'east', x: 40,  kind: 'ramp'  },
+
+  { to: 4, lane: 'west', x: -42, kind: 'stair' },
+  { to: 4, lane: 'mid',  x: -6,  kind: 'grand' },
+  { to: 4, lane: 'mid',  x: 14,  kind: 'stair' },
+  { to: 4, lane: 'east', x: 46,  kind: 'ramp'  },
+];
+
+/** Named areas for HUD callouts and minimap labels. */
+export const ZONES = [
+  { id: 'praca',      name: 'A Praça',        x: 0,   z: 48,  r: 30 },
+  { id: 'coreto',     name: 'O Coreto',       x: -6,  z: 46,  r: 11 },
+  { id: 'kombi',      name: 'Ponto de Kombi', x: 40,  z: 54,  r: 12 },
+  { id: 'mercadinho', name: 'O Mercadinho',   x: -30, z: 22,  r: 12 },
+  { id: 'campo',      name: 'O Campo',        x: 42,  z: 14,  r: 15 },
+  { id: 'mercado',    name: 'O Mercado',      x: 0,   z: 18,  r: 26 },
+  { id: 'igrejinha',  name: 'A Igrejinha',    x: -20, z: -4,  r: 13 },
+  { id: 'escadao',    name: 'O Escadão',      x: 0,   z: -4,  r: 16 },
+  { id: 'becos',      name: 'Os Becos',       x: -46, z: -6,  r: 22 },
+  { id: 'ladeira',    name: 'A Ladeira',      x: 48,  z: -6,  r: 20 },
+  { id: 'caixa',      name: "Caixa d'Água",   x: -2,  z: -30, r: 14 },
+  { id: 'baile',      name: 'O Baile',        x: 40,  z: -30, r: 15 },
+  { id: 'lajes',      name: 'As Lajes',       x: -40, z: -30, r: 20 },
+  { id: 'cruzeiro',   name: 'O Cruzeiro',     x: 0,   z: -56, r: 18 },
+  { id: 'laje',       name: 'A Laje Grande',  x: -34, z: -58, r: 18 },
+  { id: 'mirante',    name: 'O Mirante',      x: 38,  z: -58, r: 18 },
+];
+
+export function zoneAt(x, z) {
+  let best = null, bd = Infinity;
+  for (const zn of ZONES) {
+    const d = Math.hypot(x - zn.x, z - zn.z);
+    if (d < zn.r && d < bd) { bd = d; best = zn; }
+  }
+  return best?.name ?? 'O Morro';
+}
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Builder — batches geometry per material (whole level ≈ 30 draws)
+ * ══════════════════════════════════════════════════════════════════ */
+class WorldBuilder {
+  constructor(collision) {
+    this.collision = collision;
+    this.batches = new Map();
+    this.reserved = [];   // rects landmarks own; procedural houses avoid them
+  }
+
+  material(key, make) {
+    if (!this.batches.has(key)) {
+      this.batches.set(key, { batcher: new GeometryBatcher(), material: make() });
+    }
+  }
+
+  reserve(x, z, w, d, why = '') {
+    this.reserved.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, why });
+  }
+
+  isFree(x, z, w, d) {
+    const a = { x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 };
+    for (const r of this.reserved) {
+      if (a.x0 < r.x1 && a.x1 > r.x0 && a.z0 < r.z1 && a.z1 > r.z0) return false;
+    }
+    return true;
+  }
+
+  box(matKey, cx, cy, cz, w, h, d, opts = {}) {
+    const { solid = true, texScale = 0.5, rotY = 0, tag = 'world' } = opts;
+    const b = this.batches.get(matKey);
+    if (!b) throw new Error('unknown material ' + matKey);
+    const geo = texturedBox(w, h, d, texScale);
+    _m.compose(_v.set(cx, cy, cz), _q.setFromAxisAngle(_up, rotY), _s.set(1, 1, 1));
+    b.batcher.add(geo, _m);
+    geo.dispose();
+
+    if (solid) {
+      if (rotY === 0) this.collision.addBox(cx, cy, cz, w, h, d, tag);
+      else {
+        const c = Math.abs(Math.cos(rotY)), s2 = Math.abs(Math.sin(rotY));
+        this.collision.addBox(cx, cy, cz, w * c + d * s2, h, w * s2 + d * c, tag);
+      }
+    }
+  }
+
+  quad(matKey, x, y, z, w, h, rotY, tilt = 0) {
+    const b = this.batches.get(matKey);
+    const geo = new THREE.PlaneGeometry(w, h);
+    _e.set(tilt, rotY, 0, 'YXZ');
+    _m.compose(_v.set(x, y, z), _q.setFromEuler(_e), _s.set(1, 1, 1));
+    b.batcher.add(geo, _m);
+    geo.dispose();
+  }
+
+  /** Ground-hugging painted marking. */
+  floorQuad(matKey, x, y, z, w, d, rotY = 0) {
+    const b = this.batches.get(matKey);
+    const geo = new THREE.PlaneGeometry(w, d);
+    _e.set(-Math.PI / 2, rotY, 0, 'YXZ');
+    _m.compose(_v.set(x, y, z), _q.setFromEuler(_e), _s.set(1, 1, 1));
+    b.batcher.add(geo, _m);
+    geo.dispose();
+  }
+
+  cylinder(matKey, x, y, z, rTop, rBot, h, seg = 10, opts = {}) {
+    const b = this.batches.get(matKey);
+    const geo = new THREE.CylinderGeometry(rTop, rBot, h, seg);
+    _m.compose(_v.set(x, y, z), _q.setFromAxisAngle(_up, opts.rotY || 0), _s.set(1, 1, 1));
+    b.batcher.add(geo, _m);
+    geo.dispose();
+    if (opts.solid) this.collision.addBox(x, y, z, rBot * 2, h, rBot * 2, opts.tag || 'world');
+  }
+
+  finish(scene) {
+    const meshes = [];
+    for (const [key, b] of this.batches) {
+      if (b.batcher.empty) continue;
+      const mesh = new THREE.Mesh(b.batcher.build(), b.material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.name = 'level:' + key;
+      mesh.matrixAutoUpdate = false;
+      scene.add(mesh);
+      meshes.push(mesh);
+    }
+    return meshes;
+  }
+}
+
+const _m = new THREE.Matrix4();
+const _v = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+const _s = new THREE.Vector3();
+const _e = new THREE.Euler();
+const _up = new THREE.Vector3(0, 1, 0);
+
+/* ══════════════════════════════════════════════════════════════════ */
+
+export function buildFavela(scene, seed = 20240607, onProgress = () => {}) {
+  const rng = makeRNG(seed);
+  const tex = buildTextureLibrary();
+  const collision = new CollisionWorld();
+  const B = new WorldBuilder(collision);
+
+  const lam = (map, extra = {}) => () => new THREE.MeshLambertMaterial({ map, ...extra });
+  const col = (color, extra = {}) => () => new THREE.MeshLambertMaterial({ color, ...extra });
+
+  B.material('brick', lam(tex.brick));
+  B.material('concrete', lam(tex.concrete));
+  B.material('concreteDark', lam(tex.concreteDark));
+  B.material('corrugated', lam(tex.corrugated));
+  B.material('asphalt', lam(tex.asphalt));
+  B.material('dirt', lam(tex.dirt));
+  B.material('window', lam(tex.window));
+  FAVELA_COLORS.forEach((_, i) => B.material('plaster' + i, lam(tex.plaster[i])));
+  tex.graffiti.forEach((t, i) => B.material('graf' + i, lam(t, { side: THREE.DoubleSide })));
+  B.material('wood', col(0x8a6141));
+  B.material('woodDark', col(0x5c3f28));
+  B.material('metal', col(0x8d9199));
+  B.material('metalDark', col(0x3a3f47));
+  B.material('rust', col(0x8b4a2b));
+  B.material('tankBlue', col(0x2f6fb0));
+  B.material('tankBlack', col(0x24262b));
+  B.material('vegetation', col(0x2f5d34));
+  B.material('rock', col(0x3c4a38));
+  B.material('copBlue', col(0x1b2a4a));
+  B.material('copWhite', col(0xd9dde3));
+  B.material('lightRed', col(0xd62828, { emissive: 0x4a0000 }));
+  B.material('lightBlue', col(0x2b6cd6, { emissive: 0x001a4a }));
+  B.material('glass', col(0x1d2733));
+  B.material('tire', col(0x1c1c1e));
+  B.material('paint', col(0xf0ede2, { side: THREE.DoubleSide }));
+  B.material('paintYellow', col(0xf2c33d, { side: THREE.DoubleSide }));
+  B.material('pitch', col(0x2f6b45));
+  B.material('pitchLine', col(0xe8e8e0, { side: THREE.DoubleSide }));
+  B.material('fence', col(0x9aa0a6, { transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+  B.material('chapel', col(0xf2ece0));
+  B.material('chapelTrim', col(0x5b7fb0));
+  B.material('cross', col(0xe8e4d8));
+  B.material('speaker', col(0x1a1a1c));
+  B.material('bulb', col(0xffe9a8, { emissive: 0xffcc55 }));
+  B.material('kombi', col(0xe8e2d0));
+  B.material('kombiTrim', col(0x3f8f7f));
+  ['cloth0', 'cloth1', 'cloth2', 'cloth3'].forEach((k, i) =>
+    B.material(k, col([0xe94f37, 0x3ac4c4, 0xf5d547, 0xf1f1e6][i], { side: THREE.DoubleSide })));
+  ['awning0', 'awning1', 'awning2'].forEach((k, i) =>
+    B.material(k, col([0xd94f4f, 0x3f8f5f, 0x3f6f9f][i], { side: THREE.DoubleSide })));
+
+  const meta = { spawns: { gang: [], police: [] }, cover: [], pickups: [], houses: [], landmarks: [] };
+
+  onProgress(0.08, 'Carving the hillside…');
+  buildTerrain(B, rng);
+
+  onProgress(0.2, 'Laying out the lanes…');
+  reserveLanes(B);
+
+  onProgress(0.28, 'Raising the landmarks…');
+  buildPraca(B, rng, meta);
+  buildMercado(B, rng, meta);
+  buildIgrejinha(B, rng, meta);
+  buildCaixaDagua(B, rng, meta);
+  buildBaile(B, rng, meta);
+  buildCruzeiro(B, rng, meta);
+
+  onProgress(0.5, 'Stacking the houses…');
+  for (let i = 1; i < TERRACES.length; i++) infillTerrace(B, rng, i, meta);
+
+  onProgress(0.68, 'Pouring the stairs…');
+  buildClimbs(B, rng);
+
+  onProgress(0.8, 'Hanging the laundry…');
+  buildDressing(B, rng, meta);
+  buildBackdrop(B, rng, scene);
+
+  onProgress(0.92, 'Baking geometry…');
+  const meshes = B.finish(scene);
+  collision.build();
+
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(420, 24, 16),
+    new THREE.MeshBasicMaterial({ map: tex.sky, side: THREE.BackSide, fog: false, depthWrite: false }),
+  );
+  sky.name = 'sky';
+  scene.add(sky);
+
+  finalizeSpawns(meta, collision);
+  return { collision, meshes, tex, meta, sky, seed };
+}
+
+/* ── terraces + perimeter ───────────────────────────────────────── */
+function buildTerrain(B, rng) {
+  const { x0, x1 } = WORLD;
+  const w = x1 - x0;
+  const cx = (x0 + x1) / 2;
+
+  for (const t of TERRACES) {
+    const d = t.z1 - t.z0;
+    const cz = (t.z0 + t.z1) / 2;
+    // Only deep enough to reach past the terrace below - any more and the
+    // exposed side becomes a huge blank retaining wall filling the view.
+    const h = 6.5;
+    const mat = t.id === 'praca' ? 'asphalt' : t.id === 'mercado' ? 'concrete' : 'dirt';
+    B.box(mat, cx, t.y - h / 2, cz, w, h, d, { texScale: 0.2, tag: 'ground' });
+    // faced in block so the drop between terraces reads as built, not carved
+    B.box('brick', cx, t.y - 1.9, t.z1 - 0.06, w, 3.8, 0.14, { solid: false, texScale: 0.45 });
+  }
+
+  // Retaining lip along each terrace edge, broken by gaps you can drop through.
+  for (let i = 1; i < TERRACES.length; i++) {
+    const t = TERRACES[i];
+    for (let x = x0 + 3; x < x1 - 3; x += 9) {
+      if (rng.chance(0.3)) continue;
+      if (CLIMBS.some((c) => c.to === i && Math.abs(c.x - (x + 4.5)) < 7)) continue;
+      B.box('concreteDark', x + 4.5, t.y + 0.45, t.z1 - 0.4, 8.2, 0.9, 0.8, { texScale: 0.55, tag: 'parapet' });
+    }
+  }
+
+  // Perimeter: a low rock shoulder rather than a wall of grey. The distant
+  // hills and the fog carry the horizon, so this only has to stop the player.
+  const zMid = (WORLD.z0 + WORLD.z1) / 2, zLen = WORLD.z1 - WORLD.z0 + 30;
+  const wall = (x, y, z, sw, sh, sd) => {
+    B.box('rock', x, y, z, sw, sh, sd, { texScale: 0.16 });
+    // scrub along the top edge so it reads as hillside
+    for (let i = -0.5; i <= 0.5; i += 0.055) {
+      const px = x + (sw > sd ? i * sw : 0) + (sw > sd ? 0 : rng.range(-1, 1));
+      const pz = z + (sw > sd ? rng.range(-1, 1) : i * sd);
+      const bh = rng.range(2.5, 5.5);
+      B.cylinder('vegetation', px, y + sh / 2 + bh / 2, pz,
+        0.25, rng.range(1.4, 3.0), bh, 6, { rotY: rng() * 3 });
+    }
+  };
+  wall(x0 - 7, 4, zMid, 12, 26, zLen);
+  wall(x1 + 7, 4, zMid, 12, 26, zLen);
+  wall(cx, 10, WORLD.z0 - 7, w + 34, 26, 12);
+  wall(cx, -3, WORLD.z1 + 7, w + 34, 26, 12);
+}
+
+/** Keep the three lanes and every climb approach clear of infill housing. */
+function reserveLanes(B) {
+  for (const lane of Object.values(LANES)) {
+    B.reserve(lane.x, (WORLD.z0 + WORLD.z1) / 2, 9, WORLD.z1 - WORLD.z0, 'lane:' + lane.id);
+  }
+  for (const t of TERRACES) {
+    // the street band along the downhill edge - the lateral rotation route
+    B.reserve(0, t.z1 - STREET_DEPTH / 2, WORLD.x1 - WORLD.x0, STREET_DEPTH, 'street');
+  }
+  for (const c of CLIMBS) {
+    const t = TERRACES[c.to];
+    const { run, width } = climbSpec(c);
+    // the flight itself plus landings at both ends
+    B.reserve(c.x, t.z1 + run / 2, width + 5, run + 12, 'climb');
+  }
+}
+
+/* ══════════════ LANDMARK: A PRAÇA (police staging) ══════════════ */
+function buildPraca(B, rng, meta) {
+  const t = TERRACES[0];
+  B.reserve(-6, 46, 22, 22, 'coreto');
+  B.reserve(40, 54, 20, 16, 'kombi');
+
+  // road markings up the middle of the plaza
+  for (let z = t.z0 + 4; z < t.z1 - 4; z += 6) {
+    B.floorQuad('paint', 20, 0.03, z, 0.4, 3.2);
+  }
+  B.floorQuad('paintYellow', 0, 0.03, t.z0 + 3, WORLD.x1 - WORLD.x0 - 20, 0.5);
+
+  // ── O CORETO: octagonal bandstand, the plaza's cover hub ──
+  const cx = -6, cz = 46;
+  B.cylinder('concrete', cx, 0.35, cz, 7.4, 7.8, 0.7, 8, { solid: true, tag: 'ground' });
+  B.cylinder('concreteDark', cx, 0.78, cz, 6.6, 6.9, 0.18, 8, {});
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const px = cx + Math.cos(a) * 6.2, pz = cz + Math.sin(a) * 6.2;
+    B.box('paint', px, 2.4, pz, 0.32, 3.2, 0.32, { texScale: 1, tag: 'pillar' });
+    // low balustrade between columns
+    B.box('paint', cx + Math.cos(a + Math.PI / 8) * 6.2, 1.35, cz + Math.sin(a + Math.PI / 8) * 6.2,
+      4.6, 0.85, 0.28, { rotY: -a - Math.PI / 8, texScale: 1, tag: 'railing' });
+  }
+  B.cylinder('corrugated', cx, 4.3, cz, 1.2, 7.6, 1.0, 8, { solid: true, tag: 'roof' });
+  B.cylinder('metalDark', cx, 5.1, cz, 0.12, 0.12, 0.9, 6, {});
+  meta.landmarks.push({ name: 'O Coreto', x: cx, z: cz });
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    meta.cover.push(new THREE.Vector3(cx + Math.cos(a) * 8.4, 0, cz + Math.sin(a) * 8.4));
+  }
+
+  // ── viaturas nosed in at the foot of the hill ──
+  const spots = [[-34, 36, 0.15], [-14, 34, -0.1], [10, 36, 0.2], [34, 35, -0.25]];
+  spots.forEach(([vx, vz, r], i) => buildPoliceVehicle(B, rng, vx, 0, vz, r, i % 2 === 0));
+
+  // ── kombi stop shelter ──
+  const kx = 40, kz = 54;
+  B.box('concrete', kx, 0.06, kz, 14, 0.12, 5, { texScale: 0.4, tag: 'ground' });
+  for (const ox of [-6, 6]) B.box('metalDark', kx + ox, 1.4, kz - 2, 0.16, 2.8, 0.16, { texScale: 1, tag: 'pole' });
+  B.box('corrugated', kx, 2.9, kz - 1.4, 13, 0.18, 3.4, { texScale: 0.6, tag: 'roof' });
+  B.box('paint', kx, 0.55, kz - 2.6, 11, 0.5, 0.4, { texScale: 1, tag: 'bench' });
+  buildKombi(B, rng, kx + 2, 0, kz + 4.5, -0.2);
+  meta.landmarks.push({ name: 'Ponto de Kombi', x: kx, z: kz });
+
+  // sandbag line the squad forms up behind - never across a staircase mouth
+  for (let i = 0; i < 16; i++) {
+    const bx = rng.range(WORLD.x0 + 12, WORLD.x1 - 12);
+    const bz = t.z0 + rng.range(2, 7);
+    if (!B.isFree(bx, bz, 4, 4)) continue;
+    B.box('concreteDark', bx, 0.5, bz, rng.range(1.8, 2.8), 1.0, 0.8, { texScale: 0.8, tag: 'barrier' });
+    meta.cover.push(new THREE.Vector3(bx, 0, bz + 1.3));
+  }
+
+  // low shops around the plaza edge so it isn't a bowl - skipped if they'd
+  // land on a staircase approach
+  for (const [sx, sz, sw, sd, f] of [[-52, 52, 12, 9, 2], [-56, 36, 10, 8, 1],
+    [56, 44, 11, 9, 2], [22, 54, 13, 8, 1], [-24, 58, 12, 8, 2], [58, 20, 10, 9, 2]]) {
+    if (!B.isFree(sx, sz, sw + 3, sd + 3)) continue;
+    buildHouse(B, rng, sx, 0, sz, sw, sd, f, meta, 0);
+    B.reserve(sx, sz, sw + 2, sd + 2, 'shop');
+  }
+  for (let i = 0; i < 6; i++) {
+    const sx = rng.range(-20, 30), sz = rng.range(50, 62);
+    if (!B.isFree(sx, sz, 6, 6)) continue;
+    buildStall(B, rng, sx, 0, sz);
+  }
+}
+
+/* ══════════════ LANDMARK: O MERCADO + O CAMPO ══════════════ */
+function buildMercado(B, rng, meta) {
+  const t = TERRACES[1];
+
+  // ── O MERCADINHO: painted corner shop, roof reachable, west-mid anchor ──
+  const mx = -30, mz = 22;
+  B.reserve(mx, mz, 20, 16, 'mercadinho');
+  buildHouse(B, rng, mx, t.y, mz, 13, 10, 2, meta, 1, { forceStair: true, wall: 'plaster0' });
+  // big awning + produce crates out front
+  B.box('awning0', mx, t.y + 3.0, mz + 6.4, 13.5, 0.16, 3.2, { solid: false, texScale: 1 });
+  for (const ox of [-6, 0, 6]) B.box('metalDark', mx + ox, t.y + 1.5, mz + 7.7, 0.1, 3.0, 0.1, { solid: false, texScale: 1 });
+  for (let i = 0; i < 9; i++) {
+    B.box('wood', mx + rng.range(-6, 6), t.y + 0.35, mz + rng.range(5.2, 7.4), 0.9, 0.7, 0.7,
+      { texScale: 1, rotY: rng() * 0.6, tag: 'prop' });
+  }
+  B.quad('graf1', mx, t.y + 3.6, mz + 5.05, 11, 2.6, 0);
+  meta.landmarks.push({ name: 'O Mercadinho', x: mx, z: mz });
+
+  // ── O CAMPO: caged concrete pitch, the wide east flank ──
+  const px = 42, pz = 14, pw = 30, pd = 14;
+  B.reserve(px, pz, pw + 6, pd + 6, 'campo');
+  B.box('pitch', px, t.y + 0.04, pz, pw, 0.08, pd, { texScale: 0.3, tag: 'ground' });
+  // pitch markings
+  B.floorQuad('pitchLine', px, t.y + 0.1, pz, pw - 2, 0.2);
+  B.floorQuad('pitchLine', px, t.y + 0.1, pz, 0.2, pd - 2);
+  for (const s of [-1, 1]) {
+    B.floorQuad('pitchLine', px + s * (pw / 2 - 1), t.y + 0.1, pz, 0.2, pd - 2);
+    B.floorQuad('pitchLine', px, t.y + 0.1, pz + s * (pd / 2 - 1), pw - 2, 0.2);
+    // goal
+    const gx = px + s * (pw / 2 - 1.5);
+    B.box('paint', gx, t.y + 1.3, pz, 0.16, 2.6, 0.16, { texScale: 1, tag: 'goal' });
+    B.box('paint', gx, t.y + 1.3, pz + 3.4, 0.16, 2.6, 0.16, { texScale: 1, tag: 'goal' });
+    B.box('paint', gx, t.y + 2.55, pz + 1.7, 0.16, 0.16, 3.6, { solid: false, texScale: 1 });
+  }
+  // cage: posts + translucent mesh panels
+  const fh = 5.5;
+  for (let i = -1; i <= 1; i += 2) {
+    for (let x = -pw / 2; x <= pw / 2; x += 5) {
+      B.box('metalDark', px + x, t.y + fh / 2, pz + i * pd / 2, 0.18, fh, 0.18, { texScale: 1, tag: 'pole' });
+    }
+    for (let z = -pd / 2; z <= pd / 2; z += 5) {
+      B.box('metalDark', px + i * pw / 2, t.y + fh / 2, pz + z, 0.18, fh, 0.18, { texScale: 1, tag: 'pole' });
+    }
+    B.quad('fence', px, t.y + fh / 2, pz + i * pd / 2, pw, fh, 0);
+    B.quad('fence', px + i * pw / 2, t.y + fh / 2, pz, pd, fh, Math.PI / 2);
+  }
+  // collision for the cage walls, with a gap on each side to run through
+  B.collision.addBox(px - pw / 4 - 2, t.y + fh / 2, pz - pd / 2, pw / 2 - 4, fh, 0.3, 'fence');
+  B.collision.addBox(px + pw / 4 + 2, t.y + fh / 2, pz - pd / 2, pw / 2 - 4, fh, 0.3, 'fence');
+  B.collision.addBox(px - pw / 4 - 2, t.y + fh / 2, pz + pd / 2, pw / 2 - 4, fh, 0.3, 'fence');
+  B.collision.addBox(px + pw / 4 + 2, t.y + fh / 2, pz + pd / 2, pw / 2 - 4, fh, 0.3, 'fence');
+  B.collision.addBox(px - pw / 2, t.y + fh / 2, pz, 0.3, fh, pd, 'fence');
+  B.collision.addBox(px + pw / 2, t.y + fh / 2, pz, 0.3, fh, pd, 'fence');
+  // bleacher steps on the uphill side - elevated firing position
+  for (let i = 0; i < 3; i++) {
+    B.box('concreteDark', px, t.y + 0.3 + i * 0.55, pz - pd / 2 - 1.4 - i * 1.3,
+      pw, 0.6 + i * 1.1, 1.3, { texScale: 0.6, tag: 'bleacher' });
+  }
+  meta.landmarks.push({ name: 'O Campo', x: px, z: pz });
+  meta.cover.push(new THREE.Vector3(px - pw / 2 - 2, t.y, pz), new THREE.Vector3(px + pw / 2 + 2, t.y, pz));
+}
+
+/* ══════════════ LANDMARK: A IGREJINHA (chapel + bell tower) ══════════════ */
+function buildIgrejinha(B, rng, meta) {
+  const t = TERRACES[2];
+  const cx = -20, cz = -4;
+  B.reserve(cx, cz, 20, 20, 'igrejinha');
+
+  // nave
+  B.box('chapel', cx, t.y + 2.6, cz, 9, 5.2, 13, { texScale: 0.4, tag: 'building' });
+  B.box('corrugated', cx, t.y + 5.4, cz, 9.8, 0.4, 13.8, { texScale: 0.5, tag: 'roof' });
+  B.box('chapelTrim', cx, t.y + 5.85, cz, 9.8, 0.5, 0.4, { texScale: 1, tag: 'parapet' });
+  // door + windows
+  B.quad('window', cx, t.y + 1.6, cz + 6.55, 1.6, 3.0, 0);
+  for (const z of [-4, -1, 2]) {
+    B.quad('window', cx - 4.55, t.y + 3.0, cz + z, 1.0, 2.0, -Math.PI / 2);
+    B.quad('window', cx + 4.55, t.y + 3.0, cz + z, 1.0, 2.0, Math.PI / 2);
+  }
+
+  // ── bell tower: the single best angle onto the Escadão, three ways up ──
+  const tx = cx + 0.0, tz = cz - 8.2, th = 12.5;
+  B.box('chapel', tx, t.y + th / 2, tz, 4.6, th, 4.6, { texScale: 0.45, tag: 'building' });
+  // internal switchback stairs wrapped on the outside so it's contestable
+  buildSpiralStair(B, tx, t.y, tz, 2.3, th - 2.2);
+  // belfry: open on all four sides
+  const by = t.y + th;
+  for (const [ox, oz] of [[-2.1, -2.1], [2.1, -2.1], [-2.1, 2.1], [2.1, 2.1]]) {
+    B.box('chapel', tx + ox, by + 1.5, tz + oz, 0.5, 3.0, 0.5, { texScale: 1, tag: 'pillar' });
+  }
+  B.box('concrete', tx, by + 0.12, tz, 5.2, 0.24, 5.2, { texScale: 0.6, tag: 'roof' });
+  for (const [ox, oz, w, d] of [[0, -2.4, 5.2, 0.3], [0, 2.4, 5.2, 0.3], [-2.4, 0, 0.3, 5.2], [2.4, 0, 0.3, 5.2]]) {
+    B.box('chapelTrim', tx + ox, by + 0.75, tz + oz, w, 1.0, d, { texScale: 1, tag: 'railing' });
+  }
+  B.box('corrugated', tx, by + 3.3, tz, 5.4, 0.5, 5.4, { texScale: 0.6, tag: 'roof' });
+  B.cylinder('rust', tx, by + 1.9, tz, 0.55, 0.7, 0.9, 8, {});   // the bell
+  // cross on the peak
+  B.box('cross', tx, by + 4.4, tz, 0.22, 1.8, 0.22, { solid: false, texScale: 1 });
+  B.box('cross', tx, by + 4.8, tz, 1.0, 0.22, 0.22, { solid: false, texScale: 1 });
+
+  meta.landmarks.push({ name: 'A Igrejinha', x: cx, z: cz });
+  meta.cover.push(new THREE.Vector3(cx + 6, t.y, cz + 5), new THREE.Vector3(cx - 6, t.y, cz - 3));
+}
+
+/** Square switchback staircase hugging a tower - four flights per revolution. */
+function buildSpiralStair(B, x, baseY, z, r, height) {
+  const steps = Math.ceil(height / 0.3);
+  const riser = height / steps;
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2 * (height / 6.5);
+    const px = x + Math.cos(a) * (r + 0.9);
+    const pz = z + Math.sin(a) * (r + 0.9);
+    const top = riser * (i + 1);
+    B.box('concreteDark', px, baseY + top / 2, pz, 1.5, top, 1.5,
+      { texScale: 0.8, rotY: -a, tag: 'stair' });
+  }
+}
+
+/* ══════════════ LANDMARK: CAIXA D'ÁGUA ══════════════ */
+function buildCaixaDagua(B, rng, meta) {
+  const t = TERRACES[3];
+  const cx = -2, cz = -30;
+  B.reserve(cx, cz, 22, 22, 'caixa');
+
+  // plinth building underneath (pump house) - fightable interior footprint
+  B.box('concrete', cx, t.y + 1.9, cz, 9, 3.8, 9, { texScale: 0.4, tag: 'building' });
+  B.quad('graf0', cx, t.y + 1.9, cz + 4.55, 8, 2.6, 0);
+  B.box('concrete', cx, t.y + 3.95, cz, 9.8, 0.3, 9.8, { texScale: 0.5, tag: 'roof' });
+
+  // four legs + the tank
+  const legH = 7.5;
+  for (const [ox, oz] of [[-3.2, -3.2], [3.2, -3.2], [-3.2, 3.2], [3.2, 3.2]]) {
+    B.box('concreteDark', cx + ox, t.y + 4.1 + legH / 2, cz + oz, 0.7, legH, 0.7, { texScale: 0.8, tag: 'pillar' });
+  }
+  const tankY = t.y + 4.1 + legH;
+  B.box('metal', cx, tankY + 0.2, cz, 9.4, 0.4, 9.4, { texScale: 0.5, tag: 'catwalk' });
+  B.cylinder('tankBlue', cx, tankY + 2.6, cz, 4.0, 4.0, 4.4, 14, { solid: true, tag: 'tank' });
+  B.cylinder('metal', cx, tankY + 4.95, cz, 2.6, 4.1, 0.5, 14, {});
+  // catwalk railing
+  for (const [ox, oz, w, d] of [[0, -4.7, 9.4, 0.16], [0, 4.7, 9.4, 0.16], [-4.7, 0, 0.16, 9.4], [4.7, 0, 0.16, 9.4]]) {
+    B.box('metalDark', cx + ox, tankY + 0.95, cz + oz, w, 1.1, d, { texScale: 1, tag: 'railing' });
+  }
+  // access stair from the roof of the pump house up to the catwalk
+  buildStraightRun(B, cx + 6.2, t.y + 4.1, cz + 4.6, tankY + 0.4, -1, 1.4);
+  // and from the ground up to the pump house roof
+  buildStraightRun(B, cx - 6.2, t.y, cz - 4.6, t.y + 4.1, 1, 1.4);
+
+  // faded painted lettering on the tank reads as a real landmark from anywhere
+  B.quad('paint', cx, tankY + 2.9, cz + 4.05, 5.0, 1.2, 0);
+
+  meta.landmarks.push({ name: "Caixa d'Água", x: cx, z: cz });
+  meta.cover.push(new THREE.Vector3(cx + 6, t.y, cz), new THREE.Vector3(cx - 6, t.y, cz));
+}
+
+/** A straight flight of steps climbing in +Z (dir 1) or -Z (dir -1). */
+function buildStraightRun(B, x, yLow, zStart, yHigh, dir, width = 3.2) {
+  const rise = yHigh - yLow;
+  if (rise <= 0.1) return;
+  const steps = Math.ceil(rise / 0.3);
+  const riser = rise / steps;
+  const tread = 0.45;
+  for (let i = 0; i < steps; i++) {
+    const top = riser * (i + 1);
+    B.box('concreteDark', x, yLow + top / 2, zStart + dir * (i * tread + tread / 2),
+      width, top, tread, { texScale: 0.7, tag: 'stair' });
+  }
+}
+
+/* ══════════════ LANDMARK: O BAILE (the party slab) ══════════════ */
+function buildBaile(B, rng, meta) {
+  const t = TERRACES[3];
+  const cx = 40, cz = -30;
+  B.reserve(cx, cz, 26, 22, 'baile');
+
+  // raised dance slab
+  B.box('concrete', cx, t.y + 0.3, cz, 20, 0.6, 15, { texScale: 0.35, tag: 'ground' });
+  // painted floor
+  B.floorQuad('paintYellow', cx, t.y + 0.62, cz, 16, 0.3);
+  B.floorQuad('paintYellow', cx, t.y + 0.62, cz, 0.3, 11);
+
+  // roof on columns - blocks the skyline, forces close fights
+  for (const [ox, oz] of [[-9, -6.5], [9, -6.5], [-9, 6.5], [9, 6.5], [0, -6.5], [0, 6.5]]) {
+    B.box('metalDark', cx + ox, t.y + 2.6, cz + oz, 0.28, 5.0, 0.28, { texScale: 1, tag: 'pillar' });
+  }
+  B.box('corrugated', cx, t.y + 5.2, cz, 21, 0.25, 16, { texScale: 0.5, tag: 'roof' });
+
+  // speaker stacks: the cover that defines the space
+  for (const [ox, oz] of [[-9.5, -7.5], [9.5, -7.5], [-9.5, 7.5], [9.5, 7.5]]) {
+    for (let i = 0; i < 3; i++) {
+      B.box('speaker', cx + ox, t.y + 0.6 + 0.85 + i * 1.7, cz + oz, 1.5, 1.65, 1.2,
+        { texScale: 1, tag: 'prop' });
+    }
+    meta.cover.push(new THREE.Vector3(cx + ox * 1.15, t.y, cz + oz * 1.15));
+  }
+  // DJ booth
+  B.box('woodDark', cx, t.y + 1.15, cz - 6.0, 4.5, 1.1, 1.6, { texScale: 0.8, tag: 'prop' });
+  B.box('speaker', cx, t.y + 1.85, cz - 6.0, 2.0, 0.3, 0.9, { solid: false, texScale: 1 });
+
+  // string lights across the ceiling
+  for (let i = -3; i <= 3; i++) {
+    const z = cz + i * 2.2;
+    B.box('metalDark', cx, t.y + 5.0, z, 20, 0.04, 0.04, { solid: false, texScale: 1 });
+    for (let k = -4; k <= 4; k++) {
+      B.cylinder('bulb', cx + k * 2.2, t.y + 4.85, z, 0.09, 0.09, 0.16, 6, {});
+    }
+  }
+  meta.landmarks.push({ name: 'O Baile', x: cx, z: cz });
+}
+
+/* ══════════════ LANDMARK: O CRUZEIRO (summit) ══════════════ */
+function buildCruzeiro(B, rng, meta) {
+  const t = TERRACES[4];
+  const cx = 0, cz = -56;
+  B.reserve(cx, cz, 26, 24, 'cruzeiro');
+
+  // stepped plinth - high ground with a 360° approach
+  for (let i = 0; i < 4; i++) {
+    const s = 16 - i * 3;
+    B.box('concrete', cx, t.y + 0.3 + i * 0.6, cz, s, 0.6 + i * 0.6, s, { texScale: 0.5, tag: 'ground' });
+  }
+  // the cross itself
+  const by = t.y + 2.4;
+  B.box('cross', cx, by + 4.2, cz, 1.1, 8.4, 1.1, { texScale: 0.6, tag: 'monument' });
+  B.box('cross', cx, by + 6.2, cz, 5.0, 1.1, 1.1, { texScale: 0.6, tag: 'monument' });
+  meta.landmarks.push({ name: 'O Cruzeiro', x: cx, z: cz });
+
+  // ── A LAJE GRANDE: the crew's rooftop HQ, west summit ──
+  const hx = -34, hz = -58;
+  B.reserve(hx, hz, 26, 22, 'laje');
+  buildHouse(B, rng, hx, t.y, hz, 16, 13, 3, meta, 4, { forceStair: true, wall: 'plaster3' });
+  buildHouse(B, rng, hx + 13, t.y, hz + 8, 9, 8, 2, meta, 4);
+  buildHouse(B, rng, hx - 12, t.y, hz - 5, 10, 9, 2, meta, 4, { forceStair: true });
+  meta.landmarks.push({ name: 'A Laje Grande', x: hx, z: hz });
+
+  // ── O MIRANTE: east summit viewpoint over the whole hill ──
+  const vx = 38, vz = -58;
+  B.reserve(vx, vz, 24, 20, 'mirante');
+  B.box('concrete', vx, t.y + 0.35, vz, 18, 0.7, 14, { texScale: 0.4, tag: 'ground' });
+  for (let x = -8.5; x <= 8.5; x += 1.7) {
+    B.box('paint', vx + x, t.y + 1.25, vz + 7.2, 0.16, 1.1, 0.16, { solid: false, texScale: 1 });
+  }
+  B.box('paint', vx, t.y + 1.8, vz + 7.2, 18, 0.2, 0.4, { texScale: 1, tag: 'railing' });
+  // shade structure + benches
+  for (const ox of [-6, 6]) B.box('woodDark', vx + ox, t.y + 2.0, vz - 4, 0.3, 3.2, 0.3, { texScale: 1, tag: 'pole' });
+  B.box('awning1', vx, t.y + 3.7, vz - 4, 14, 0.2, 5, { solid: false, texScale: 1 });
+  for (const oz of [-1.5, -6.5]) B.box('wood', vx, t.y + 1.05, vz + oz, 8, 0.4, 0.6, { texScale: 1, tag: 'bench' });
+  meta.landmarks.push({ name: 'O Mirante', x: vx, z: vz });
+
+  // a wall of stacked houses across the back so the summit has depth
+  for (let x = WORLD.x0 + 12; x < WORLD.x1 - 12; x += 13) {
+    if (!B.isFree(x, t.z0 + 7, 11, 10)) continue;
+    buildHouse(B, rng, x + rng.range(-1, 1), t.y, t.z0 + 7 + rng.range(-1, 1),
+      rng.range(9, 11), rng.range(8, 10), rng.int(2, 3), meta, 4);
+  }
+}
+
+/* ══════════════ procedural infill ══════════════ */
+function infillTerrace(B, rng, index, meta) {
+  const t = TERRACES[index];
+  const bandZ0 = t.z0 + 3;
+  const bandZ1 = t.z1 - STREET_DEPTH;
+  if (bandZ1 - bandZ0 < 7) return;
+
+  // Dense grid with narrow alleys - a favela is packed, and the tight gaps
+  // between blocks are what make the flanking routes interesting.
+  const cellW = 9.2;
+  const cols = Math.floor((WORLD.x1 - WORLD.x0 - 8) / cellW);
+  const rows = Math.max(1, Math.round((bandZ1 - bandZ0) / 9.2));
+  const cellD = (bandZ1 - bandZ0) / rows;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (rng.chance(0.07)) continue;                 // the occasional empty lot
+      const gx = WORLD.x0 + 4 + c * cellW + cellW / 2 + rng.range(-0.9, 0.9);
+      const gz = bandZ0 + r * cellD + cellD / 2 + rng.range(-0.8, 0.8);
+
+      const w = Math.min(cellW - 2.2, rng.range(5.4, 8.2));
+      const d = Math.min(cellD - 2.2, rng.range(5.0, 7.8));
+      if (w < 4.2 || d < 4.2) continue;
+      if (!B.isFree(gx, gz, w + 1.2, d + 1.2)) continue;
+
+      const floors = index >= 3
+        ? (rng() < 0.34 ? 1 : rng() < 0.76 ? 2 : 3)
+        : (rng() < 0.22 ? 1 : rng() < 0.66 ? 2 : 3);
+      buildHouse(B, rng, gx, t.y, gz, w, d, floors, meta, index);
+      B.reserve(gx, gz, w + 0.9, d + 0.9, 'house');
+    }
+  }
+
+  // shacks scattered on the street band for cover rhythm
+  for (let i = 0; i < 9; i++) {
+    const sx = rng.range(WORLD.x0 + 10, WORLD.x1 - 10);
+    const sz = rng.range(bandZ1 + 2, t.z1 - 3);
+    if (!B.isFree(sx, sz, 7, 7)) continue;
+    buildShack(B, rng, sx, t.y, sz);
+    B.reserve(sx, sz, 6, 6, 'shack');
+    meta.cover.push(new THREE.Vector3(sx, t.y, sz + 3));
+  }
+}
+
+/* ── the block house ────────────────────────────────────────────── */
+function buildHouse(B, rng, x, baseY, z, w, d, floors, meta, terraceIndex, opts = {}) {
+  const h = floors * FLOOR_H;
+  const wallMat = opts.wall || (rng.chance(0.26) ? 'brick' : 'plaster' + rng.int(0, FAVELA_COLORS.length - 1));
+
+  B.box(wallMat, x, baseY + h / 2, z, w, h, d, { texScale: 0.42, tag: 'building' });
+
+  for (const face of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    const nx = Math.sin(face), nz = Math.cos(face);
+    const faceW = Math.abs(nz) > 0.5 ? w : d;
+    const off = (Math.abs(nz) > 0.5 ? d : w) / 2 + 0.03;
+    const px = x + nx * off, pz = z + nz * off;
+    const perFloor = Math.max(1, Math.floor(faceW / 3.2));
+
+    for (let f = 0; f < floors; f++) {
+      for (let i = 0; i < perFloor; i++) {
+        if (rng.chance(0.26)) continue;
+        const u = (i + 0.5) / perFloor - 0.5;
+        const wx = px + Math.cos(face) * u * faceW * 0.86;
+        const wz = pz - Math.sin(face) * u * faceW * 0.86;
+        const wy = baseY + f * FLOOR_H + 1.7;
+        B.quad('window', wx, wy, wz, 1.0, 1.15, face);
+        if (rng.chance(0.3)) {
+          B.box('metalDark', wx + nx * 0.06, wy, wz + nz * 0.06,
+            Math.abs(nz) > 0.5 ? 1.1 : 0.06, 0.07, Math.abs(nz) > 0.5 ? 0.06 : 1.1,
+            { solid: false, texScale: 1 });
+        }
+      }
+    }
+    if (rng.chance(0.28)) {
+      B.quad('graf' + rng.int(0, 2), px + nx * 0.02, baseY + 1.5, pz + nz * 0.02,
+        Math.min(faceW * 0.8, 5), 2.4, face);
+    }
+  }
+
+  const roofY = baseY + h;
+  B.box('concrete', x, roofY + 0.13, z, w + 0.5, 0.26, d + 0.5, { texScale: 0.5, tag: 'roof' });
+
+  if (rng.chance(0.72)) {
+    const ph = rng.range(0.6, 1.0);
+    const pw = w + 0.5, pd = d + 0.5;
+    for (const [sx, sz2, bw, bd] of [
+      [0, -pd / 2, pw, 0.26], [0, pd / 2, pw, 0.26],
+      [-pw / 2, 0, 0.26, pd], [pw / 2, 0, 0.26, pd]]) {
+      if (rng.chance(0.2)) continue;
+      B.box(rng.chance(0.5) ? 'brick' : 'concreteDark', x + sx, roofY + 0.26 + ph / 2, z + sz2,
+        bw, ph, bd, { texScale: 0.6, tag: 'parapet' });
+    }
+  }
+
+  const roofTop = roofY + 0.26;
+  if (rng.chance(0.75)) {
+    const tx = x + rng.range(-w / 3, w / 3), tz = z + rng.range(-d / 3, d / 3);
+    B.cylinder(rng.chance(0.6) ? 'tankBlue' : 'tankBlack', tx, roofTop + 0.75, tz, 0.72, 0.72, 1.5, 12,
+      { solid: true, tag: 'prop' });
+    B.cylinder('tankBlack', tx, roofTop + 1.56, tz, 0.5, 0.62, 0.16, 12, {});
+  }
+  if (rng.chance(0.5)) {
+    const dx = x + rng.range(-w / 3, w / 3), dz = z + rng.range(-d / 3, d / 3);
+    B.box('metal', dx, roofTop + 0.4, dz, 0.1, 0.8, 0.1, { solid: false, texScale: 1 });
+    B.cylinder('copWhite', dx, roofTop + 0.85, dz, 0.42, 0.42, 0.07, 12, { rotY: rng() * 3 });
+  }
+  if (rng.chance(0.55)) {
+    for (let i = 0; i < rng.int(3, 7); i++) {
+      B.box('rust', x + rng.range(-w / 2.4, w / 2.4), roofTop + 0.45, z + rng.range(-d / 2.4, d / 2.4),
+        0.06, 0.9, 0.06, { solid: false, texScale: 1 });
+    }
+  }
+  if (rng.chance(0.28)) {
+    B.box('woodDark', x + rng.range(-w / 3, w / 3), roofTop + 0.35, z + rng.range(-d / 3, d / 3),
+      1.1, 0.7, 0.9, { texScale: 0.8, tag: 'prop' });
+    meta.cover.push(new THREE.Vector3(x, roofTop, z));
+  }
+
+  if (opts.forceStair || rng.chance(0.45)) buildExternalStair(B, rng, x, baseY, z, w, d, h);
+
+  meta.houses.push({ x, z, w, d, y: baseY, h, roof: roofTop, terraceIndex });
+  const hw = w / 2 + 1.0, hd = d / 2 + 1.0;
+  for (const [ox, oz] of [[-hw, -hd], [hw, -hd], [-hw, hd], [hw, hd]]) {
+    meta.cover.push(new THREE.Vector3(x + ox, baseY, z + oz));
+  }
+  if (rng.chance(0.35)) meta.pickups.push(new THREE.Vector3(x + hw + 0.7, baseY, z));
+  if (rng.chance(0.3)) meta.pickups.push(new THREE.Vector3(x, roofTop, z + hd - 1.5));
+}
+
+function buildExternalStair(B, rng, x, baseY, z, w, d, h) {
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const [dx, dz] = dirs[rng.int(0, 3)];
+  const steps = Math.ceil(h / 0.29);
+  const riser = h / steps;
+  const tread = 0.42;
+  const run = steps * tread;
+  const sw = 1.3;
+
+  const sx0 = x + dx * ((dx !== 0 ? w : d) / 2 + 0.1);
+  const sz0 = z + dz * ((dx !== 0 ? w : d) / 2 + 0.1);
+  if (Math.abs(sx0 + dx * run) > WORLD.x1 - 3) return;
+  if (sz0 + dz * run < WORLD.z0 + 3 || sz0 + dz * run > WORLD.z1 - 3) return;
+
+  for (let i = 0; i < steps; i++) {
+    const t = run - i * tread - tread / 2;
+    const top = riser * (i + 1);
+    B.box('concreteDark',
+      dx !== 0 ? sx0 + dx * t : x, baseY + top / 2, dz !== 0 ? sz0 + dz * t : z,
+      dx !== 0 ? tread : sw, top, dz !== 0 ? tread : sw,
+      { texScale: 0.7, tag: 'stair' });
+  }
+  B.box('concreteDark', sx0 + dx * (tread * 0.6), baseY + h + 0.1, sz0 + dz * (tread * 0.6),
+    dx !== 0 ? 1.3 : sw, 0.2, dz !== 0 ? 1.3 : sw, { texScale: 0.7, tag: 'stair' });
+}
+
+function buildShack(B, rng, x, baseY, z) {
+  const w = rng.range(3.2, 4.8), d = rng.range(3, 4.6), h = rng.range(2.4, 3.0);
+  const mat = rng.chance(0.45) ? 'corrugated' : rng.chance(0.5) ? 'wood' : 'brick';
+  B.box(mat, x, baseY + h / 2, z, w, h, d, { texScale: 0.6, tag: 'shack' });
+  B.box('corrugated', x, baseY + h + 0.1, z, w + 0.7, 0.2, d + 0.7, { texScale: 0.7, tag: 'roof' });
+  if (rng.chance(0.5)) B.cylinder('tire', x + w / 2 + 0.1, baseY + h + 0.3, z, 0.5, 0.5, 0.2, 10, {});
+}
+
+/* ── the climbs ─────────────────────────────────────────────────── */
+
+/**
+ * Dimensions of a climb. The level builder and the navigation graph both read
+ * this, so a waypoint can never be placed off the end of a staircase.
+ * `divider` is the half-width of the grand stair's central spine, which is
+ * solid cover — waypoints have to be routed around it, not through it.
+ */
+export function climbSpec(c) {
+  const rise = TERRACES[c.to].y - TERRACES[c.to - 1].y;
+  if (c.kind === 'ramp') {
+    const steps = Math.ceil(rise / 0.16);
+    return { run: steps * 0.62, width: 8.5, divider: 0 };
+  }
+  const steps = Math.ceil(rise / 0.29);
+  const tread = c.kind === 'grand' ? 0.52 : 0.46;
+  return {
+    run: steps * tread,
+    width: c.kind === 'grand' ? 7.5 : 3.8,
+    divider: c.kind === 'grand' ? 0.35 : 0,
+  };
+}
+
+function buildClimbs(B, rng) {
+  for (const c of CLIMBS) {
+    const upper = TERRACES[c.to];
+    const lower = TERRACES[c.to - 1];
+    if (c.kind === 'ramp') buildRamp(B, c.x, lower.y, upper.y, upper.z1);
+    else buildStair(B, rng, c.x, lower.y, upper.y, upper.z1, c.kind === 'grand');
+  }
+}
+
+function buildStair(B, rng, x, yLow, yHigh, zTop, grand) {
+  const rise = yHigh - yLow;
+  const steps = Math.ceil(rise / 0.29);
+  const riser = rise / steps;
+  const tread = grand ? 0.52 : 0.46;
+  const width = grand ? 7.5 : 3.8;
+
+  for (let i = 0; i < steps; i++) {
+    const top = riser * (i + 1);
+    const z = zTop + tread * (steps - i) - tread / 2;
+    B.box(grand && i % 2 === 0 ? 'paint' : 'concreteDark', x, yLow + top / 2, z, width, top, tread,
+      { texScale: 0.7, tag: 'stair' });
+  }
+  const run = steps * tread;
+
+  if (grand) {
+    // central divider - the thing that makes the Escadão survivable
+    for (let i = 0; i < steps; i += 1) {
+      const top = riser * (i + 1);
+      const z = zTop + tread * (steps - i) - tread / 2;
+      B.box('brick', x, yLow + top + 0.45, z, 0.7, 0.9, tread, { texScale: 0.8, tag: 'railing' });
+    }
+  }
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < steps; i += 2) {
+      const top = riser * (i + 1);
+      const z = zTop + tread * (steps - i) - tread;
+      B.box('brick', x + s * (width / 2 + 0.2), yLow + top + 0.45, z, 0.4, 0.9, tread * 2,
+        { texScale: 0.7, tag: 'railing' });
+    }
+  }
+  B.box('concrete', x, yLow + 0.08, zTop + run + 1.5, width + 2, 0.16, 3, { texScale: 0.5, tag: 'ground' });
+  if (rng.chance(0.7)) {
+    B.box('metalDark', x + (width / 2 + 0.8) * rng.sign(), yLow + 2.0, zTop + run + 2.4, 0.15, 4.0, 0.15,
+      { texScale: 1, tag: 'pole' });
+  }
+}
+
+/** Vehicle ramp: risers small enough that it reads and walks like a slope. */
+function buildRamp(B, x, yLow, yHigh, zTop) {
+  const rise = yHigh - yLow;
+  const steps = Math.ceil(rise / 0.16);
+  const riser = rise / steps;
+  const tread = 0.62;
+  const width = 8.5;
+
+  for (let i = 0; i < steps; i++) {
+    const top = riser * (i + 1);
+    const z = zTop + tread * (steps - i) - tread / 2;
+    B.box('asphalt', x, yLow + top / 2, z, width, top, tread, { texScale: 0.35, tag: 'ramp' });
+  }
+  const run = steps * tread;
+  // kerbs - deliberately below step height so they read as trim, not a wall
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < steps; i += 3) {
+      const top = riser * (i + 1);
+      const z = zTop + tread * (steps - i) - tread * 1.5;
+      B.box('concrete', x + s * (width / 2 + 0.25), yLow + top + 0.16, z, 0.5, 0.32, tread * 3,
+        { texScale: 0.6, tag: 'kerb' });
+    }
+  }
+  // centre line
+  for (let i = 2; i < steps; i += 6) {
+    const top = riser * (i + 1);
+    const z = zTop + tread * (steps - i);
+    B.floorQuad('paintYellow', x, yLow + top + 0.02, z, 0.35, tread * 3);
+  }
+}
+
+/* ── props, wires, laundry ──────────────────────────────────────── */
+function buildDressing(B, rng, meta) {
+  let prev = null;
+  for (let i = 0; i < TERRACES.length; i++) {
+    const t = TERRACES[i];
+    const px = WORLD.x0 + 10 + (i % 2) * 7;
+    const pz = t.z1 - 4;
+    B.box('woodDark', px, t.y + 4.4, pz, 0.26, 8.8, 0.26, { texScale: 0.8, tag: 'pole' });
+    B.box('woodDark', px, t.y + 7.9, pz, 2.1, 0.15, 0.15, { solid: false, texScale: 1 });
+    if (rng.chance(0.5)) B.box('metalDark', px + 0.45, t.y + 6.8, pz, 0.55, 0.75, 0.45, { solid: false, texScale: 1 });
+    const node = { x: px, y: t.y + 7.8, z: pz };
+    if (prev) drawWire(B, prev, node);
+    prev = node;
+  }
+
+  for (let i = 0; i < 34; i++) {
+    const t = TERRACES[rng.int(1, TERRACES.length - 1)];
+    const x = rng.range(WORLD.x0 + 12, WORLD.x1 - 12);
+    const z = rng.range(t.z0 + 5, t.z1 - 5);
+    const y = t.y + rng.range(3.0, 6.0);
+    const len = rng.range(4, 9);
+    const rot = rng.chance(0.5) ? 0 : Math.PI / 2;
+    B.box('metal', x, y, z, rot === 0 ? len : 0.05, 0.05, rot === 0 ? 0.05 : len, { solid: false, texScale: 1 });
+    const n = Math.floor(len / 1.1);
+    for (let k = 0; k < n; k++) {
+      const u = (k + 0.5) / n - 0.5;
+      const ch = rng.range(0.5, 1.0);
+      B.quad('cloth' + rng.int(0, 3),
+        x + (rot === 0 ? u * len : 0), y - ch / 2 - 0.05, z + (rot === 0 ? 0 : u * len),
+        rng.range(0.45, 0.78), ch, rot === 0 ? 0 : Math.PI / 2);
+    }
+  }
+
+  for (let i = 0; i < 95; i++) {
+    const t = TERRACES[rng.int(0, TERRACES.length - 1)];
+    const x = rng.range(WORLD.x0 + 9, WORLD.x1 - 9);
+    const z = rng.range(t.z1 - STREET_DEPTH + 1.5, t.z1 - 1.5);
+    const y = t.y;
+    if (!B.isFree(x, z, 3, 3)) continue;
+    const r = rng();
+    if (r < 0.32) {
+      B.cylinder(rng.chance(0.5) ? 'rust' : 'tankBlue', x, y + 0.47, z, 0.36, 0.36, 0.94, 10,
+        { solid: true, tag: 'prop' });
+    } else if (r < 0.66) {
+      const s = rng.range(0.7, 1.15);
+      B.box('wood', x, y + s / 2, z, s, s, s * rng.range(0.85, 1.2),
+        { texScale: 1, rotY: rng() * Math.PI, tag: 'prop' });
+      if (rng.chance(0.4)) {
+        B.box('wood', x + rng.range(-0.2, 0.2), y + s * 1.5, z, s * 0.9, s, s * 0.9,
+          { texScale: 1, rotY: rng() * Math.PI, tag: 'prop' });
+      }
+    } else {
+      const n = rng.int(2, 4);
+      for (let k = 0; k < n; k++) B.cylinder('tire', x, y + 0.12 + k * 0.22, z, 0.48, 0.48, 0.22, 12, {});
+      B.collision.addBox(x, y + n * 0.11, z, 0.96, n * 0.22, 0.96, 'prop');
+    }
+    if (rng.chance(0.25)) meta.cover.push(new THREE.Vector3(x, y, z));
+  }
+
+  for (let i = 0; i < 55; i++) {
+    const t = TERRACES[rng.int(1, TERRACES.length - 1)];
+    const x = rng.range(WORLD.x0 + 3, WORLD.x1 - 3);
+    const z = t.z1 - rng.range(0.5, 2.5);
+    // bushes: narrow at the crown, wide at the base
+    const bh = rng.range(1.4, 3.2);
+    B.cylinder('vegetation', x, t.y - rng.range(0.4, 1.8) + bh / 2, z,
+      0.22, rng.range(0.7, 1.8), bh, 6, { rotY: rng() * 3 });
+  }
+}
+
+function drawWire(B, a, b) {
+  const seg = 8, sag = 1.8;
+  let prev = a;
+  for (let i = 1; i <= seg; i++) {
+    const t = i / seg;
+    const p = {
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t - Math.sin(t * Math.PI) * sag,
+      z: a.z + (b.z - a.z) * t,
+    };
+    const len = Math.hypot(p.x - prev.x, p.y - prev.y, p.z - prev.z);
+    const geo = new THREE.BoxGeometry(0.05, 0.05, len);
+    _m.lookAt(_v.set(prev.x, prev.y, prev.z), _v2.set(p.x, p.y, p.z), _up);
+    _m.setPosition((p.x + prev.x) / 2, (p.y + prev.y) / 2, (p.z + prev.z) / 2);
+    B.batches.get('metalDark').batcher.add(geo, _m);
+    geo.dispose();
+    prev = p;
+  }
+}
+
+/* ── vehicles ───────────────────────────────────────────────────── */
+function buildPoliceVehicle(B, rng, x, y, z, rotY, isVan) {
+  const w = 2.1, len = isVan ? 5.4 : 4.5, h = isVan ? 2.3 : 1.45;
+  const cos = Math.cos(rotY), sin = Math.sin(rotY);
+  const at = (ox, oy, oz) => [x + ox * cos + oz * sin, y + oy, z - ox * sin + oz * cos];
+  let p;
+
+  p = at(0, h / 2 + 0.35, 0);
+  B.box('copBlue', p[0], p[1], p[2], w, h, len, { rotY, texScale: 0.6, tag: 'vehicle' });
+  B.box('copWhite', p[0], p[1] - 0.16, p[2], w + 0.04, h * 0.34, len * 0.5, { rotY, solid: false, texScale: 0.6 });
+
+  if (!isVan) {
+    p = at(0, h + 0.65, -0.2);
+    B.box('glass', p[0], p[1], p[2], w - 0.22, 0.85, len * 0.42, { rotY, texScale: 1, tag: 'vehicle' });
+  } else {
+    p = at(0, h + 0.15, -len / 2 + 0.7);
+    B.box('glass', p[0], p[1], p[2], w - 0.2, 0.7, 0.3, { rotY, solid: false, texScale: 1 });
+  }
+  const lby = isVan ? h + 0.62 : h + 1.18;
+  p = at(-0.45, lby, isVan ? -len / 2 + 0.9 : -0.2);
+  B.box('lightRed', p[0], p[1], p[2], 0.7, 0.24, 0.32, { rotY, solid: false, texScale: 1 });
+  p = at(0.45, lby, isVan ? -len / 2 + 0.9 : -0.2);
+  B.box('lightBlue', p[0], p[1], p[2], 0.7, 0.24, 0.32, { rotY, solid: false, texScale: 1 });
+
+  for (const ox of [-w / 2, w / 2]) {
+    for (const oz of [-len / 2 + 1.1, len / 2 - 1.1]) {
+      p = at(ox, 0.42, oz);
+      B.cylinder('tire', p[0], p[1], p[2], 0.42, 0.42, 0.26, 10, { rotY: rotY + Math.PI / 2 });
+    }
+  }
+}
+
+function buildKombi(B, rng, x, y, z, rotY) {
+  const w = 2.0, len = 4.4, h = 2.0;
+  const cos = Math.cos(rotY), sin = Math.sin(rotY);
+  const at = (ox, oy, oz) => [x + ox * cos + oz * sin, y + oy, z - ox * sin + oz * cos];
+  let p = at(0, h / 2 + 0.4, 0);
+  B.box('kombi', p[0], p[1], p[2], w, h, len, { rotY, texScale: 0.6, tag: 'vehicle' });
+  p = at(0, 0.95, 0);
+  B.box('kombiTrim', p[0], p[1], p[2], w + 0.05, 0.45, len, { rotY, solid: false, texScale: 0.6 });
+  p = at(0, h + 0.05, -len / 2 + 0.55);
+  B.box('glass', p[0], p[1], p[2], w - 0.2, 0.85, 0.3, { rotY, solid: false, texScale: 1 });
+  for (const ox of [-w / 2, w / 2]) {
+    for (const oz of [-len / 2 + 1.0, len / 2 - 1.0]) {
+      p = at(ox, 0.4, oz);
+      B.cylinder('tire', p[0], p[1], p[2], 0.4, 0.4, 0.24, 10, { rotY: rotY + Math.PI / 2 });
+    }
+  }
+}
+
+function buildStall(B, rng, x, y, z) {
+  const w = rng.range(2.8, 4.2), d = rng.range(2.1, 2.9);
+  B.box('wood', x, y + 0.45, z, w, 0.9, d, { texScale: 0.8, tag: 'stall' });
+  for (const [ox, oz] of [[-w / 2 + 0.1, -d / 2 + 0.1], [w / 2 - 0.1, -d / 2 + 0.1],
+    [-w / 2 + 0.1, d / 2 - 0.1], [w / 2 - 0.1, d / 2 - 0.1]]) {
+    B.box('woodDark', x + ox, y + 1.3, z + oz, 0.1, 2.6, 0.1, { solid: false, texScale: 1 });
+  }
+  B.box('awning' + rng.int(0, 2), x, y + 2.64, z, w + 0.8, 0.12, d + 0.8, { solid: false, texScale: 1 });
+  for (let i = 0; i < rng.int(2, 5); i++) {
+    B.box(['cloth0', 'cloth1', 'cloth2'][rng.int(0, 2)], x + rng.range(-w / 3, w / 3), y + 1.02,
+      z + rng.range(-d / 3, d / 3), 0.4, 0.3, 0.4, { solid: false, texScale: 1 });
+  }
+}
+
+/* ── backdrop ───────────────────────────────────────────────────── */
+function buildBackdrop(B, rng, scene) {
+  const g = new THREE.Group();
+  g.name = 'backdrop';
+  const near = new THREE.MeshBasicMaterial({ color: 0x4a6b78, fog: false });
+  const far = new THREE.MeshBasicMaterial({ color: 0x395663, fog: false });
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2 + rng.range(-0.12, 0.12);
+    const dist = rng.range(240, 350);
+    const r = rng.range(45, 100), h = rng.range(40, 115);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), rng.chance(0.5) ? near : far);
+    cone.position.set(Math.cos(a) * dist, h / 2 - 28, Math.sin(a) * dist);
+    cone.rotation.y = rng() * 3;
+    g.add(cone);
+  }
+  scene.add(g);
+}
+
+/* ── spawns ─────────────────────────────────────────────────────── */
+function finalizeSpawns(meta, collision) {
+  const r = makeRNG(4242);
+  const place = (list, tIndex, count) => {
+    const t = TERRACES[tIndex];
+    let guard = 0;
+    while (guard++ < 1400 && list.length < count) {
+      const x = r.range(WORLD.x0 + 9, WORLD.x1 - 9);
+      const z = r.range(t.z0 + 4, t.z1 - 4);
+      const g = collision.groundHeight(x, z, t.y + 1.2, 0.45);
+      if (g < t.y - 0.6) continue;
+      if (collision.isBlocked(x, g, z, 0.6, 1.8)) continue;
+      list.push(new THREE.Vector3(x, g, z));
+    }
+  };
+  place(meta.spawns.gang, 4, 14);
+  place(meta.spawns.gang, 3, 8);
+  place(meta.spawns.police, 0, 16);
+  place(meta.spawns.police, 1, 6);
+
+  const standable = (p) => {
+    const g = collision.groundHeight(p.x, p.z, p.y + 1.6, 0.4);
+    if (g < p.y - 1.6) return false;
+    p.y = g;
+    return !collision.isBlocked(p.x, g, p.z, 0.5, 1.7);
+  };
+  meta.cover = meta.cover.filter(standable);
+  meta.pickups = meta.pickups.filter(standable);
+}

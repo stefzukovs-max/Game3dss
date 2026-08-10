@@ -1,0 +1,508 @@
+import * as THREE from 'three';
+import { clamp, damp, lerp, now } from '../core/utils.js';
+import { CharacterModel, makeOutfit } from './character.js';
+import { WEAPONS, WeaponState, attachWeapon } from '../systems/weapons.js';
+import { audio } from '../core/audio.js';
+
+const BASE_SPEED = 4.65;
+const SPRINT_MUL = 1.62;
+const CROUCH_MUL = 0.5;
+const ADS_MUL = 0.56;
+const AIR_CONTROL = 0.32;
+const JUMP_V = 7.4;
+const STAND_H = 1.82;
+const CROUCH_H = 1.25;
+const EYE = 1.62;
+
+export class Player {
+  constructor(game, char, faction) {
+    this.game = game;
+    this.char = char;               // roster entry
+    this.faction = faction;
+    this.isPlayer = true;
+    this.team = faction;
+
+    const s = char.stats;
+    this.maxHealth = s.health;
+    this.health = s.health;
+    this.maxArmor = s.armor;
+    this.armor = s.armor;
+    this.speedMul = s.speed;
+    this.control = s.control;
+
+    // ── body ──
+    this.pos = new THREE.Vector3();
+    this.vel = new THREE.Vector3();
+    this.radius = 0.4;
+    this.height = STAND_H;
+    this.standHeight = STAND_H;
+    this.stepHeight = 0.45;
+    this.onGround = false;
+    this.crouching = false;
+    this.sprinting = false;
+    this.alive = true;
+
+    // ── look ──
+    this.yaw = Math.PI;
+    this.pitch = 0;
+    this.recoilPitch = 0;
+    this.recoilYaw = 0;
+    this.shoulder = 1;              // +1 right, -1 left
+    this.camDist = 3.25;
+    this.camDistCur = 3.25;
+    this.aiming = false;
+    this.aimBlend = 0;
+
+    // ── combat ──
+    this.weapons = {};
+    for (const id of char.loadout) this.weapons[id] = new WeaponState(id);
+    if (char.passive.name === 'Logística') {
+      for (const w of Object.values(this.weapons)) {
+        w.def = { ...w.def, maxReserve: Math.round(w.def.maxReserve * 1.6) };
+        w.reserve = Math.round(w.reserve * 1.6);
+      }
+    }
+    this.weaponId = char.loadout[0];
+    this.grenades = char.grenades;
+    this.maxGrenades = char.grenades;
+    this.abilityCd = 0;
+    this.abilityActive = 0;
+
+    // ── state ──
+    this.stamina = 100;
+    this.staminaLock = 0;
+    this.lastDamaged = -99;
+    this.lastFired = -99;
+    this.footTimer = 0;
+    this.airTime = 0;
+    this.fallStart = null;
+    this.kills = 0;
+    this.deaths = 0;
+    this.headshots = 0;
+    this.damageDealt = 0;
+    this.streak = 0;
+    this.bestStreak = 0;
+    this.buffs = { damage: 1, fireRate: 1, speed: 1, until: 0 };
+    this.upgrades = { damage: 1, health: 1, speed: 1, reload: 1, ammo: 1, cooldown: 1, armorRegen: 0, lifesteal: 0 };
+    this.flashed = 0;
+    this.burning = 0;
+
+    // ── model: the roster character's signature silhouette ──
+    const b = char.build;
+    const outfit = makeOutfit(faction, 'elite');
+    outfit.helmet = b.headgear === 'helmet';
+    outfit.cap = b.headgear === 'cap';
+    outfit.bandana = b.headgear === 'bandana' ? (outfit.bandana ?? 0xe11d48) : null;
+    outfit.hasVest = b.frame === 'heavy' || faction === 'police';
+    outfit.visor = b.extra === 'shield' || b.extra === 'breach';
+    this.model = new CharacterModel(outfit);
+    this.model.root.scale.setScalar(b.frame === 'heavy' ? 1.09 : b.frame === 'light' ? 0.95 : 1);
+    game.scene.add(this.model.root);
+    attachWeapon(this.model, this.weaponId);
+  }
+
+  get weapon() { return this.weapons[this.weaponId]; }
+  get eyeHeight() { return this.crouching ? CROUCH_H - 0.2 : EYE; }
+
+  spawnAt(v) {
+    this.pos.copy(v);
+    this.vel.set(0, 0, 0);
+    this.health = this.maxHealth * this.upgrades.health;
+    this.armor = this.maxArmor;
+    this.alive = true;
+    this.model.deadBlend = 0;
+    this.model.root.visible = true;
+    this.stamina = 100;
+    this.burning = 0;
+    this.flashed = 0;
+    for (const w of Object.values(this.weapons)) {
+      w.mag = w.def.mag;
+      w.reloading = false;
+      w.reserve = Math.max(w.reserve, Math.floor(w.def.reserve * 0.6));
+    }
+  }
+
+  /* ══════════════ per-frame ══════════════ */
+  update(dt, input, world) {
+    const t = now();
+    if (!this.alive) {
+      this.model.update(dt, { speed: 0, dead: true, aiming: false, crouching: false, pitch: 0 });
+      return;
+    }
+
+    this._look(dt, input);
+    this._move(dt, input, world);
+    this._combat(dt, input, t);
+    this._vitals(dt, t);
+
+    this.model.setPosition(this.pos.x, this.pos.y, this.pos.z);
+    this.model.root.rotation.y = this.yaw + Math.PI;
+    const hs = Math.hypot(this.vel.x, this.vel.z);
+    this.model.update(dt, {
+      speed: hs, aiming: this.aiming, crouching: this.crouching,
+      pitch: this.pitch, dead: false, lean: this._strafe,
+    });
+  }
+
+  _look(dt, input) {
+    const d = input.takeLook();
+    const adsScale = this.aiming ? 0.55 : 1;
+    this.yaw -= d.x * adsScale;
+    this.pitch = clamp(this.pitch - d.y * adsScale, -1.35, 1.28);
+
+    // recoil settles back down
+    const rec = 9 * this.control * this.upgrades.reload;
+    this.recoilPitch = damp(this.recoilPitch, 0, rec, dt);
+    this.recoilYaw = damp(this.recoilYaw, 0, rec, dt);
+
+    if (input.pressed('KeyQ')) this.shoulder *= -1;
+  }
+
+  _move(dt, input, world) {
+    const ax = input.moveAxis();
+    this._strafe = ax.x;
+
+    const wantCrouch = input.down('ControlLeft') || input.down('KeyC');
+    const canStand = !world.collision.isBlocked(this.pos.x, this.pos.y, this.pos.z, this.radius, STAND_H);
+    this.crouching = wantCrouch || (this.crouching && !canStand);
+    this.height = this.crouching ? CROUCH_H : STAND_H;
+
+    const wantSprint = input.down('ShiftLeft') && ax.y > 0.25 && !this.aiming
+      && !this.crouching && this.stamina > 2;
+    this.sprinting = wantSprint;
+
+    if (this.sprinting) {
+      this.stamina = Math.max(0, this.stamina - dt * 17);
+      this.staminaLock = 0.85;
+    } else {
+      this.staminaLock = Math.max(0, this.staminaLock - dt);
+      if (this.staminaLock <= 0) this.stamina = Math.min(100, this.stamina + dt * 24);
+    }
+
+    let speed = BASE_SPEED * this.speedMul * this.upgrades.speed * this.buffs.speed;
+    if (this.sprinting) speed *= SPRINT_MUL;
+    else if (this.crouching) speed *= CROUCH_MUL;
+    if (this.aiming) speed *= ADS_MUL + (this.weapon?.def.aimMul ?? 0.6) * 0.35;
+    if (this.burning > 0) speed *= 0.85;
+
+    // camera-relative movement
+    const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
+    const wishX = ax.x * cos - ax.y * sin;
+    const wishZ = -ax.x * sin - ax.y * cos;
+
+    const accel = this.onGround ? 42 : 42 * AIR_CONTROL;
+    const targetVX = wishX * speed, targetVZ = wishZ * speed;
+    this.vel.x = damp(this.vel.x, targetVX, accel / Math.max(1, speed), dt);
+    this.vel.z = damp(this.vel.z, targetVZ, accel / Math.max(1, speed), dt);
+    if (this.onGround && ax.x === 0 && ax.y === 0) {
+      this.vel.x = damp(this.vel.x, 0, 16, dt);
+      this.vel.z = damp(this.vel.z, 0, 16, dt);
+    }
+
+    // jump
+    const jumpMul = this.char.passive.name === 'Telhado' ? 1.4 : 1;
+    if (input.pressed('Space') && this.onGround) {
+      this.vel.y = JUMP_V * Math.sqrt(jumpMul);
+      this.onGround = false;
+      audio.footstep(this.pos, true);
+    }
+
+    const wasAir = !this.onGround;
+    const prevY = this.pos.y;
+    world.collision.moveBody(this, dt);
+
+    // fall damage
+    if (!this.onGround) {
+      if (this.vel.y < -1) this.fallStart = Math.max(this.fallStart ?? prevY, prevY);
+      this.airTime += dt;
+    } else {
+      if (wasAir && this.fallStart != null) {
+        const drop = this.fallStart - this.pos.y;
+        const free = this.char.passive.name === 'Telhado' ? 9.5 : 6.5;
+        if (drop > free) this.damage((drop - free) * 8.5, null, 'the fall');
+        if (drop > 1.5) audio.footstep(this.pos, true);
+      }
+      this.fallStart = null;
+      this.airTime = 0;
+    }
+
+    // footsteps
+    const hs = Math.hypot(this.vel.x, this.vel.z);
+    if (this.onGround && hs > 1) {
+      this.footTimer -= dt * hs;
+      if (this.footTimer <= 0) {
+        this.footTimer = this.sprinting ? 3.2 : 4.2;
+        if (this.char.passive.name !== 'Telhado') audio.footstep(this.pos, this.sprinting);
+      }
+    }
+
+    // keep inside the map
+    this.pos.x = clamp(this.pos.x, world.bounds.x0, world.bounds.x1);
+    this.pos.z = clamp(this.pos.z, world.bounds.z0, world.bounds.z1);
+  }
+
+  _combat(dt, input, t) {
+    const w = this.weapon;
+    if (!w) return;
+
+    // ── aim ──
+    const focusing = this.abilityActive > 0 && this.char.ability.id === 'focus';
+    this.aiming = (input.aiming || focusing) && !this.sprinting;
+    this.aimBlend = damp(this.aimBlend, this.aiming ? 1 : 0,
+      this.char.passive.name === 'Porta Abaixo' ? 20 : 14, dt);
+
+    w.decayBloom(dt * this.control);
+
+    // ── weapon switching ──
+    for (const id of Object.keys(this.weapons)) {
+      const slot = WEAPONS[id].slot;
+      if (input.pressed('Digit' + slot)) this.switchTo(id);
+    }
+    const wheel = input.takeWheel();
+    if (wheel !== 0 || input.pressed('KeyX')) {
+      const ids = Object.keys(this.weapons);
+      const i = ids.indexOf(this.weaponId);
+      this.switchTo(ids[(i + (wheel > 0 ? 1 : ids.length - 1) + (input.pressed('KeyX') ? 1 : 0)) % ids.length]);
+    }
+
+    // ── reload ──
+    if (input.pressed('KeyR') && w.canReload) this.startReload();
+    if (w.reloading) {
+      if (t >= w.reloadEnd) this.finishReload();
+    } else if (w.mag <= 0 && w.reserve > 0) {
+      this.startReload();
+    }
+
+    // ── fire ──
+    const def = w.def;
+    const canFire = this.alive && !w.reloading && !this.sprinting && t >= w.nextShot && this.flashed <= 0;
+
+    if (input.firing && canFire && w.mag > 0 && (def.auto || !this._semiLatch)) {
+      this.fire(t);
+      if (!def.auto) this._semiLatch = true;
+    }
+    if (!input.firing) this._semiLatch = false;
+
+    if (input.firing && w.mag <= 0 && !w.reloading && t >= w.nextShot) {
+      w.nextShot = t + 0.35;
+      audio.click(this.pos, 400, 0.3);
+      if (w.reserve > 0) this.startReload();
+    }
+  }
+
+  switchTo(id) {
+    if (!id || !this.weapons[id] || id === this.weaponId) return;
+    const w = this.weapon;
+    if (w) w.reloading = false;
+    this.weaponId = id;
+    attachWeapon(this.model, id);
+    audio.click(this.pos, 1100, 0.25);
+  }
+
+  startReload() {
+    const w = this.weapon;
+    if (!w.canReload) return;
+    w.reloading = true;
+    w.reloadStart = now();
+    const mul = this.char.passive.name === 'Comando' ? 0.8 : 1;
+    w.reloadEnd = w.reloadStart + w.def.reload * mul / this.upgrades.reload;
+    audio.reload(this.pos);
+  }
+
+  finishReload() {
+    const w = this.weapon;
+    w.reloading = false;
+    if (w.def.shellReload) {
+      // pump guns top up one shell at a time; keep going while the mag isn't full
+      const n = Math.min(1, w.reserve, w.def.mag - w.mag);
+      w.mag += n; w.reserve -= n;
+      if (w.mag < w.def.mag && w.reserve > 0) this.startReload();
+    } else {
+      const n = Math.min(w.def.mag - w.mag, w.reserve);
+      w.mag += n; w.reserve -= n;
+    }
+  }
+
+  /** Where the shot comes from visually. */
+  muzzleWorld(out = new THREE.Vector3()) {
+    if (this.model.muzzleNode) return this.model.muzzleNode.getWorldPosition(out);
+    return out.set(this.pos.x, this.pos.y + this.eyeHeight, this.pos.z);
+  }
+
+  fire(t) {
+    const w = this.weapon;
+    const def = w.def;
+    const game = this.game;
+
+    w.mag--;
+    w.nextShot = t + 60 / (def.rpm * this.buffs.fireRate);
+    this.lastFired = t;
+
+    const cam = game.camera;
+    const origin = _o.copy(cam.position);
+    const dir = cam.getWorldDirection(_d).clone();
+
+    const hs = Math.hypot(this.vel.x, this.vel.z);
+    let spread = w.spread(this.aiming, hs, this.crouching);
+
+    // Rainha: crouched ADS is pinpoint
+    if (this.char.passive.name === 'Respiração' && this.aiming && this.crouching) spread *= 0.05;
+    if (this.abilityActive > 0 && this.char.ability.id === 'focus') spread = 0;
+
+    const muzzle = this.muzzleWorld(_mz);
+    const hits = game.combat.fire(this, origin, dir, w, game.livingTargets(this), { spread, muzzle });
+
+    w.addBloom();
+
+    // recoil
+    const kick = def.recoil / this.control * (this.aiming ? 0.62 : 1) * (this.crouching ? 0.8 : 1);
+    this.recoilPitch += kick * 0.011;
+    this.pitch += kick * 0.009;
+    this.recoilYaw += (Math.random() - 0.5) * def.recoilSide * 0.01;
+    this.yaw += (Math.random() - 0.5) * def.recoilSide * 0.006;
+    game.camera.userData.shake = Math.min(1, (game.camera.userData.shake || 0) + kick * 0.09);
+
+    // damage bonuses
+    let mul = this.upgrades.damage * this.buffs.damage;
+    if (this.char.passive.name === 'Frieza' && this.aiming && hs < 0.4) mul *= 1.45;
+    if (this.char.passive.name === 'Respiração') mul *= 1.0;
+    if (this.abilityActive > 0 && this.char.ability.id === 'focus') mul *= 1.35;
+
+    for (const h of hits) {
+      let dmg = h.damage * mul;
+      if (this.char.passive.name === 'Porta Abaixo' && h.dist < 8) dmg *= 1.35;
+      if (this.char.passive.name === 'Respiração' && h.zone === 'head') dmg *= 1.3;
+      game.applyDamage(h.target, dmg, this, h.zone, h.point);
+    }
+    if (hits.length) game.onPlayerHit(hits);
+    game.hud.onShot(this);
+  }
+
+  /* ══════════════ damage ══════════════ */
+  damage(amount, from, cause) {
+    if (!this.alive) return 0;
+    let dmg = amount;
+
+    if (this.char.passive.name === 'Couro Grosso') dmg *= 0.75;
+    if (this.char.passive.name === 'Blindado' && from) {
+      // frontal arc only
+      _d.subVectors(from.pos ?? from, this.pos).normalize();
+      const fwd = _f.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+      if (_d.dot(fwd) > 0.25) dmg *= 0.7;
+    }
+
+    if (this.armor > 0) {
+      const absorbed = Math.min(this.armor, dmg * 0.65);
+      this.armor -= absorbed;
+      dmg -= absorbed;
+    }
+    this.health -= dmg;
+    this.lastDamaged = now();
+    audio.hurt();
+
+    if (from && from.pos) this.game.hud.damageFrom(from.pos, this);
+    if (this.health <= 0) {
+      this.health = 0;
+      this.die(from, cause);
+    }
+    return dmg;
+  }
+
+  heal(n) {
+    this.health = Math.min(this.maxHealth * this.upgrades.health, this.health + n);
+  }
+  addArmor(n) { this.armor = Math.min(this.maxArmor || 50, this.armor + n); }
+
+  die(from, cause) {
+    if (!this.alive) return;
+    this.alive = false;
+    this.deaths++;
+    this.streak = 0;
+    this.vel.set(0, 0, 0);
+    this.game.onPlayerDeath(from, cause);
+  }
+
+  _vitals(dt, t) {
+    // out-of-combat regeneration
+    const doc = this.char.passive.name === 'Mão Boa';
+    const delay = doc ? 3 : 6.5;
+    const rate = doc ? 22 : 8;
+    if (t - this.lastDamaged > delay && this.health > 0) {
+      this.heal(rate * dt);
+      if (this.upgrades.armorRegen > 0) this.addArmor(this.upgrades.armorRegen * dt);
+    }
+
+    if (this.burning > 0) {
+      this.burning -= dt;
+      this.damage(9 * dt, null, 'fire');
+    }
+    if (this.flashed > 0) this.flashed -= dt;
+    if (this.abilityCd > 0) this.abilityCd -= dt;
+    if (this.abilityActive > 0) this.abilityActive -= dt;
+    if (this.buffs.until > 0 && t > this.buffs.until) {
+      this.buffs.damage = 1; this.buffs.fireRate = 1; this.buffs.speed = 1; this.buffs.until = 0;
+    }
+  }
+
+  /* ══════════════ third-person camera ══════════════ */
+  updateCamera(camera, dt, collision) {
+    const aim = this.aimBlend;
+
+    const pivot = _p.set(this.pos.x, this.pos.y + lerp(this.eyeHeight, this.eyeHeight + 0.06, aim), this.pos.z);
+
+    const pitch = clamp(this.pitch + this.recoilPitch, -1.35, 1.28);
+    const yaw = this.yaw + this.recoilYaw;
+
+    // desired offset behind the shoulder
+    const dist = lerp(3.25, 1.45, aim) * (this.crouching ? 0.9 : 1);
+    const side = lerp(0.62, 0.42, aim) * this.shoulder;
+    const up = lerp(0.12, 0.06, aim);
+
+    const fwd = _f.set(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)).normalize();
+    const right = _r.set(Math.cos(yaw), 0, -Math.sin(yaw));
+
+    const desired = _c.copy(pivot).addScaledVector(right, side).addScaledVector(fwd, -dist);
+    desired.y += up;
+
+    // pull the camera in if the wall is closer than the arm
+    const armDir = _a.copy(desired).sub(pivot);
+    const armLen = armDir.length();
+    armDir.multiplyScalar(1 / Math.max(armLen, 1e-5));
+    const hit = collision.raycast(pivot, armDir, armLen + 0.35, _hit);
+    let allowed = armLen;
+    if (hit) allowed = Math.max(0.35, hit.distance - 0.32);
+
+    this.camDistCur = allowed < this.camDistCur
+      ? allowed                                  // snap in instantly, never clip
+      : damp(this.camDistCur, allowed, 9, dt);
+
+    camera.position.copy(pivot).addScaledVector(armDir, this.camDistCur);
+
+    // shake
+    const sh = camera.userData.shake || 0;
+    if (sh > 0.001) {
+      camera.position.x += (Math.random() - 0.5) * sh * 0.13;
+      camera.position.y += (Math.random() - 0.5) * sh * 0.13;
+      camera.userData.shake = sh * Math.max(0, 1 - dt * 7);
+    }
+
+    camera.rotation.set(0, 0, 0);
+    camera.rotateY(yaw);
+    camera.rotateX(pitch);
+
+    const focus = this.abilityActive > 0 && this.char.ability.id === 'focus';
+    const targetFov = lerp(this.game.settings.fov, this.game.settings.fov - 22, aim) - (focus ? 14 : 0);
+    camera.fov = damp(camera.fov, targetFov, 11, dt);
+    camera.updateProjectionMatrix();
+  }
+}
+
+const _o = new THREE.Vector3();
+const _d = new THREE.Vector3();
+const _p = new THREE.Vector3();
+const _f = new THREE.Vector3();
+const _r = new THREE.Vector3();
+const _c = new THREE.Vector3();
+const _a = new THREE.Vector3();
+const _mz = new THREE.Vector3();
+const _hit = {};
