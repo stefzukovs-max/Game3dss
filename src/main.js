@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { clamp, now, damp, advanceClock } from './core/utils.js';
-import { Input } from './core/input.js';
+import { Input, IS_TOUCH } from './core/input.js';
 import { audio } from './core/audio.js';
 import { buildFavela, WORLD, TERRACES, zoneAt } from './world/favela.js';
 import { NavGraph } from './world/navgraph.js';
@@ -12,6 +12,7 @@ import { drawCards } from './systems/upgrades.js';
 import { Player } from './entities/player.js';
 import { ROSTER, FACTIONS, rosterFor, byId } from './entities/roster.js';
 import { HUD } from './ui/hud.js';
+import { setCharacterDetail } from './entities/character.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -55,7 +56,10 @@ class Game {
       if (locked) $('scr-lock').classList.add('hidden');
     });
 
-    addEventListener('resize', () => this._resize());
+    const onResize = () => { this._resize(); this._checkOrientation(); };
+    addEventListener('resize', onResize);
+    addEventListener('orientationchange', () => setTimeout(onResize, 250));
+    this._checkOrientation();
 
     // build the level in idle chunks so the loading bar actually moves
     requestAnimationFrame(() => this._load());
@@ -112,7 +116,7 @@ class Game {
 
   _resize() {
     const s = this.settings.res / 100;
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * s);
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, this._pixelCap ?? 2) * s);
     this.renderer.setSize(innerWidth, innerHeight, false);
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
@@ -170,7 +174,11 @@ class Game {
 
   /* ══════════════════ settings ══════════════════ */
   _loadSettings() {
-    const d = { sens: 1, fov: 78, vol: 70, invert: false, shadows: true, blood: true, dmgnum: true, res: 100 };
+    const d = {
+      sens: 1, tsens: 1, fov: IS_TOUCH ? 82 : 78, vol: 70, invert: false,
+      shadows: true, blood: true, dmgnum: true, res: 100,
+      quality: 'auto', assist: true, lefty: false,
+    };
     try { return { ...d, ...JSON.parse(localStorage.getItem('mdc.settings') || '{}') }; }
     catch { return d; }
   }
@@ -184,25 +192,96 @@ class Game {
     $('set-fov').value = s.fov;   $('lbl-fov').textContent = s.fov;
     $('set-vol').value = s.vol;   $('lbl-vol').textContent = s.vol;
     $('set-res').value = s.res;   $('lbl-res').textContent = s.res + '%';
+    $('set-tsens').value = s.tsens; $('lbl-tsens').textContent = (+s.tsens).toFixed(2);
     $('set-invert').checked = s.invert;
     $('set-shadows').checked = s.shadows;
     $('set-blood').checked = s.blood;
     $('set-dmgnum').checked = s.dmgnum;
+    $('set-assist').checked = s.assist;
+    $('set-lefty').checked = s.lefty;
+    for (const b of document.querySelectorAll('#seg-quality button')) {
+      b.classList.toggle('on', b.dataset.v === s.quality);
+    }
     this._applySettings();
   }
 
   _applySettings() {
     const s = this.settings;
     this.input.sensitivity = +s.sens;
+    this.input.touchSensitivity = +s.tsens;
     this.input.invertY = s.invert;
     audio.setVolume(s.vol / 100);
-    this.renderer.shadowMap.enabled = s.shadows;
-    this.sun.castShadow = s.shadows;
-    if (this.combat) this.combat.effectsOn = s.blood;
     this.camera.fov = +s.fov;
     this.camera.updateProjectionMatrix();
-    this._resize();
+    document.body.classList.toggle('lefty', !!s.lefty);
+    this._applyQuality();
     this._saveSettings();
+  }
+
+  /* ══════════════════ quality ══════════════════ */
+
+  /**
+   * Pick a tier from what the device tells us about itself. Phones get 'low'
+   * unless they look genuinely capable — a mid-range handset running a 2048
+   * shadow map at full DPR will not hold 30 fps.
+   */
+  _detectQuality() {
+    const cores = navigator.hardwareConcurrency || 4;
+    const mem = navigator.deviceMemory || (IS_TOUCH ? 3 : 8);
+    if (IS_TOUCH) return cores >= 8 && mem >= 6 ? 'medium' : 'low';
+    return cores <= 4 || mem <= 4 ? 'medium' : 'high';
+  }
+
+  _applyQuality() {
+    const s = this.settings;
+    const q = s.quality === 'auto' ? (this._autoQuality ??= this._detectQuality()) : s.quality;
+    this.quality = q;
+    const low = q === 'low', med = q === 'medium';
+
+    // resolution
+    const cap = low ? 1 : med ? 1.5 : 2;
+    this._pixelCap = cap;
+    this._resize();
+
+    // shadows
+    const shadows = s.shadows && !low;
+    this.renderer.shadowMap.enabled = shadows;
+    this.sun.castShadow = shadows;
+    const mapSize = med ? 1024 : 2048;
+    if (shadows && this.sun.shadow.mapSize.x !== mapSize) {
+      this.sun.shadow.mapSize.set(mapSize, mapSize);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
+
+    // draw distance, model detail, effects, crowd size
+    this.scene.fog.near = low ? 45 : 70;
+    this.scene.fog.far = low ? 165 : med ? 230 : 300;
+    this.camera.far = low ? 420 : 900;
+    this.camera.updateProjectionMatrix();
+    setCharacterDetail(low ? 0 : 1);
+    if (this.combat) this.combat.effectsOn = s.blood && !low;
+    this.maxEnemies = low ? 8 : med ? 12 : 18;
+    this.allyCap = low ? 2 : med ? 3 : 6;
+  }
+
+  /** Portrait on a phone is unplayable - gate it rather than squeeze it. */
+  _checkOrientation() {
+    const portrait = innerHeight > innerWidth * 1.02;
+    const gate = $('rotate-gate');
+    if (!gate) return;
+    const show = IS_TOUCH && portrait;
+    gate.classList.toggle('hidden', !show);
+    if (show && this.state === STATE.PLAYING) this.pause();
+  }
+
+  /** Best-effort immersive mode. Must be called from inside a user gesture. */
+  _goFullscreen() {
+    if (!IS_TOUCH) return;
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    try { req?.call(el)?.catch?.(() => {}); } catch { /* denied is fine */ }
+    try { screen.orientation?.lock?.('landscape')?.catch?.(() => {}); } catch { /* ditto */ }
   }
 
   /* ══════════════════ menus ══════════════════ */
@@ -259,15 +338,39 @@ class Game {
     bind('set-fov', 'fov', { id: 'lbl-fov', f: (v) => v }, parseInt);
     bind('set-vol', 'vol', { id: 'lbl-vol', f: (v) => v }, parseInt);
     bind('set-res', 'res', { id: 'lbl-res', f: (v) => v + '%' }, parseInt);
+    bind('set-tsens', 'tsens', { id: 'lbl-tsens', f: (v) => (+v).toFixed(2) }, parseFloat);
     bind('set-invert', 'invert');
+    bind('set-assist', 'assist');
+    bind('set-lefty', 'lefty');
+
+    for (const b of document.querySelectorAll('#seg-quality button')) {
+      b.addEventListener('click', () => {
+        this.settings.quality = b.dataset.v;
+        for (const o of document.querySelectorAll('#seg-quality button')) o.classList.toggle('on', o === b);
+        this._applySettings();
+      });
+    }
+
+    // on-screen pause (touch has no Esc)
+    $('btn-pause')?.addEventListener('touchstart', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (this.state === STATE.PLAYING) this.pause();
+    }, { passive: false });
+    $('btn-pause')?.addEventListener('click', () => {
+      if (this.state === STATE.PLAYING) this.pause();
+    });
     bind('set-shadows', 'shadows');
     bind('set-blood', 'blood');
     bind('set-dmgnum', 'dmgnum');
 
     // pointer lock / pause
-    this.canvas.addEventListener('click', () => {
-      if (this.state === STATE.PLAYING) { audio.init(); audio.resume(); this.input.requestLock(); }
-    });
+    const wake = () => {
+      if (this.state !== STATE.PLAYING) return;
+      audio.init(); audio.resume();
+      this.input.requestLock();
+    };
+    this.canvas.addEventListener('click', wake);
+    this.canvas.addEventListener('touchstart', wake, { passive: true });
     addEventListener('keydown', (e) => {
       if (e.code === 'Escape') {
         if (this.state === STATE.PLAYING) this.pause();
@@ -371,14 +474,31 @@ class Game {
 
     this.state = STATE.PLAYING;
     this.hud.show(true);
-    this._hideOverlay();
-    $('scr-lock').classList.remove('hidden');
-    $('overlay').classList.remove('gone');
-    $('overlay').classList.add('transparent');
-    this.input.requestLock();
+    this._goFullscreen();
+    this._enterPlay();
 
     this.hud.banner(FACTIONS[this.playerFaction].name.toUpperCase(),
       this.playerFaction === 'gang' ? 'Hold the hill' : 'Take the hill');
+  }
+
+  /**
+   * Hand control back to the game. On desktop that means showing the
+   * click-to-capture card; on touch the controls are already on screen, so we
+   * go straight in.
+   */
+  _enterPlay() {
+    const ov = $('overlay');
+    if (IS_TOUCH) {
+      ov.classList.add('gone');
+      this.input.requestLock();     // no-op on touch, but clears the lock card
+      return;
+    }
+    ov.classList.remove('gone');
+    ov.classList.add('transparent');
+    for (const sc of ov.querySelectorAll('.screen')) {
+      sc.classList.toggle('hidden', sc.id !== 'scr-lock');
+    }
+    this.input.requestLock();
   }
 
   _playerSpawn() {
@@ -410,6 +530,7 @@ class Game {
     if (this.state !== STATE.PLAYING) return;
     this.state = STATE.PAUSED;
     this.input.exitLock();
+    this.input.releaseAll();
     $('pause-stats').innerHTML = this._statBlocks();
     this._showScreen('scr-pause', true);
   }
@@ -417,14 +538,7 @@ class Game {
   resume() {
     if (this.state !== STATE.PAUSED) return;
     this.state = STATE.PLAYING;
-    this._hideOverlay();
-    $('overlay').classList.remove('gone');
-    $('overlay').classList.add('transparent');
-    $('scr-lock').classList.remove('hidden');
-    for (const s of $('overlay').querySelectorAll('.screen')) {
-      s.classList.toggle('hidden', s.id !== 'scr-lock');
-    }
-    this.input.requestLock();
+    this._enterPlay();
   }
 
   toMenu() {
@@ -531,6 +645,7 @@ class Game {
   onPlayerDeath(from, cause) {
     this.state = STATE.DEAD;
     this.input.exitLock();
+    this.input.releaseAll();
     this.revives--;
 
     const killer = from?.nameTag ?? (cause ? `${cause}` : 'the hill');
@@ -563,13 +678,7 @@ class Game {
     this.player.spawnAt(best);
     this.player.abilityCd = Math.min(this.player.abilityCd, 4);
     this.state = STATE.PLAYING;
-    this._hideOverlay();
-    $('overlay').classList.remove('gone');
-    $('overlay').classList.add('transparent');
-    for (const s of $('overlay').querySelectorAll('.screen')) {
-      s.classList.toggle('hidden', s.id !== 'scr-lock');
-    }
-    this.input.requestLock();
+    this._enterPlay();
     this.hud.banner('BACK UP', `${this.revives} ${this.revives === 1 ? 'life' : 'lives'} left`);
   }
 
@@ -619,6 +728,7 @@ class Game {
   _openDraft(wave) {
     this.state = STATE.DRAFT;
     this.input.exitLock();
+    this.input.releaseAll();
     const cards = drawCards(3, wave);
     $('draft-title').textContent = `WAVE ${wave} CLEARED`;
     $('draft-sub').textContent = 'Resupply — take one before the next push';
@@ -646,11 +756,7 @@ class Game {
 
   _closeDraft() {
     this.state = STATE.PLAYING;
-    for (const s of $('overlay').querySelectorAll('.screen')) {
-      s.classList.toggle('hidden', s.id !== 'scr-lock');
-    }
-    $('overlay').classList.add('transparent');
-    this.input.requestLock();
+    this._enterPlay();
   }
 
   /* ══════════════════ helpers ══════════════════ */

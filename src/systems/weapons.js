@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PartMesh, BODY_MATERIAL } from '../entities/character.js';
 
 /**
  * Weapon stats + procedural weapon models.
@@ -50,11 +51,18 @@ const box = (w, h, d) => {
   return g;
 };
 
-const M = new Map();
-const mat = (c) => {
-  let m = M.get(c);
-  if (!m) M.set(c, (m = new THREE.MeshLambertMaterial({ color: c })));
-  return m;
+const _wm = new THREE.Matrix4();
+
+/** Barrel / tube running down -Z. */
+const rod = (r, len) => {
+  const k = `r${r}|${len}`;
+  let g = G.get(k);
+  if (!g) {
+    g = new THREE.CylinderGeometry(r, r, len, 8);
+    g.rotateX(Math.PI / 2);            // stand it up along Z
+    G.set(k, g);
+  }
+  return g;
 };
 
 const GUNMETAL = 0x2b2e33;
@@ -66,15 +74,31 @@ const STEEL = 0x585d66;
  * Builds a weapon oriented so that -Z is "down the barrel", ready to be
  * parented to a hand. The `muzzle` child marks where fire comes from.
  */
+const MODEL_CACHE = new Map();
+
 export function buildWeaponModel(id) {
+  const cached = MODEL_CACHE.get(id);
   const g = new THREE.Group();
-  const add = (geo, m, x, y, z, rx = 0) => {
-    const mesh = new THREE.Mesh(geo, mat(m));
-    mesh.position.set(x, y, z);
-    mesh.rotation.x = rx;
+
+  if (cached) {
+    const mesh = new THREE.Mesh(cached.geo, BODY_MATERIAL);
     mesh.castShadow = true;
     g.add(mesh);
-    return mesh;
+    const muzzle = new THREE.Object3D();
+    muzzle.position.copy(cached.muzzle);
+    muzzle.name = 'muzzle';
+    g.add(muzzle);
+    g.userData.muzzle = muzzle;
+    return g;
+  }
+
+  // Merge the whole gun into one vertex-coloured buffer sharing the character
+  // material: seven meshes per weapon times twenty combatants is a lot of draw
+  // calls to spend on something the size of a shoebox.
+  const part = new PartMesh();
+  const add = (geo, colour, x, y, z) => {
+    _wm.makeTranslation(x, y, z);
+    part.add(geo, _wm, colour);
   };
 
   let muzzleZ = -0.3;
@@ -84,8 +108,8 @@ export function buildWeaponModel(id) {
       add(box(0.055, 0.11, 0.24), GUNMETAL, 0, 0.03, -0.06);   // slide
       add(box(0.05, 0.14, 0.07), POLYMER, 0, -0.07, 0.03);     // grip
       add(box(0.03, 0.045, 0.05), GUNMETAL, 0, -0.02, 0.0);    // trigger guard
-      add(box(0.06, 0.05, 0.07), STEEL, 0, 0.0, -0.02);        // cylinder
-      add(box(0.028, 0.028, 0.1), STEEL, 0, 0.035, -0.2);      // barrel
+      add(rod(0.031, 0.07), STEEL, 0, 0.0, -0.02);             // cylinder
+      add(rod(0.016, 0.11), STEEL, 0, 0.035, -0.2);            // barrel
       muzzleZ = -0.26;
       break;
     }
@@ -93,7 +117,7 @@ export function buildWeaponModel(id) {
       add(box(0.06, 0.11, 0.34), POLYMER, 0, 0.02, -0.08);
       add(box(0.05, 0.15, 0.07), POLYMER, 0, -0.08, 0.05);     // grip
       add(box(0.045, 0.2, 0.06), GUNMETAL, 0, -0.11, -0.05);   // magazine
-      add(box(0.03, 0.03, 0.14), STEEL, 0, 0.035, -0.29);      // barrel
+      add(rod(0.017, 0.15), STEEL, 0, 0.035, -0.29);           // barrel
       add(box(0.05, 0.06, 0.16), GUNMETAL, 0, 0.0, 0.16);      // stock
       add(box(0.02, 0.03, 0.02), STEEL, 0, 0.085, -0.2);       // front sight
       muzzleZ = -0.37;
@@ -103,7 +127,7 @@ export function buildWeaponModel(id) {
       add(box(0.06, 0.1, 0.42), POLYMER, 0, 0.02, -0.1);       // receiver
       add(box(0.05, 0.15, 0.07), POLYMER, 0, -0.08, 0.08);     // grip
       add(box(0.05, 0.24, 0.07), GUNMETAL, 0, -0.12, -0.02);   // magazine (curved-ish)
-      add(box(0.032, 0.032, 0.24), STEEL, 0, 0.035, -0.42);    // barrel
+      add(rod(0.018, 0.25), STEEL, 0, 0.035, -0.42);           // barrel
       add(box(0.055, 0.06, 0.16), POLYMER, 0, 0.03, -0.28);    // handguard
       add(box(0.055, 0.08, 0.2), POLYMER, 0, -0.01, 0.24);     // stock
       add(box(0.03, 0.05, 0.03), GUNMETAL, 0, 0.09, -0.02);    // rear sight
@@ -113,8 +137,8 @@ export function buildWeaponModel(id) {
     }
     case 'shotgun': {
       add(box(0.06, 0.09, 0.4), WOOD, 0, 0.01, -0.08);
-      add(box(0.038, 0.038, 0.34), STEEL, 0, 0.05, -0.34);     // barrel
-      add(box(0.036, 0.036, 0.3), GUNMETAL, 0, 0.005, -0.32);  // tube magazine
+      add(rod(0.021, 0.35), STEEL, 0, 0.05, -0.34);            // barrel
+      add(rod(0.019, 0.31), GUNMETAL, 0, 0.005, -0.32);        // tube magazine
       add(box(0.06, 0.055, 0.12), WOOD, 0, 0.0, -0.3);         // pump
       add(box(0.05, 0.13, 0.06), WOOD, 0, -0.06, 0.06);        // grip
       add(box(0.055, 0.1, 0.22), WOOD, 0, -0.02, 0.24);        // stock
@@ -123,8 +147,15 @@ export function buildWeaponModel(id) {
     }
   }
 
+  const geo = part.build();
+  const muzzlePos = new THREE.Vector3(0, 0.04, muzzleZ);
+  MODEL_CACHE.set(id, { geo, muzzle: muzzlePos });
+
+  const mesh = new THREE.Mesh(geo, BODY_MATERIAL);
+  mesh.castShadow = true;
+  g.add(mesh);
   const muzzle = new THREE.Object3D();
-  muzzle.position.set(0, 0.04, muzzleZ);
+  muzzle.position.copy(muzzlePos);
   muzzle.name = 'muzzle';
   g.add(muzzle);
   g.userData.muzzle = muzzle;
@@ -140,7 +171,7 @@ export function attachWeapon(character, id) {
     character.rightHand.remove(character.weaponModel);
   }
   const m = buildWeaponModel(id);
-  m.position.set(0, -0.05, -0.06);
+  m.position.set(0.012, -0.055, -0.035);
   m.rotation.set(Math.PI / 2, 0, 0); // hand hangs down: rotate barrel to forward
   character.rightHand.add(m);
   character.weaponModel = m;

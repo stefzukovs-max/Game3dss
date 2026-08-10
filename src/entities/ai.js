@@ -77,10 +77,11 @@ export class Agent {
     this.buffs = { damage: 1, fireRate: 1, speed: 1, until: 0 };
     this.rng = makeRNG(this.id * 7919 + 13);
 
-    // model
+    // model - the bigger archetypes get a broader build, not just a bigger scale
     const outfit = makeOutfit(faction, archetype.rank, this.rng);
+    outfit.frame = archetype.health >= 150 ? 'heavy' : 'normal';
     this.model = new CharacterModel(outfit);
-    this.model.root.scale.setScalar(archetype.rank === 'elite' ? 1.06 : 1);
+    this.model.root.scale.setScalar(archetype.rank === 'elite' ? 1.05 : 1);
     this.model.setPosition(spawn.x, spawn.y, spawn.z);
     game.scene.add(this.model.root);
     attachWeapon(this.model, archetype.weapon);

@@ -5,9 +5,9 @@ Two factions fight over the same hill: the **Comando do Morro** hold it, the
 **Batalhão Tático** try to take it. Pick a side, pick an operator, survive the
 waves.
 
-Runs in any modern browser. No build step, no bundler, no downloads at
-runtime — three.js is vendored and every texture, sound and 3D model is
-generated procedurally at load time.
+Runs in any modern browser, **desktop or phone**. No build step, no bundler,
+no downloads at runtime — three.js is vendored and every texture, sound and
+3D model is generated procedurally at load time.
 
 ```bash
 npm start          # → http://localhost:8080
@@ -31,7 +31,31 @@ npm start          # → http://localhost:8080
 | `E` | operator ability · `G` grenade |
 | `M` | toggle radar rotation · `Esc` pause |
 
-Touch controls (stick + buttons) appear automatically on touch devices.
+## On mobile
+
+Touch is a first-class path, not a shim. The game detects a touch device and
+switches over completely: no pointer lock, no click-to-play card, on-screen
+controls, and a graphics tier picked from what the device reports about itself.
+
+- **Left thumb** — a stick that *floats to wherever your thumb lands*, so you
+  never hunt for a fixed pad. Push it to the edge to sprint.
+- **Right thumb** — drag anywhere on the right of the screen to look. Touches
+  are tracked per finger, so you can keep dragging while the other thumb holds
+  FIRE.
+- **Buttons** — fire, aim toggle, jump, crouch, reload, weapon swap, ability
+  and grenade, plus an on-screen pause. Sized in `vmin` and laid out inside the
+  safe area, so notches and home bars don't eat them. There's a left-handed
+  layout in the settings.
+- **Aim assist** — on by default. It nudges your aim toward a hostile already
+  near the crosshair and fades to nothing at the edge of the cone; a thumb
+  can't make 1° corrections. Roughly twice the pull on touch as on a mouse, and
+  it can be switched off.
+- **Portrait is gated** with a rotate prompt rather than squeezed — the HUD
+  needs the width.
+- **Quality tiers** (Auto/Low/Medium/High) scale resolution, shadows, draw
+  distance, character detail, effects and crowd size together. A phone
+  typically lands on Low: no shadows, 1× pixel ratio, simplified character
+  meshes, fog pulled in to 165 m and the enemy cap dropped from 18 to 8.
 
 ---
 
@@ -93,6 +117,14 @@ and all the audio (synthesised through WebAudio — gunshots are a noise burst
 through a swept resonant filter plus a low body thump, distance-attenuated and
 low-passed).
 
+**Characters** are built from capsules, spheres and a lathed torso rather than
+boxes. Two things keep that cheap enough to run twenty of them on a phone:
+every part of a limb — sleeve, skin, glove, strapping — is baked into one
+buffer with **vertex colours** under a single shared material, so a limb is one
+draw call instead of four; and outfits come from a small preset table, so the
+merged geometry for "gang grunt #3" is built once and shared by everyone
+wearing it. Spawning an agent allocates nothing but a handful of `Object3D`s.
+
 ```
 src/
   core/       utils (RNG, geometry batching, game clock) · collision · input · audio
@@ -130,6 +162,14 @@ wedged in a corner would otherwise stall the run forever.
 all read an internal clock advanced by `dt`, so the game behaves identically
 under a frame drop and nothing ticks down while paused.
 
+**Shots converge on the crosshair.** The aim ray starts at the camera, which
+sits behind and to one side of the shooter, so firing straight down it would
+send bullets past whatever you were pointing at. Instead the game finds what
+the crosshair is over — world geometry *and* characters — and fires from the
+muzzle at that point. Leaving characters out of that test is worse than it
+sounds: the convergence point lands on the wall behind your target and the
+muzzle offset then carries the shot wide by more than the weapon's own spread.
+
 ---
 
 ## Development tools
@@ -142,9 +182,17 @@ npm run check:map        # asserts every staircase and ramp is walkable end to e
                          # and dumps live AI nav state (path, waypoint, stuck timers)
 npm run check:sim        # drives the game at a fixed 60 Hz timestep for N minutes —
                          # waves, AI, combat and the draft, far faster than real time
-npm run check:shooting   # measures sustained hit rate against a stationary target
-npm run shots            # captures menu / HUD / map screenshots for visual review
+npm run check:mobile     # emulates a phone and drives the game through synthetic
+                         # touch events: stick, look drag and every button
+npm run check:shooting   # weapon bench on open ground, isolated from allied fire
+npm run shots            # captures menu / HUD / map screenshots
+npm run shots:chars      # close-up portraits of both factions' character rigs
 ```
+
+The weapon bench is worth a note: it measures the **player's own** damage
+output, never the dummy's health. Reading the dummy's health folds in every
+ally shooting the same target, which swamps the signal completely — an earlier
+version of this harness did exactly that and reported pure noise.
 
 `check:sim` is the useful one: it reports wave progression, how far up the hill
 the attackers have travelled, kills, score and any thrown exception.

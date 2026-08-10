@@ -109,18 +109,33 @@
   <div id="fps"></div>
 </div>
 
-<!-- ═══════════════════════ TOUCH ═══════════════════════ -->
+<!-- ═══════════════════════ TOUCH CONTROLS ═══════════════════════ -->
 <div id="touch" class="hidden">
-  <div id="stick-move" class="stick"><i></i></div>
-  <div id="touch-right">
-    <button id="btn-ability" class="tbtn small">E</button>
-    <button id="btn-nade" class="tbtn small">G</button>
-    <button id="btn-aim" class="tbtn">AIM</button>
-    <button id="btn-jump" class="tbtn">JUMP</button>
-    <button id="btn-reload" class="tbtn">RLD</button>
-    <button id="btn-swap" class="tbtn">SWAP</button>
-    <button id="btn-fire" class="tbtn fire">FIRE</button>
+  <!-- floating stick: jumps to wherever the left thumb lands -->
+  <div id="stick-move"><span id="stick-knob"></span></div>
+  <div id="stick-hint">MOVE · push to sprint</div>
+
+  <div id="touch-left-top">
+    <button id="btn-pause" class="tbtn tiny">❚❚</button>
   </div>
+
+  <div id="touch-right">
+    <button id="btn-ability" class="tbtn util"><b>E</b><span>SKILL</span></button>
+    <button id="btn-nade"    class="tbtn util"><b>G</b><span>NADE</span></button>
+    <button id="btn-swap"    class="tbtn util"><b>⇄</b><span>GUN</span></button>
+    <button id="btn-reload"  class="tbtn util"><b>⟳</b><span>RELOAD</span></button>
+    <button id="btn-crouch"  class="tbtn util"><b>▼</b><span>CROUCH</span></button>
+    <button id="btn-jump"    class="tbtn util"><b>▲</b><span>JUMP</span></button>
+    <button id="btn-aim"     class="tbtn aim">AIM</button>
+    <button id="btn-fire"    class="tbtn fire">FIRE</button>
+  </div>
+</div>
+
+<!-- shown when a phone is held upright - the game needs the width -->
+<div id="rotate-gate" class="hidden">
+  <div class="rot-icon">⟳</div>
+  <h3>ROTATE YOUR DEVICE</h3>
+  <p>Morro do Cruzeiro plays in landscape.</p>
 </div>
 
 <!-- ═══════════════════════ OVERLAY / MENUS ═══════════════════════ -->
@@ -183,6 +198,12 @@
       <div><b>1–4 / wheel</b> weapons</div><div><b>Q</b> swap shoulder</div>
       <div><b>M</b> rotate radar</div><div><b>Esc</b> pause</div>
     </div>
+    <div class="keys touch-only">
+      <div><b>Left thumb</b> move · push to the edge to sprint</div>
+      <div><b>Right thumb</b> drag anywhere to look</div>
+      <div><b>FIRE</b> hold to shoot · <b>AIM</b> toggles sights</div>
+      <div><b>E</b> ability · <b>G</b> grenade · <b>⇄</b> swap weapon</div>
+    </div>
     <h2>SETTINGS</h2>
     <div class="settings">
       <label>Mouse sensitivity <span id="lbl-sens">1.00</span>
@@ -193,11 +214,24 @@
         <input id="set-vol" type="range" min="0" max="100" step="1" value="70" /></label>
       <label>Render scale <span id="lbl-res">100%</span>
         <input id="set-res" type="range" min="50" max="100" step="5" value="100" /></label>
+      <label class="touch-only">Touch look speed <span id="lbl-tsens">1.00</span>
+        <input id="set-tsens" type="range" min="0.3" max="2.5" step="0.05" value="1" /></label>
+      <div class="seg-row">
+        <label>QUALITY</label>
+        <div class="seg" id="seg-quality">
+          <button data-v="auto" class="on">Auto</button>
+          <button data-v="low">Low</button>
+          <button data-v="medium">Medium</button>
+          <button data-v="high">High</button>
+        </div>
+      </div>
       <div class="chk-grid">
         <label class="chk"><input id="set-invert" type="checkbox" /> Invert vertical look</label>
+        <label class="chk"><input id="set-assist" type="checkbox" checked /> Aim assist</label>
         <label class="chk"><input id="set-shadows" type="checkbox" checked /> Shadows</label>
         <label class="chk"><input id="set-blood" type="checkbox" checked /> Impact effects</label>
         <label class="chk"><input id="set-dmgnum" type="checkbox" checked /> Damage numbers</label>
+        <label class="chk"><input id="set-lefty" type="checkbox" /> Left-handed layout</label>
       </div>
     </div>
     <button id="btn-opts-back" class="big">BACK</button>
@@ -242,8 +276,10 @@
   <!-- ── click to lock ── -->
   <section id="scr-lock" class="screen bare hidden">
     <div class="lockcard">
-      <h3>CLICK TO PLAY</h3>
-      <p>Your mouse will be captured. Press <b>Esc</b> to pause.</p>
+      <h3 class="mouse-only">CLICK TO PLAY</h3>
+      <h3 class="touch-only">TAP TO PLAY</h3>
+      <p class="mouse-only">Your mouse will be captured. Press <b>Esc</b> to pause.</p>
+      <p class="touch-only">Left thumb moves, right thumb looks. <b>❚❚</b> to pause.</p>
     </div>
   </section>
 </div>

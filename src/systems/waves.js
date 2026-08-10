@@ -91,7 +91,7 @@ export class WaveDirector {
     if (this.queue.length) {
       this.spawnTimer -= dt;
       const alive = game.agents.filter((a) => a.alive && a.faction === game.enemyFaction).length;
-      const cap = Math.min(18, 7 + Math.floor(this.wave * 0.8));
+      const cap = Math.min(game.maxEnemies ?? 18, 7 + Math.floor(this.wave * 0.8));
       if (this.spawnTimer <= 0 && alive < cap) {
         this.spawnTimer = Math.max(0.28, 1.5 - this.wave * 0.06);
         this._spawnOne(this.queue.shift());
@@ -164,7 +164,7 @@ export class WaveDirector {
     const game = this.game;
     this._allyTimer = (this._allyTimer ?? 0) - dt;
     const allies = game.agents.filter((a) => a.alive && a.faction === game.playerFaction);
-    if (allies.length >= this.alliesWanted) return;
+    if (allies.length >= Math.min(this.alliesWanted, game.allyCap ?? 6)) return;
     if (this._allyTimer > 0) return;
     this._allyTimer = 3.5;
 

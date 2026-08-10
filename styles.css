@@ -213,20 +213,177 @@ body.side-police .abil.ready{ box-shadow:0 0 16px rgba(78,163,255,.3), 0 4px 14p
 #fps{ position:absolute; left:50%; bottom:6px; transform:translateX(-50%);
   font-size:11px; color:rgba(255,255,255,.28); letter-spacing:.14em; }
 
-/* ══════════════════════════ TOUCH ══════════════════════════ */
+/* ══════════════════════════ TOUCH CONTROLS ══════════════════════════ */
+/* Sized in vmin so the same layout works on a 5" phone and a 13" tablet.
+   Everything sits inside the safe area so notches and home bars don't eat it. */
+:root{
+  --pad-l: max(14px, env(safe-area-inset-left));
+  --pad-r: max(14px, env(safe-area-inset-right));
+  --pad-b: max(12px, env(safe-area-inset-bottom));
+  --pad-t: max(10px, env(safe-area-inset-top));
+  --btn: clamp(46px, 8.4vmin, 72px);
+}
+html,body{ overscroll-behavior:none; }
+
 #touch{ position:fixed; inset:0; z-index:14; pointer-events:none; }
-.stick{ position:absolute; left:28px; bottom:32px; width:136px; height:136px;
-  border:2px solid rgba(255,255,255,.26); border-radius:50%; background:rgba(0,0,0,.28);
-  pointer-events:auto; }
-.stick i{ position:absolute; left:50%; top:50%; width:56px; height:56px; margin:-28px 0 0 -28px;
-  border-radius:50%; background:rgba(255,255,255,.34); }
-#touch-right{ position:absolute; right:20px; bottom:26px; display:grid;
-  grid-template-columns:repeat(3,72px); gap:9px; pointer-events:auto; }
-.tbtn{ height:52px; border-radius:11px; border:2px solid rgba(255,255,255,.28);
-  background:rgba(0,0,0,.4); color:#fff; font:800 14px/1 var(--font); letter-spacing:.09em; }
-.tbtn.small{ height:44px; }
-.tbtn.fire{ grid-column:span 3; height:64px; background:rgba(200,30,30,.42); }
-.tbtn:active,.tbtn.on{ background:rgba(255,255,255,.32); }
+.mouse-only{ display:revert; } .touch-only{ display:none !important; }
+body.is-touch .mouse-only{ display:none !important; }
+body.is-touch .touch-only{ display:revert !important; }
+
+/* floating stick - hidden until a thumb lands, then it appears there */
+#stick-move{ position:absolute; left:22%; bottom:26%; width:clamp(96px,22vmin,150px);
+  aspect-ratio:1; transform:translate(-50%,50%); border-radius:50%;
+  border:2px solid rgba(255,255,255,.22); background:rgba(0,0,0,.22);
+  opacity:0; transition:opacity .12s; }
+#stick-move.on{ opacity:1; }
+#stick-knob{ position:absolute; left:50%; top:50%; width:44%; aspect-ratio:1;
+  margin:-22% 0 0 -22%; border-radius:50%; background:rgba(255,255,255,.4);
+  box-shadow:0 2px 10px rgba(0,0,0,.5); }
+#stick-hint{ position:absolute; left:var(--pad-l); bottom:var(--pad-b);
+  font-size:10px; letter-spacing:.18em; color:rgba(255,255,255,.3); }
+
+#touch-left-top{ position:absolute; left:var(--pad-l); top:var(--pad-t); pointer-events:auto; }
+
+#touch-right{ position:absolute; right:var(--pad-r); bottom:var(--pad-b);
+  pointer-events:auto; display:grid; gap:clamp(6px,1.2vmin,11px);
+  grid-template-columns:repeat(3, var(--btn));
+  grid-template-areas:
+    "skill nade  gun"
+    "reload crouch jump"
+    ".      aim   fire"; }
+body.lefty #touch-right{ right:auto; left:var(--pad-r);
+  grid-template-areas:
+    "gun   nade   skill"
+    "jump  crouch reload"
+    "fire  aim    ."; }
+body.lefty #stick-move{ left:auto; right:22%; }
+
+.tbtn{ display:grid; place-content:center; gap:1px; width:var(--btn); height:var(--btn);
+  border-radius:50%; border:2px solid rgba(255,255,255,.26);
+  background:rgba(10,12,16,.44); color:#fff; font:700 13px/1 var(--font);
+  letter-spacing:.06em; -webkit-tap-highlight-color:transparent; backdrop-filter:blur(2px); }
+.tbtn b{ font-size:clamp(15px,3vmin,21px); line-height:1; }
+.tbtn span{ font-size:8.5px; letter-spacing:.12em; opacity:.62; }
+.tbtn:active,.tbtn.on{ background:rgba(255,255,255,.34); border-color:#fff; transform:scale(.94); }
+.tbtn.tiny{ width:clamp(38px,6vmin,50px); height:clamp(38px,6vmin,50px); font-size:12px; }
+#btn-skill{ grid-area:skill; }
+#btn-ability{ grid-area:skill; }
+#btn-nade{ grid-area:nade; }
+#btn-swap{ grid-area:gun; }
+#btn-reload{ grid-area:reload; }
+#btn-crouch{ grid-area:crouch; }
+#btn-jump{ grid-area:jump; }
+#btn-aim{ grid-area:aim; background:rgba(30,70,120,.42); }
+#btn-fire{ grid-area:fire; width:calc(var(--btn) * 1.34); height:calc(var(--btn) * 1.34);
+  margin:-17% 0 0 -17%; background:rgba(190,40,40,.46); border-color:rgba(255,140,140,.5);
+  font-size:clamp(12px,2.4vmin,16px); }
+
+/* ── rotate gate ── */
+#rotate-gate{ position:fixed; inset:0; z-index:40; display:grid; place-content:center;
+  text-align:center; gap:10px; background:#06070a; }
+#rotate-gate .rot-icon{ font-size:64px; animation:rot 2s ease-in-out infinite; }
+@keyframes rot{ 0%,100%{ transform:rotate(0) } 50%{ transform:rotate(90deg) } }
+#rotate-gate h3{ letter-spacing:.2em; }
+#rotate-gate p{ color:var(--dim); font-size:14px; }
+
+/* ══════════════════ COMPACT HUD (phones / short viewports) ══════════════════ */
+@media (max-width: 900px), (max-height: 520px){
+  #objective{ left:var(--pad-l); top:var(--pad-t); }
+  /* the on-screen pause button lives in this corner on touch */
+  body.is-touch #objective{ left:calc(var(--pad-l) + clamp(46px,7vmin,58px)); }
+  body.is-touch.lefty #objective{ left:var(--pad-l); }
+  #wave-label{ font-size:20px; }
+  #wave-sub{ font-size:10px; letter-spacing:.08em; max-width:38vw; }
+  #enemies-left,#intermission{ font-size:10px; margin-top:3px; }
+  #enemies-left b,#intermission b{ font-size:15px; }
+
+  #topright{ right:var(--pad-r); top:var(--pad-t); gap:8px; }
+  #minimap{ width:clamp(74px,15vmin,104px); height:clamp(74px,15vmin,104px); }
+  #zone-name{ font-size:9px; letter-spacing:.12em; margin-top:3px; }
+  #score{ font-size:20px; }
+  #scorebox .lbl{ font-size:8px; letter-spacing:.2em; }
+  #streak{ font-size:9px; }  #combo{ font-size:12px; }
+
+  #killfeed{ top:auto; bottom:calc(var(--pad-b) + 6px); right:auto;
+    left:var(--pad-l); width:44vw; text-align:left; }
+  #killfeed div{ font-size:10px; padding:2px 6px; border-right:0; border-left:3px solid var(--accent); }
+
+  /* vitals move above the stick so the thumb never covers them */
+  #vitals{ left:var(--pad-l); bottom:auto; top:calc(var(--pad-t) + 58px); width:min(200px,34vw); }
+  .bar{ height:9px; } .bar.ar{ height:6px; } .bar-row.thin .bar{ height:4px; }
+  .bar-row{ gap:5px; margin-top:4px; }
+  .bi{ font-size:10px; width:12px; }
+  #hp-num,#ar-num{ font-size:13px; width:26px; } .spacer{ width:26px; }
+
+  #weaponbox{ right:auto; left:50%; bottom:calc(var(--pad-b) + 2px);
+    transform:translateX(-50%); text-align:center; }
+  #wpn-name{ font-size:10px; letter-spacing:.14em; }
+  #ammo{ font-size:26px; } #ammo .sep,#ammo-res{ font-size:14px; }
+  #reload-bar{ width:96px; margin:4px auto 0; }
+  #wpn-slots{ justify-content:center; margin-top:4px; }
+  #wpn-slots .slot{ font-size:9px; padding:2px 6px; }
+  #reload-hint{ font-size:10px; }
+
+  /* the on-screen buttons already show the ability state - drop the panel */
+  #abilities{ display:none; }
+  #fps{ display:none; }
+  #banner{ top:22%; font-size:clamp(20px,5.4vw,34px); }
+  #banner small{ font-size:11px; }
+  #crosshair{ transform:translate(-50%,-50%) scale(.82); }
+  #boss-bar{ width:min(300px,46vw); top:calc(var(--pad-t) + 2px); }
+  #boss-name{ font-size:10px; } .bbar{ height:7px; }
+  #popups span{ font-size:13px; }
+}
+
+/* ── menus on small screens ── */
+@media (max-width: 900px), (max-height: 560px){
+  .screen{ padding:12px 10px; }
+  .logo{ font-size:clamp(26px,7vw,44px); }
+  .logo.small{ font-size:clamp(18px,4.4vw,26px); }
+  h2{ font-size:clamp(19px,4.6vw,26px); }
+  .menu-head{ gap:8px; }
+  .ftab{ padding:6px 12px; } .ftab b{ font-size:12px; } .ftab span{ font-size:9px; }
+  .faction-blurb{ font-size:11px; margin-bottom:9px; }
+  .op-layout{ grid-template-columns:minmax(150px,32%) 1fr; gap:9px; }
+  .op-card{ padding:5px 7px; gap:7px; }
+  .op-face{ width:28px; height:28px; font-size:14px; }
+  .op-meta b{ font-size:13px; } .op-meta span{ font-size:8.5px; letter-spacing:.12em; }
+  .op-detail{ padding:10px 12px; }
+  .od-name{ font-size:20px; } .od-tag{ font-size:8.5px; } .od-role{ font-size:9px; }
+  .od-quote{ font-size:12px; } .od-quote small{ font-size:9px; }
+  .od-bio{ font-size:11px; line-height:1.45; margin-bottom:8px; }
+  .od-stat{ font-size:8.5px; grid-template-columns:50px 1fr 28px; }
+  .od-stat b{ font-size:11px; }
+  .chip{ font-size:8.5px; padding:2px 6px; }
+  .od-skill{ gap:7px; padding:6px 0; }
+  .od-skill .ic{ width:26px; height:26px; font-size:13px; }
+  .od-skill .tx b{ font-size:12px; } .od-skill .tx p{ font-size:10px; line-height:1.35; }
+  .od-skill .kbd{ font-size:8.5px; padding:1px 5px; }
+  button.big{ padding:11px; font-size:16px; width:min(300px,92%); }
+  button.link{ font-size:12px; }
+  .seg button{ padding:5px 10px; font-size:11px; }
+  .opt-row label{ font-size:9px; letter-spacing:.2em; }
+  .disclaimer{ font-size:9px; margin-top:9px; }
+  .keys{ font-size:11px; gap:4px 10px; } .keys div{ padding:4px 6px; }
+  .settings{ font-size:12px; gap:8px; }
+  .cards{ grid-template-columns:1fr 1fr 1fr; gap:7px; }
+  .card{ padding:10px 9px; } .card .ci{ font-size:20px; margin-bottom:5px; }
+  .card .cn{ font-size:14px; } .card .ce{ font-size:8.5px; margin-bottom:5px; }
+  .card .cd{ font-size:10.5px; line-height:1.35; }
+  .card .cr{ font-size:7.5px; padding:2px 4px; top:6px; right:6px; }
+  .stats{ gap:6px; margin:9px 0 12px; }
+  .stats div{ padding:7px 4px; } .stats b{ font-size:19px; } .stats span{ font-size:8px; }
+}
+
+/* very short viewports: the operator list stacks under the detail panel */
+@media (max-height: 430px){
+  .op-layout{ grid-template-columns:minmax(126px,30%) 1fr; }
+  .od-bio{ display:none; }
+  .disclaimer{ display:none; }
+}
+
+.seg-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.seg-row label{ font-size:11px; letter-spacing:.22em; color:var(--dim); }
 
 /* ══════════════════════════ MENUS ══════════════════════════ */
 #overlay{ position:fixed; inset:0; z-index:20; display:grid; place-items:center; overflow:auto;

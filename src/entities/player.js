@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { clamp, damp, lerp, now } from '../core/utils.js';
+import { clamp, damp, lerp, now, angleDelta } from '../core/utils.js';
 import { CharacterModel, makeOutfit } from './character.js';
 import { WEAPONS, WeaponState, attachWeapon } from '../systems/weapons.js';
 import { audio } from '../core/audio.js';
@@ -90,13 +90,20 @@ export class Player {
     // ── model: the roster character's signature silhouette ──
     const b = char.build;
     const outfit = makeOutfit(faction, 'elite');
-    outfit.helmet = b.headgear === 'helmet';
-    outfit.cap = b.headgear === 'cap';
-    outfit.bandana = b.headgear === 'bandana' ? (outfit.bandana ?? 0xe11d48) : null;
-    outfit.hasVest = b.frame === 'heavy' || faction === 'police';
+    outfit.head = ['helmet', 'cap', 'bandana'].includes(b.headgear) ? b.headgear : 'none';
+    outfit.frame = b.frame;
+    outfit.helmet = outfit.helmet ?? 0x1a2130;
+    outfit.capColor = outfit.capColor ?? (faction === 'police' ? 0x151c2b : 0xffd23f);
+    outfit.bandana = outfit.bandana ?? 0xe11d48;
+    if (b.frame === 'heavy' || faction === 'police') {
+      outfit.vest = outfit.vest ?? 0x11151f;
+      outfit.hasVest = true;
+    }
     outfit.visor = b.extra === 'shield' || b.extra === 'breach';
+    // operators get their own cached build so they never share a body with a grunt
+    outfit.preset += ':op:' + char.id;
     this.model = new CharacterModel(outfit);
-    this.model.root.scale.setScalar(b.frame === 'heavy' ? 1.09 : b.frame === 'light' ? 0.95 : 1);
+    this.model.root.scale.setScalar(b.frame === 'heavy' ? 1.06 : b.frame === 'light' ? 0.96 : 1);
     game.scene.add(this.model.root);
     attachWeapon(this.model, this.weaponId);
   }
@@ -156,6 +163,50 @@ export class Player {
     this.recoilYaw = damp(this.recoilYaw, 0, rec, dt);
 
     if (input.pressed('KeyQ')) this.shoulder *= -1;
+
+    if (this.game.settings.assist && (this.aiming || input.firing)) {
+      this._aimAssist(dt, input.isTouch);
+    }
+  }
+
+  /**
+   * Aim magnetism. Not a snap: it nudges the look angles toward a hostile
+   * that is already close to the crosshair, and the nudge fades to nothing at
+   * the edge of the cone. Touch gets roughly twice the pull of a mouse, since
+   * a thumb can't make 1° corrections.
+   */
+  _aimAssist(dt, isTouch) {
+    const game = this.game;
+    const cone = isTouch ? 0.15 : 0.075;          // ~8.6° / ~4.3°
+    const strength = isTouch ? 7.5 : 3.0;
+
+    const cp = Math.cos(this.pitch);
+    _f.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp).normalize();
+    const eye = _p.set(this.pos.x, this.pos.y + this.eyeHeight, this.pos.z);
+
+    let best = null, bestAng = cone;
+    for (const a of game.agents) {
+      if (!a.alive || a.faction === this.faction) continue;
+      _d.set(a.pos.x - eye.x, a.pos.y + 1.2 - eye.y, a.pos.z - eye.z);
+      const dist = _d.length();
+      if (dist > 70 || dist < 1.5) continue;
+      _d.multiplyScalar(1 / dist);
+      const ang = Math.acos(clamp(_d.dot(_f), -1, 1));
+      if (ang >= bestAng) continue;
+      _c.set(a.pos.x, a.pos.y + 1.2, a.pos.z);
+      if (game.world.collision.losBlocked(eye, _c)) continue;
+      bestAng = ang;
+      best = _a.copy(_d);
+    }
+    if (!best) return;
+
+    const targetYaw = Math.atan2(-best.x, -best.z);
+    const targetPitch = Math.asin(clamp(best.y, -1, 1));
+    const falloff = 1 - bestAng / cone;           // no pull at the cone edge
+    const k = 1 - Math.exp(-strength * falloff * dt);
+
+    this.yaw += angleDelta(this.yaw, targetYaw) * k * 0.85;
+    this.pitch += (targetPitch - this.pitch) * k * 0.85;
   }
 
   _move(dt, input, world) {

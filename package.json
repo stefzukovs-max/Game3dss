@@ -10,7 +10,9 @@
     "check:map": "node tools/map-check.mjs",
     "check:sim": "node tools/sim.mjs 5",
     "check:shooting": "node tools/test-shooting.mjs",
-    "shots": "node tools/shots.mjs"
+    "shots": "node tools/shots.mjs",
+    "check:mobile": "node tools/mobile-check.mjs",
+    "shots:chars": "node tools/character-shots.mjs"
   },
   "devDependencies": {
     "playwright": "^1.56.0",

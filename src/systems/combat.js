@@ -14,6 +14,9 @@ const _n = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _up = new THREE.Vector3(0, 0, 1);
 const _hit = {};
+const _lookHit = {};
+const _aim = new THREE.Vector3();
+const _base = new THREE.Vector3();
 
 /** Ray vs vertical cylinder. Returns entry distance or -1. */
 function rayCylinder(ox, oy, oz, dx, dy, dz, cx, cz, r, y0, y1, maxT) {
@@ -140,12 +143,39 @@ export class CombatSystem {
     const spread = opts.spread ?? 0;
     const results = [];
     const muzzle = opts.muzzle || origin;
+    const maxRange = def.range * 2.2;
+
+    /*
+     * Converge on the crosshair. The aim ray starts at the camera, which sits
+     * behind and to one side of the shooter - firing straight down it would
+     * send bullets past everything the crosshair is actually on. So: find
+     * where the crosshair lands, then shoot from the muzzle at that point.
+     */
+    const look = this.collision.raycast(origin, dir, maxRange, _lookHit);
+    let lookDist = look ? look.distance : maxRange;
+
+    // Converge on whatever the crosshair is actually over, characters
+    // included. Using only world geometry puts the convergence point on the
+    // wall *behind* a target, and the muzzle's offset then carries the shot
+    // wide by more than the weapon's own spread.
+    for (const t of targets) {
+      if (t === shooter || !t.alive) continue;
+      const th = rayCylinder(
+        origin.x, origin.y, origin.z, dir.x, dir.y, dir.z,
+        t.pos.x, t.pos.z, t.radius * 1.28,
+        t.pos.y + 0.15, t.pos.y + t.standHeight * (t.crouching ? 0.72 : 1),
+        lookDist,
+      );
+      if (th >= 0 && th < lookDist) lookDist = th;
+    }
+
+    _aim.copy(origin).addScaledVector(dir, lookDist);
+    _base.subVectors(_aim, muzzle);
+    if (_base.lengthSq() < 0.36) _base.copy(dir); else _base.normalize();
 
     for (let p = 0; p < (def.pellets || 1); p++) {
-      coneSpread(dir, spread, _d);
-      _o.copy(origin);
-
-      const maxRange = def.range * 2.2;
+      coneSpread(_base, spread, _d);
+      _o.copy(muzzle);
       const wall = this.collision.raycast(_o, _d, maxRange, _hit);
       let bestT = wall ? wall.distance : maxRange;
       let victim = null;
