@@ -94,22 +94,21 @@ for (let i = 1; i <= 18; i++) seq.push({ type: 'touchmove', touches: [{ id: 1, x
 // sample peak speed rather than net displacement: the player can spawn
 // facing a wall, in which case they legitimately go nowhere while the stick
 // is working perfectly well
-await page.evaluate(() => {
-  window.__peak = 0;
-  window.__peakTimer = setInterval(() => {
-    const v = window.__game.player.vel;
-    window.__peak = Math.max(window.__peak, Math.hypot(v.x, v.z));
-  }, 16);
-});
 await touchDrive(seq);
-await page.waitForTimeout(900);
+// Pump the simulation at a fixed step. Under software rendering the real
+// frame loop crawls, so anything measured against wall-clock reports the
+// renderer's speed rather than whether the stick is wired up.
 const moved = await page.evaluate(() => {
-  clearInterval(window.__peakTimer);
+  const g = window.__game;
+  let peak = 0;
+  for (let i = 0; i < 90; i++) {
+    g._tick(1 / 60);
+    peak = Math.max(peak, Math.hypot(g.player.vel.x, g.player.vel.z));
+  }
   return {
-    x: window.__game.player.pos.x, z: window.__game.player.pos.z,
-    mx: window.__game.input.touch.mx, my: window.__game.input.touch.my,
-    sprint: window.__game.input.keys.has('ShiftLeft'),
-    peak: window.__peak,
+    x: g.player.pos.x, z: g.player.pos.z,
+    mx: g.input.touch.mx, my: g.input.touch.my,
+    sprint: g.input.keys.has('ShiftLeft'), peak,
   };
 });
 ok('stick drives movement', moved.my > 0.9 && moved.peak > 2,
@@ -123,8 +122,12 @@ const look = [{ type: 'touchstart', touches: [{ id: 2, x: 600, y: 160 }] }];
 for (let i = 1; i <= 14; i++) look.push({ type: 'touchmove', touches: [{ id: 2, x: 600 + i * 9, y: 160 }] });
 look.push({ type: 'touchend', touches: [{ id: 2, x: 726, y: 160 }] });
 await touchDrive(look);
-await page.waitForTimeout(400);
-const looked = await page.evaluate(() => window.__game.player.yaw);
+// same fixed-step pump: the accumulated look delta is consumed inside _tick
+const looked = await page.evaluate(() => {
+  const g = window.__game;
+  for (let i = 0; i < 10; i++) g._tick(1 / 60);
+  return g.player.yaw;
+});
 ok('right-thumb drag turns the camera', Math.abs(looked - before.yaw) > 0.15,
   `Δyaw ${(looked - before.yaw).toFixed(2)} rad`);
 
@@ -152,9 +155,13 @@ await page.waitForTimeout(200);
 ok('AIM toggles', await page.evaluate(() => window.__game.input.touch.aim));
 await tapBtn('btn-aim');
 
+await page.evaluate(() => { window.__game.player.vel.y = 0; window.__game.player.onGround = true; });
 await tapBtn('btn-jump');
-await page.waitForTimeout(120);
-ok('JUMP registers', await page.evaluate(() => !window.__game.player.onGround || window.__game.player.vel.y > 0));
+ok('JUMP registers', await page.evaluate(() => {
+  const g = window.__game;
+  g._tick(1 / 60);                       // the tick that consumes the press
+  return g.player.vel.y > 1 || !g.player.onGround;
+}));
 
 const cdBefore = await page.evaluate(() => window.__game.player.abilityCd);
 await tapBtn('btn-ability');
@@ -189,6 +196,13 @@ await page.waitForTimeout(400);
 ok('landscape hides it again',
   await page.evaluate(() => document.getElementById('rotate-gate').classList.contains('hidden')));
 
+/*
+ * Deliberately not reporting a render-cost number here. Under swiftshader
+ * everything is CPU-bound, and switching between the composer and a direct
+ * canvas render flips three's tone-mapping define, forcing a full shader
+ * recompile — so any timing taken across the two paths measures compilation,
+ * not frame cost. Real GPU numbers need real hardware.
+ */
 console.log(`\nERRORS (${errors.length})`);
 for (const e of errors.slice(0, 10)) console.log('  •', e);
 await browser.close();

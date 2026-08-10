@@ -13,6 +13,8 @@ import { Player } from './entities/player.js';
 import { ROSTER, FACTIONS, rosterFor, byId } from './entities/roster.js';
 import { HUD } from './ui/hud.js';
 import { setCharacterDetail } from './entities/character.js';
+import { ProceduralSky } from './core/sky.js';
+import { PostChain } from './core/post.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -75,41 +77,51 @@ class Game {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.06;
+    this.renderer.toneMappingExposure = 1.0;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xc4cfd6, 70, 300);
+    // fog tinted to the sky's own horizon so distance reads as air, not haze
+    this.scene.fog = new THREE.Fog(0xd9b892, 95, 330);
 
     this.camera = new THREE.PerspectiveCamera(this.settings.fov, innerWidth / innerHeight, 0.12, 900);
     this.camera.position.set(0, 12, 40);
     this.camera.userData.shake = 0;
 
-    // ── lighting: late-afternoon sun raking across the hill ──
-    // Sky/ground bounce does the heavy lifting on vertical faces; without enough
-    // of it every wall not facing the sun goes muddy.
-    const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x7d6a52, 1.45);
-    this.scene.add(hemi);
+    /*
+     * ── lighting ──
+     * One sky drives everything: it is the visible dome, the source of the
+     * pre-filtered environment map that lights every surface, and the thing
+     * the sun direction and colour are read from. Keeping them in sync is
+     * what stops the scene looking like objects pasted onto a backdrop.
+     */
+    this.sky = new ProceduralSky();
+    this.skyDome = this.sky.mesh;
+    this.scene.add(this.skyDome);
+    this.scene.environment = this.sky.generateEnvironment(this.renderer, 256);
 
-    this.sun = new THREE.DirectionalLight(0xffd9a8, 1.75);
-    this.sun.position.set(-60, 80, 50);
+    this.scene.add(this.sky.makeAmbient());
+
+    this.sun = this.sky.makeSun();
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.camera.near = 1;
-    this.sun.shadow.camera.far = 220;
+    this.sun.shadow.camera.far = 260;
     const S = 52;
     Object.assign(this.sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S });
     // Without this the shadow camera keeps its default ±5 frustum and every
     // surface outside that tiny box samples the shadow map as occluded.
     this.sun.shadow.camera.updateProjectionMatrix();
-    this.sun.shadow.bias = -0.0008;
-    this.sun.shadow.normalBias = 0.05;
+    this.sun.shadow.bias = -0.0006;
+    this.sun.shadow.normalBias = 0.045;
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
 
-    const fill = new THREE.DirectionalLight(0x9fc4e8, 0.55);
-    fill.position.set(50, 40, -40);
+    // cool bounce from the opposite side so shadowed faces keep their form
+    const fill = new THREE.DirectionalLight(0x9fc4e8, 0.22);
+    fill.position.set(60, 34, -46);
     this.scene.add(fill);
-    this.scene.add(new THREE.AmbientLight(0xa9bccd, 0.28));
+
+    this.post = new PostChain(this.renderer, this.scene, this.camera);
 
     this._resize();
   }
@@ -120,6 +132,7 @@ class Game {
     this.renderer.setSize(innerWidth, innerHeight, false);
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
+    this.post?.setSize(innerWidth, innerHeight);
   }
 
   async _load() {
@@ -133,7 +146,7 @@ class Game {
     this.world = buildFavela(this.scene, 20240607, (p, m) => {
       $('loadfill').style.width = (p * 100) + '%';
       $('loadmsg').textContent = m;
-    });
+    }, { detail: this.materialDetail !== false });
     this.world.bounds = { x0: WORLD.x0 + 7, x1: WORLD.x1 - 7, z0: WORLD.z0 + 7, z1: WORLD.z1 - 7 };
 
     await step(0.94, 'Plotting the alleys…');
@@ -263,6 +276,14 @@ class Game {
     if (this.combat) this.combat.effectsOn = s.blood && !low;
     this.maxEnemies = low ? 8 : med ? 12 : 18;
     this.allyCap = low ? 2 : med ? 3 : 6;
+
+    // Surface detail is decided once, when the world is built - swapping
+    // material maps on a live scene would mean rebuilding every batch.
+    this.materialDetail = !low;
+
+    // post-processing: GTAO is the expensive one, so only the top tier gets it
+    this.post?.build(low ? 'minimal' : med ? 'lite' : 'full');
+    this.renderer.toneMappingExposure = low ? 1.0 : 0.94;
   }
 
   /** Portrait on a phone is unplayable - gate it rather than squeeze it. */
@@ -786,11 +807,13 @@ class Game {
       this.combat?.update(0, this.camera);
     }
 
-    if (this.world) {
-      this.world.sky.position.copy(this.camera.position);
-      this.renderer.render(this.scene, this.camera);
-    }
+    if (this.world) this.renderFrame(dt);
     this.input.endFrame();
+  }
+
+  /** Single render entry point, so tools and the game agree on the pipeline. */
+  renderFrame(dt = 0.016) {
+    this.post.render(dt);
   }
 
   _tick(dt) {
@@ -834,11 +857,12 @@ class Game {
     this.pickups.update(dt);
   }
 
+  /** Keep the shadow frustum on the player, along the sky's own sun axis. */
   _updateSun() {
     const p = this.player;
     if (!p) return;
     this.sun.target.position.copy(p.pos);
-    this.sun.position.set(p.pos.x - 55, p.pos.y + 70, p.pos.z + 45);
+    this.sun.position.copy(p.pos).addScaledVector(this.sky.preset.sunDir, 90);
     this.sun.target.updateMatrixWorld();
   }
 

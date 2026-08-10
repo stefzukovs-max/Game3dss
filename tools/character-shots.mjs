@@ -48,11 +48,11 @@ const shot = async (name, faction) => {
     g.camera.position.set(base.x + 0.6, base.y + 1.35, base.z + 0.4);
     g.camera.lookAt(base.x + 0.6, base.y + 1.0, base.z - 5);
     g.camera.fov = 42; g.camera.updateProjectionMatrix();
-    g.world.sky.position.copy(g.camera.position);
+    if (g.skyDome) g.skyDome.position.copy(g.camera.position);
     g.sun.target.position.set(base.x, base.y, base.z - 5);
     g.sun.position.set(base.x - 8, base.y + 14, base.z + 8);
     g.sun.target.updateMatrixWorld();
-    g.renderer.render(g.scene, g.camera);
+    (g.renderFrame ? g.renderFrame() : g.renderer.render(g.scene, g.camera));
   }, faction);
   await p.waitForTimeout(700);
   await p.evaluate(() => window.__game.renderer.render(window.__game.scene, window.__game.camera));

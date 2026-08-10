@@ -332,6 +332,96 @@ export function bulletHoleTexture() {
   return t;
 }
 
+
+/* ══════════════════════════════════════════════════════════════════
+ *  Derived PBR channels
+ *
+ *  Every texture here is painted into a <canvas>, and a CanvasTexture keeps
+ *  that canvas on `.image`. So the albedo we already generated doubles as a
+ *  height field: a Sobel pass over its luminance gives a normal map, and the
+ *  same luminance remapped gives roughness. Real surface relief for free, no
+ *  authored maps to ship.
+ * ══════════════════════════════════════════════════════════════════ */
+
+/** Sobel the source's luminance into a tangent-space normal map. */
+export function deriveNormalMap(srcTexture, strength = 2.2) {
+  const src = srcTexture.image;
+  const w = src.width, h = src.height;
+  const sx = src.getContext('2d').getImageData(0, 0, w, h).data;
+
+  // luminance field first, so the Sobel reads brightness not colour
+  const lum = new Float32Array(w * h);
+  for (let i = 0, p = 0; i < sx.length; i += 4, p++) {
+    lum[p] = (sx[i] * 0.299 + sx[i + 1] * 0.587 + sx[i + 2] * 0.114) / 255;
+  }
+
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const ctx = out.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+  const at = (x, y) => lum[((y + h) % h) * w + ((x + w) % w)];
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const gx =
+        (at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1)) -
+        (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1));
+      const gy =
+        (at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1)) -
+        (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1));
+
+      let nx = gx * strength, ny = gy * strength, nz = 1;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      nx /= len; ny /= len; nz /= len;
+
+      const i = (y * w + x) * 4;
+      d[i]     = (nx * 0.5 + 0.5) * 255;
+      d[i + 1] = (ny * 0.5 + 0.5) * 255;
+      d[i + 2] = (nz * 0.5 + 0.5) * 255;
+      d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const t = new THREE.CanvasTexture(out);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.copy(srcTexture.repeat);
+  t.anisotropy = srcTexture.anisotropy;
+  return t;   // normal maps stay in linear space - no colorSpace set
+}
+
+/**
+ * Remap the source's luminance into a roughness map.
+ * Bright, clean areas polish up slightly; grime and mortar stay rough.
+ */
+export function deriveRoughnessMap(srcTexture, min = 0.55, max = 0.98, invert = false) {
+  const src = srcTexture.image;
+  const w = src.width, h = src.height;
+  const sx = src.getContext('2d').getImageData(0, 0, w, h).data;
+
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const ctx = out.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+
+  for (let i = 0; i < sx.length; i += 4) {
+    let l = (sx[i] * 0.299 + sx[i + 1] * 0.587 + sx[i + 2] * 0.114) / 255;
+    if (invert) l = 1 - l;
+    const r = (min + (max - min) * (1 - l)) * 255;
+    d[i] = d[i + 1] = d[i + 2] = r;
+    d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const t = new THREE.CanvasTexture(out);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.copy(srcTexture.repeat);
+  t.anisotropy = srcTexture.anisotropy;
+  return t;
+}
+
 /** Build every texture once and hand back a shared library. */
 export function buildTextureLibrary() {
   return {

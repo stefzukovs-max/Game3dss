@@ -111,7 +111,16 @@ function at(x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) {
   return _m.compose(_v2.set(x, y, z), _q.setFromEuler(_e), _v3.set(sx, sy, sz));
 }
 
-export const BODY_MATERIAL = new THREE.MeshLambertMaterial({ vertexColors: true });
+/**
+ * One material for every body on screen. Roughness is set for cloth and skin;
+ * weapons get their own metallic material so guns don't read as fabric.
+ */
+export const BODY_MATERIAL = new THREE.MeshStandardMaterial({
+  vertexColors: true, roughness: 0.78, metalness: 0.02, envMapIntensity: 0.55,
+});
+export const GEAR_MATERIAL = new THREE.MeshStandardMaterial({
+  vertexColors: true, roughness: 0.38, metalness: 0.82, envMapIntensity: 1.0,
+});
 
 /* ── outfits ──────────────────────────────────────────────────────────
  * A small preset table rather than free randomisation: the crew reads as a
@@ -428,13 +437,23 @@ export class CharacterModel {
     this.root.position.set(x, y, z);
   }
 
-  /** Flash white on a hit. Geometry is shared, so only the material swaps. */
+  /**
+   * Flash white on a hit. Geometry is shared, so only the material swaps —
+   * and each mesh remembers its own, because the weapon in the hand is on a
+   * metallic material and must not come back as skin.
+   */
   flash() {
     if (this._flashing) return;
     this._flashing = true;
-    this.root.traverse((m) => { if (m.isMesh) m.material = FLASH_MATERIAL; });
+    this.root.traverse((m) => {
+      if (!m.isMesh) return;
+      m.userData.baseMaterial = m.userData.baseMaterial || m.material;
+      m.material = FLASH_MATERIAL;
+    });
     setTimeout(() => {
-      this.root.traverse((m) => { if (m.isMesh) m.material = BODY_MATERIAL; });
+      this.root.traverse((m) => {
+        if (m.isMesh && m.userData.baseMaterial) m.material = m.userData.baseMaterial;
+      });
       this._flashing = false;
     }, 65);
   }
@@ -443,7 +462,7 @@ export class CharacterModel {
   dispose() { this.root.parent?.remove(this.root); }
 }
 
-const FLASH_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xffe3e3 });
+const FLASH_MATERIAL = new THREE.MeshBasicMaterial({ color: 0xffe3e3, toneMapped: false });
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();

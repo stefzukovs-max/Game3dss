@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { makeRNG, texturedBox, GeometryBatcher } from '../core/utils.js';
 import { CollisionWorld } from '../core/collision.js';
-import { buildTextureLibrary, FAVELA_COLORS } from './textures.js';
+import { buildTextureLibrary, FAVELA_COLORS, deriveNormalMap, deriveRoughnessMap } from './textures.js';
 
 /**
  * ══════════════════════════════════════════════════════════════════
@@ -214,50 +214,80 @@ const _up = new THREE.Vector3(0, 1, 0);
 
 /* ══════════════════════════════════════════════════════════════════ */
 
-export function buildFavela(scene, seed = 20240607, onProgress = () => {}) {
+export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts = {}) {
   const rng = makeRNG(seed);
   const tex = buildTextureLibrary();
   const collision = new CollisionWorld();
   const B = new WorldBuilder(collision);
 
-  const lam = (map, extra = {}) => () => new THREE.MeshLambertMaterial({ map, ...extra });
-  const col = (color, extra = {}) => () => new THREE.MeshLambertMaterial({ color, ...extra });
+  /*
+   * PBR materials. `detail` adds a Sobel-derived normal map and a luminance
+   * roughness map off the same canvas the albedo came from - real relief with
+   * nothing extra to ship. Dropped on the low tier, where the extra texture
+   * fetches per fragment cost more than they're worth on a phone.
+   */
+  const detail = opts.detail !== false;
 
-  B.material('brick', lam(tex.brick));
-  B.material('concrete', lam(tex.concrete));
-  B.material('concreteDark', lam(tex.concreteDark));
-  B.material('corrugated', lam(tex.corrugated));
-  B.material('asphalt', lam(tex.asphalt));
-  B.material('dirt', lam(tex.dirt));
-  B.material('window', lam(tex.window));
-  FAVELA_COLORS.forEach((_, i) => B.material('plaster' + i, lam(tex.plaster[i])));
-  tex.graffiti.forEach((t, i) => B.material('graf' + i, lam(t, { side: THREE.DoubleSide })));
-  B.material('wood', col(0x8a6141));
-  B.material('woodDark', col(0x5c3f28));
-  B.material('metal', col(0x8d9199));
-  B.material('metalDark', col(0x3a3f47));
-  B.material('rust', col(0x8b4a2b));
-  B.material('tankBlue', col(0x2f6fb0));
-  B.material('tankBlack', col(0x24262b));
-  B.material('vegetation', col(0x2f5d34));
-  B.material('rock', col(0x3c4a38));
-  B.material('copBlue', col(0x1b2a4a));
-  B.material('copWhite', col(0xd9dde3));
-  B.material('lightRed', col(0xd62828, { emissive: 0x4a0000 }));
-  B.material('lightBlue', col(0x2b6cd6, { emissive: 0x001a4a }));
-  B.material('glass', col(0x1d2733));
-  B.material('tire', col(0x1c1c1e));
+  const pbr = (map, o = {}) => () => {
+    const { roughness = 0.92, metalness = 0, bump = 2.2, bumpScale = 1,
+      rmin = 0.55, rmax = 1.0, roughMap = true, env = 0.62, ...rest } = o;
+    const m = new THREE.MeshStandardMaterial({
+      map, roughness, metalness, envMapIntensity: env, ...rest });
+    if (detail && map) {
+      m.normalMap = deriveNormalMap(map, bump);
+      m.normalScale = new THREE.Vector2(bumpScale, bumpScale);
+      if (roughMap) {
+        m.roughnessMap = deriveRoughnessMap(map, rmin, rmax);
+        m.roughness = 1;      // the map carries the range; don't scale it down
+      }
+    }
+    return m;
+  };
+
+  const col = (color, o = {}) => () => {
+    const { roughness = 0.9, metalness = 0, env = 0.62, ...rest } = o;
+    return new THREE.MeshStandardMaterial({
+      color, roughness, metalness, envMapIntensity: env, ...rest });
+  };
+  const lam = pbr;   // every registration below goes through the PBR path
+
+  B.material('brick', pbr(tex.brick, { bump: 3.0, rmin: 0.72, rmax: 1.0 }));
+  B.material('concrete', pbr(tex.concrete, { bump: 1.6, rmin: 0.7, rmax: 0.98 }));
+  B.material('concreteDark', pbr(tex.concreteDark, { bump: 1.8, rmin: 0.72, rmax: 0.98 }));
+  B.material('corrugated', pbr(tex.corrugated, { bump: 3.6, metalness: 0.72, rmin: 0.3, rmax: 0.78, env: 0.95 }));
+  B.material('asphalt', pbr(tex.asphalt, { bump: 1.4, rmin: 0.78, rmax: 1.0 }));
+  B.material('dirt', pbr(tex.dirt, { bump: 1.8, rmin: 0.88, rmax: 1.0 }));
+  B.material('window', pbr(tex.window, { bump: 1.0, metalness: 0.55, rmin: 0.06, rmax: 0.3, roughMap: true }));
+  FAVELA_COLORS.forEach((_, i) => B.material('plaster' + i,
+    pbr(tex.plaster[i], { bump: 1.5, rmin: 0.66, rmax: 0.97 })));
+  tex.graffiti.forEach((t, i) => B.material('graf' + i,
+    pbr(t, { side: THREE.DoubleSide, bump: 1.2, rmin: 0.5, rmax: 0.95 })));
+  B.material('wood', col(0x8a6141, { roughness: 0.88 }));
+  B.material('woodDark', col(0x5c3f28, { roughness: 0.9 }));
+  B.material('metal', col(0x8d9199, { metalness: 0.88, roughness: 0.38, env: 1.0 }));
+  B.material('metalDark', col(0x3a3f47, { metalness: 0.85, roughness: 0.45, env: 1.0 }));
+  B.material('rust', col(0x8b4a2b, { metalness: 0.35, roughness: 0.9 }));
+  B.material('tankBlue', col(0x2f6fb0, { roughness: 0.55, metalness: 0.12 }));
+  B.material('tankBlack', col(0x24262b, { roughness: 0.6, metalness: 0.15 }));
+  B.material('vegetation', col(0x2f5d34, { roughness: 0.95 }));
+  B.material('rock', col(0x3c4a38, { roughness: 1.0 }));
+  B.material('copBlue', col(0x1b2a4a, { roughness: 0.42, metalness: 0.2 }));
+  B.material('copWhite', col(0xd9dde3, { roughness: 0.45, metalness: 0.15 }));
+  B.material('lightRed', col(0xd62828, { emissive: 0xd62828, emissiveIntensity: 2.2, roughness: 0.4 }));
+  B.material('lightBlue', col(0x2b6cd6, { emissive: 0x2b6cd6, emissiveIntensity: 2.2, roughness: 0.4 }));
+  B.material('glass', col(0x1d2733, { roughness: 0.08, metalness: 0.6, env: 1.3 }));
+  B.material('tire', col(0x1c1c1e, { roughness: 0.95 }));
   B.material('paint', col(0xf0ede2, { side: THREE.DoubleSide }));
   B.material('paintYellow', col(0xf2c33d, { side: THREE.DoubleSide }));
-  B.material('pitch', col(0x2f6b45));
+  B.material('pitch', col(0x2f6b45, { roughness: 0.92 }));
   B.material('pitchLine', col(0xe8e8e0, { side: THREE.DoubleSide }));
   B.material('fence', col(0x9aa0a6, { transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
-  B.material('chapel', col(0xf2ece0));
+  B.material('chapel', col(0xf2ece0, { roughness: 0.85 }));
   B.material('chapelTrim', col(0x5b7fb0));
-  B.material('cross', col(0xe8e4d8));
-  B.material('speaker', col(0x1a1a1c));
-  B.material('bulb', col(0xffe9a8, { emissive: 0xffcc55 }));
-  B.material('van', col(0xe8e2d0));
+  B.material('cross', col(0xe8e4d8, { roughness: 0.8 }));
+  B.material('speaker', col(0x1a1a1c, { roughness: 0.7 }));
+  B.material('bulb', col(0xffe9a8, { emissive: 0xffcc55, emissiveIntensity: 3.0 }));
+  B.material('van', col(0xe8e2d0, { roughness: 0.4, metalness: 0.2 }));
   B.material('vanTrim', col(0x3f8f7f));
   ['cloth0', 'cloth1', 'cloth2', 'cloth3'].forEach((k, i) =>
     B.material(k, col([0xe94f37, 0x3ac4c4, 0xf5d547, 0xf1f1e6][i], { side: THREE.DoubleSide })));
@@ -294,15 +324,10 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}) {
   const meshes = B.finish(scene);
   collision.build();
 
-  const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(420, 24, 16),
-    new THREE.MeshBasicMaterial({ map: tex.sky, side: THREE.BackSide, fog: false, depthWrite: false }),
-  );
-  sky.name = 'sky';
-  scene.add(sky);
-
+  // The sky is owned by the renderer now (src/core/sky.js): one shader dome
+  // that also generates the environment map lighting the whole scene.
   finalizeSpawns(meta, collision);
-  return { collision, meshes, tex, meta, sky, seed };
+  return { collision, meshes, tex, meta, seed };
 }
 
 /* ── terraces + perimeter ───────────────────────────────────────── */

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PartMesh, BODY_MATERIAL } from '../entities/character.js';
+import { PartMesh, GEAR_MATERIAL } from '../entities/character.js';
 
 /**
  * Weapon stats + procedural weapon models.
@@ -81,7 +81,7 @@ export function buildWeaponModel(id) {
   const g = new THREE.Group();
 
   if (cached) {
-    const mesh = new THREE.Mesh(cached.geo, BODY_MATERIAL);
+    const mesh = new THREE.Mesh(cached.geo, GEAR_MATERIAL);
     mesh.castShadow = true;
     g.add(mesh);
     const muzzle = new THREE.Object3D();
@@ -92,7 +92,7 @@ export function buildWeaponModel(id) {
     return g;
   }
 
-  // Merge the whole gun into one vertex-coloured buffer sharing the character
+  // Merge the whole gun into one vertex-coloured buffer on a shared metallic
   // material: seven meshes per weapon times twenty combatants is a lot of draw
   // calls to spend on something the size of a shoebox.
   const part = new PartMesh();
@@ -151,7 +151,7 @@ export function buildWeaponModel(id) {
   const muzzlePos = new THREE.Vector3(0, 0.04, muzzleZ);
   MODEL_CACHE.set(id, { geo, muzzle: muzzlePos });
 
-  const mesh = new THREE.Mesh(geo, BODY_MATERIAL);
+  const mesh = new THREE.Mesh(geo, GEAR_MATERIAL);
   mesh.castShadow = true;
   g.add(mesh);
   const muzzle = new THREE.Object3D();

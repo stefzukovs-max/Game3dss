@@ -72,18 +72,18 @@ for (const [name, pos, look] of views) {
     g.camera.lookAt(l[0], l[1], l[2]);
     g.camera.fov = 62;
     g.camera.updateProjectionMatrix();
-    g.world.sky.position.copy(g.camera.position);
+    if (g.skyDome) g.skyDome.position.copy(g.camera.position);
     // keep the sun shadow box on what we're looking at
     g.sun.target.position.set(l[0], l[1], l[2]);
     g.sun.position.set(l[0] - 55, l[1] + 70, l[2] + 45);
     g.sun.target.updateMatrixWorld();
-    g.renderer.render(g.scene, g.camera);
+    (g.renderFrame ? g.renderFrame() : g.renderer.render(g.scene, g.camera));
   }, [pos, look]);
   await page.waitForTimeout(650);
   await page.evaluate(() => {
     const g = window.__game;
-    g.world.sky.position.copy(g.camera.position);
-    g.renderer.render(g.scene, g.camera);
+    if (g.skyDome) g.skyDome.position.copy(g.camera.position);
+    (g.renderFrame ? g.renderFrame() : g.renderer.render(g.scene, g.camera));
   });
   await page.screenshot({ path: `${OUT}/${name}.png` });
 }
