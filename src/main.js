@@ -8,6 +8,7 @@ import { CombatSystem } from './systems/combat.js';
 import { AbilitySystem } from './systems/abilities.js';
 import { PickupSystem } from './systems/pickups.js';
 import { WaveDirector, PHASE } from './systems/waves.js';
+import { applyWeaponMaterials } from './systems/weapons.js';
 import { drawCards } from './systems/upgrades.js';
 import { Player } from './entities/player.js';
 import { ROSTER, FACTIONS, rosterFor, byId } from './entities/roster.js';
@@ -163,6 +164,7 @@ class Game {
     if (this.assets.ready) {
       this._applyEnvironment();
       applyCharacterMaterials(this.assets);
+      applyWeaponMaterials(this.assets);
     }
 
     await step(0.57, 'Waking the hillside…');

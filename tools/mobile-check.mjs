@@ -197,16 +197,21 @@ await page.waitForTimeout(300);
 ok('pause button pauses', await page.evaluate(() => window.__game.state === 'paused'));
 await page.screenshot({ path: `${OUT}/mob-3-pause.png` });
 
-/* ── portrait gate ── */
+/* ── portrait gate ──
+ * Waiting on the condition rather than a fixed delay. The resize handler
+ * rebuilds the post-processing chain, which under software rendering can take
+ * well over half a second — a sleep long enough to be safe today stops being
+ * safe the moment the scene gets heavier, which is exactly what happened.
+ */
+const gateShown = (want) => page.waitForFunction(
+  (w) => document.getElementById('rotate-gate').classList.contains('hidden') !== w,
+  want, { timeout: 15000 }).then(() => true, () => false);
+
 await page.setViewportSize({ width: 390, height: 844 });
-await page.waitForTimeout(500);
-ok('portrait shows the rotate gate',
-  await page.evaluate(() => !document.getElementById('rotate-gate').classList.contains('hidden')));
+ok('portrait shows the rotate gate', await gateShown(true));
 await page.screenshot({ path: `${OUT}/mob-4-portrait.png` });
 await page.setViewportSize({ width: 844, height: 390 });
-await page.waitForTimeout(400);
-ok('landscape hides it again',
-  await page.evaluate(() => document.getElementById('rotate-gate').classList.contains('hidden')));
+ok('landscape hides it again', await gateShown(false));
 
 /*
  * Deliberately not reporting a render-cost number here. Under swiftshader

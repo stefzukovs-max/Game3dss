@@ -502,7 +502,7 @@ function buildPlaza(B, rng, meta) {
 
   // ── squad cars nosed in at the foot of the hill ──
   const spots = [[-34, 36, 0.15], [-14, 34, -0.1], [10, 36, 0.2], [34, 35, -0.25]];
-  spots.forEach(([vx, vz, r], i) => buildPoliceVehicle(B, rng, vx, 0, vz, r, i % 2 === 0));
+  spots.forEach(([vx, vz, r], i) => buildPoliceVehicle(B, rng, vx, 0, vz, r, i === 1));
 
   // ── minibus stop shelter ──
   const kx = 40, kz = 54;
@@ -1148,35 +1148,101 @@ function drawWire(B, a, b) {
 }
 
 /* ── vehicles ───────────────────────────────────────────────────── */
-function buildPoliceVehicle(B, rng, x, y, z, rotY, isVan) {
-  const w = 2.1, len = isVan ? 5.4 : 4.5, h = isVan ? 2.3 : 1.45;
+/**
+ * Brazilian military-police vehicles.
+ *
+ * Two kinds, because the battalion arrives in two very different things and
+ * the difference is the story of the map: a marked patrol pickup at the foot
+ * of the hill, and an armoured personnel carrier — the one favela residents
+ * call the caveirão — that can actually drive up into the lanes.
+ *
+ * Both are built from a bonnet / cabin / rear break rather than one box. A
+ * single extruded slab with wheels reads as a toy no matter what livery is
+ * painted on it; the step down from cabin roof to bonnet is what makes it a
+ * vehicle.
+ */
+function buildPoliceVehicle(B, rng, x, y, z, rotY, armoured) {
   const cos = Math.cos(rotY), sin = Math.sin(rotY);
   const at = (ox, oy, oz) => [x + ox * cos + oz * sin, y + oy, z - ox * sin + oz * cos];
-  let p;
+  const put = (mat, ox, oy, oz, w, h, d, o = {}) => {
+    const p = at(ox, oy, oz);
+    B.box(mat, p[0], p[1], p[2], w, h, d, { rotY, texScale: 0.7, ...o });
+  };
+  const wheel = (ox, oz, r) => {
+    const p = at(ox, r, oz);
+    B.cylinder('tire', p[0], p[1], p[2], r, r, 0.28, 12, { rotY: rotY + Math.PI / 2, texScale: 1.4 });
+    B.cylinder('metal', p[0], p[1], p[2], r * 0.52, r * 0.52, 0.30, 8, { rotY: rotY + Math.PI / 2, texScale: 1.4 });
+  };
 
-  p = at(0, h / 2 + 0.35, 0);
-  B.box('copBlue', p[0], p[1], p[2], w, h, len, { rotY, texScale: 0.6, tag: 'vehicle' });
-  B.box('copWhite', p[0], p[1] - 0.16, p[2], w + 0.04, h * 0.34, len * 0.5, { rotY, solid: false, texScale: 0.6 });
-
-  if (!isVan) {
-    p = at(0, h + 0.65, -0.2);
-    B.box('glass', p[0], p[1], p[2], w - 0.22, 0.85, len * 0.42, { rotY, texScale: 1, tag: 'vehicle' });
-  } else {
-    p = at(0, h + 0.15, -len / 2 + 0.7);
-    B.box('glass', p[0], p[1], p[2], w - 0.2, 0.7, 0.3, { rotY, solid: false, texScale: 1 });
-  }
-  const lby = isVan ? h + 0.62 : h + 1.18;
-  p = at(-0.45, lby, isVan ? -len / 2 + 0.9 : -0.2);
-  B.box('lightRed', p[0], p[1], p[2], 0.7, 0.24, 0.32, { rotY, solid: false, texScale: 1 });
-  p = at(0.45, lby, isVan ? -len / 2 + 0.9 : -0.2);
-  B.box('lightBlue', p[0], p[1], p[2], 0.7, 0.24, 0.32, { rotY, solid: false, texScale: 1 });
-
-  for (const ox of [-w / 2, w / 2]) {
-    for (const oz of [-len / 2 + 1.1, len / 2 - 1.1]) {
-      p = at(ox, 0.42, oz);
-      B.cylinder('tire', p[0], p[1], p[2], 0.42, 0.42, 0.26, 10, { rotY: rotY + Math.PI / 2 });
+  /* Light bar: alternating red and blue heads on a low black spine, which is
+   * the read from any distance at which the vehicle is only a few pixels. */
+  const lightBar = (oy, oz, width) => {
+    put('metalDark', 0, oy, oz, width, 0.05, 0.22, { solid: false });
+    for (let i = 0; i < 4; i++) {
+      const ox = (i - 1.5) * (width / 4.2);
+      put(i < 2 ? 'lightRed' : 'lightBlue', ox, oy + 0.09, oz, width / 4.6, 0.13, 0.24, { solid: false });
     }
+  };
+
+  if (armoured) {
+    const w = 2.5, len = 6.0;
+    // hull: a tall slab-sided box with a sloped nose, riding high on the axles
+    put('copBlue', 0, 1.55, 0.2, w, 2.1, len - 1.0, { tag: 'vehicle' });
+    put('copBlue', 0, 1.15, -len / 2 + 0.55, w - 0.1, 1.3, 1.2, { tag: 'vehicle' });
+    put('metalDark', 0, 0.62, 0, w + 0.06, 0.5, len - 0.6, { solid: false });   // skirt
+    // vision blocks and gun ports down the flanks
+    for (const side of [-1, 1]) {
+      for (let i = -1; i <= 1; i++) {
+        put('glass', side * (w / 2 - 0.02), 2.05, i * 1.4, 0.06, 0.34, 0.5, { solid: false });
+        put('metalDark', side * (w / 2 - 0.02), 1.55, i * 1.4 + 0.3, 0.08, 0.16, 0.16, { solid: false });
+      }
+    }
+    put('glass', 0, 1.62, -len / 2 + 0.62, w - 0.55, 0.55, 0.12, { solid: false });  // windscreen slit
+    // roof hatch, heavy bumper, light bar
+    put('metalDark', 0, 2.66, 0.6, 1.0, 0.14, 1.0, { solid: false });
+    put('metalDark', 0, 0.95, -len / 2 + 0.02, w + 0.14, 0.6, 0.28, { solid: false });
+    for (const ox of [-0.75, 0.75]) put('metalDark', ox, 1.5, -len / 2 - 0.05, 0.14, 1.4, 0.2, { solid: false });
+    lightBar(2.72, -1.4, 1.9);
+    for (const ox of [-w / 2, w / 2]) for (const oz of [-1.9, 0.4, 2.2]) wheel(ox, oz, 0.62);
+    return;
   }
+
+  /* ── marked patrol pickup ── */
+  const w = 2.0, len = 5.0;
+  put('copWhite', 0, 0.86, 0.1, w, 0.86, len - 0.4, { tag: 'vehicle' });          // body
+  put('copWhite', 0, 0.62, -len / 2 + 0.55, w - 0.12, 0.55, 1.1, { tag: 'vehicle' }); // bonnet
+  put('copWhite', 0, 1.62, -0.15, w - 0.14, 0.66, 2.0, { tag: 'vehicle' });        // cabin
+  put('glass', 0, 1.66, -1.14, w - 0.30, 0.58, 0.14, { solid: false });            // windscreen
+  put('glass', 0, 1.66, 0.86, w - 0.32, 0.52, 0.12, { solid: false });             // rear glass
+  for (const side of [-1, 1]) {
+    put('glass', side * (w / 2 - 0.09), 1.64, -0.15, 0.10, 0.50, 1.7, { solid: false });
+    put('metalDark', side * (w / 2 + 0.02), 1.66, -1.02, 0.16, 0.14, 0.10, { solid: false }); // mirror
+  }
+  put('metalDark', 0, 1.14, 1.35, w - 0.06, 0.7, 0.14, { solid: false });          // bed headboard
+  put('copWhite', 0, 0.98, 1.9, w, 0.5, 0.9, { solid: false });                    // tailgate
+
+  /*
+   * Livery. A broad blue band along the flank with a white body above and
+   * below it is the PM scheme, and it is what makes the vehicle identifiable
+   * as police in one glance rather than as a white pickup.
+   */
+  for (const side of [-1, 1]) {
+    put('copBlue', side * (w / 2 + 0.01), 0.90, 0.1, 0.04, 0.34, len - 0.5, { solid: false });
+    put('copBlue', side * (w / 2 + 0.015), 1.62, -0.15, 0.03, 0.16, 1.9, { solid: false });
+  }
+  put('copBlue', 0, 0.72, -len / 2 + 0.02, w - 0.1, 0.30, 0.06, { solid: false });
+
+  // black bumpers, push bar, grille, lamps
+  put('metalDark', 0, 0.52, -len / 2 + 0.04, w + 0.08, 0.34, 0.24, { solid: false });
+  put('metalDark', 0, 0.52, len / 2 - 0.06, w + 0.04, 0.30, 0.2, { solid: false });
+  put('metalDark', 0, 0.86, -len / 2 - 0.06, w - 0.2, 0.72, 0.12, { solid: false });   // push bar
+  for (const ox of [-0.55, 0.55]) put('metalDark', ox, 1.10, -len / 2 - 0.04, 0.12, 1.1, 0.14, { solid: false });
+  put('metalDark', 0, 0.86, -len / 2 + 0.02, w - 0.42, 0.24, 0.08, { solid: false });  // grille
+  for (const ox of [-0.66, 0.66]) put('bulb', ox, 0.86, -len / 2 + 0.0, 0.34, 0.2, 0.08, { solid: false });
+  for (const ox of [-0.72, 0.72]) put('lightRed', ox, 1.02, len / 2 - 0.12, 0.24, 0.24, 0.1, { solid: false });
+
+  lightBar(1.98, -0.15, 1.5);
+  for (const ox of [-w / 2, w / 2]) for (const oz of [-1.45, 1.5]) wheel(ox, oz, 0.44);
 }
 
 function buildVan(B, rng, x, y, z, rotY) {

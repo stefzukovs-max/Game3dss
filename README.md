@@ -148,6 +148,14 @@ models, the characters, and all the audio (synthesised through WebAudio —
 gunshots are a noise burst through a swept resonant filter plus a low body
 thump, distance-attenuated and low-passed).
 
+**Weapons** are built from 2D side-view profiles extruded across the gun's
+width. A firearm read in silhouette *is* its side view — the banana curve of a
+7.62 magazine, the step where a pistol slide meets the frame, the drop of a
+shotgun stock — so extruding that profile gets the shapes right for no more
+cost than the axis-aligned boxes it replaced. Parts are sorted into a metal
+buffer and a non-metal one, because a wooden stock shaded as metal looks like
+painted tin.
+
 **Characters** are built from capsules, spheres and a lathed torso rather than
 boxes. Two things keep that cheap enough to run twenty of them on a phone:
 every part of a limb — sleeve, skin, glove, strapping — is baked into one
@@ -222,6 +230,7 @@ npm run check:mobile     # emulates a phone and drives the game through syntheti
 npm run check:shooting   # weapon bench on open ground, isolated from allied fire
 npm run shots            # captures menu / HUD / map screenshots
 npm run shots:chars      # close-up portraits of both factions' character rigs
+npm run shots:guns       # turntable portraits of the four weapon models
 npm run props            # what is inside each baked prop GLB: part names,
                          # triangle counts and real sizes in metres
 node tools/expose.mjs    # two-axis lighting sweep (exposure × sun × env × bloom)

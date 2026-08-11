@@ -14,7 +14,8 @@
     "check:mobile": "node tools/mobile-check.mjs",
     "shots:chars": "node tools/character-shots.mjs",
     "assets": "node tools/fetch-assets.mjs",
-    "props": "node tools/prop-info.mjs"
+    "props": "node tools/prop-info.mjs",
+    "shots:guns": "node tools/weapon-shots.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.4.2",

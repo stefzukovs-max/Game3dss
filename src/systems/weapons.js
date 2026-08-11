@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PartMesh, GEAR_MATERIAL } from '../entities/character.js';
+import { PartMesh } from '../entities/character.js';
 
 /**
  * Weapon stats + procedural weapon models.
@@ -42,33 +42,157 @@ export const WEAPONS = {
 
 export const WEAPON_ORDER = ['pistol', 'smg', 'rifle', 'shotgun'];
 
-/* ── models ─────────────────────────────────────────────────────── */
+/* ── models ──────────────────────────────────────────────────────────
+ *
+ * Every gun is built from 2D side-view profiles extruded across the weapon's
+ * width, plus turned parts for anything cylindrical.
+ *
+ * A firearm read in silhouette *is* its side view — the banana curve of an AK
+ * magazine, the step where a pistol slide meets the frame, the drop of a
+ * shotgun stock. Extruding that profile gets those shapes exactly right, and
+ * it costs no more than the axis-aligned boxes it replaces. The bevel on every
+ * extrusion is the other half of it: a hard 90° edge catches no light at all,
+ * so a bevelled edge two millimetres wide is what makes a receiver read as
+ * machined metal rather than as a grey block.
+ *
+ * Parts are sorted into two buffers, metal and non-metal, because a wooden
+ * stock shaded as metal looks like painted tin and a polymer grip shaded as
+ * metal looks like chrome. Two merged meshes per weapon is the cheapest way to
+ * get that right without patching the standard material's shader.
+ */
+
 const G = new Map();
-const box = (w, h, d) => {
-  const k = `${w}|${h}|${d}`;
+const cache = (k, make) => {
   let g = G.get(k);
-  if (!g) G.set(k, (g = new THREE.BoxGeometry(w, h, d)));
+  if (!g) G.set(k, (g = make()));
   return g;
 };
 
 const _wm = new THREE.Matrix4();
+const _wq = new THREE.Quaternion();
+const _wv = new THREE.Vector3();
+const _ws = new THREE.Vector3(1, 1, 1);
+const _we = new THREE.Euler();
+
+/**
+ * Extrude a side-view profile across the gun's width.
+ *
+ * `pts` are [z, y] pairs in metres, with -Z down the barrel, traced in order
+ * around the outline. The result is centred on X and carries the bevel that
+ * gives the edges a highlight.
+ */
+function profile(key, pts, width, bevel = 0.0035) {
+  return cache(`p${key}`, () => {
+    const shape = new THREE.Shape();
+    shape.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i][0], pts[i][1]);
+    shape.closePath();
+    const g = new THREE.ExtrudeGeometry(shape, {
+      depth: Math.max(width - bevel * 2, 0.001),
+      bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1,
+      curveSegments: 6,
+    });
+    /*
+     * The shape's local x carries the intended world z and the extrusion runs
+     * along local z, which has to become world x. Rotating +90° about Y does
+     * swap those axes — but it also negates z, which silently mirrors every
+     * profile front-to-back: handguards end up behind the shooter and stocks
+     * out past the muzzle. -90° is the rotation that preserves the sign.
+     */
+    g.rotateY(-Math.PI / 2);
+    g.translate(width / 2 - bevel, 0, 0);
+    g.computeVertexNormals();
+    return g;
+  });
+}
+
+/**
+ * The banana magazine.
+ *
+ * `depth` is the front-to-back measurement — the one you see in profile — and
+ * `width` is the thin cross-axis. Getting those the wrong way round is easy
+ * and produces a magazine that looks like a blade edge-on to the shooter.
+ *
+ * The spine sweeps forward as it drops, which is the entire reason a 7.62
+ * rifle is recognisable from fifty metres away.
+ */
+function curvedMag(key, len, depthTop, depthBot, arc, width) {
+  return cache(`c${key}`, () => {
+    const front = [], back = [];
+    const N = 8;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const y = -len * t;
+      // t² rather than sin(t): a sine spreads the bend evenly down the
+      // magazine and reads as a straight slab tipped forward, where the real
+      // curve is gentle at the well and tightens toward the floorplate
+      const z = -(arc * t * t) * len;                  // forward as it drops
+      const half = (depthTop + (depthBot - depthTop) * t) / 2;
+      front.push([z - half, y]);
+      back.push([z + half, y]);
+    }
+    return profile(key, [...front, ...back.reverse()], width);
+  });
+}
 
 /** Barrel / tube running down -Z. */
-const rod = (r, len) => {
-  const k = `r${r}|${len}`;
-  let g = G.get(k);
-  if (!g) {
-    g = new THREE.CylinderGeometry(r, r, len, 8);
-    g.rotateX(Math.PI / 2);            // stand it up along Z
-    G.set(k, g);
-  }
+const rod = (r, len, seg = 10) => cache(`r${r}|${len}|${seg}`, () => {
+  const g = new THREE.CylinderGeometry(r, r, len, seg);
+  g.rotateX(Math.PI / 2);
   return g;
-};
+});
 
-const GUNMETAL = 0x2b2e33;
-const POLYMER = 0x1b1d20;
-const WOOD = 0x6b4a2f;
-const STEEL = 0x585d66;
+/** A short turned ring — muzzle brakes, gas blocks, suppressor collars. */
+const ring = (r, len, seg = 10) => rod(r, len, seg);
+
+const box = (w, h, d) => cache(`b${w}|${h}|${d}`, () => new THREE.BoxGeometry(w, h, d));
+
+const GUNMETAL = 0x383c43;   // parkerised steel, lifted so the form reads small
+const STEEL = 0x878e97;      // bare/worn steel: bolt, barrel, sights
+const POLYMER = 0x26292e;    // moulded furniture
+const WOOD = 0x7a4e28;       // AK / shotgun furniture
+const BRASS = 0xb08d4a;
+
+/**
+ * Two materials, one metallic and one not.
+ *
+ * Both take the scanned normal and roughness the asset pack provides for
+ * metal, so a receiver has fine machining grain rather than a mirror finish —
+ * a perfectly smooth gun at this size reads as plastic no matter how dark it
+ * is.
+ */
+export const WEAPON_METAL = new THREE.MeshStandardMaterial({
+  vertexColors: true, roughness: 0.34, metalness: 1.0, envMapIntensity: 1.15,
+});
+export const WEAPON_POLY = new THREE.MeshStandardMaterial({
+  vertexColors: true, roughness: 0.58, metalness: 0.0, envMapIntensity: 0.75,
+});
+
+/** Apply the scanned surface detail once the asset pack has loaded. */
+export function applyWeaponMaterials(assets) {
+  if (!assets?.ready) return false;
+  const wrap = (t, r) => {
+    if (!t) return null;
+    const c = t.clone();
+    c.needsUpdate = true;
+    c.wrapS = c.wrapT = THREE.RepeatWrapping;
+    c.repeat.set(r, r);
+    return c;
+  };
+  const rust = assets.material('rust');
+  const leather = assets.material('leather');
+  if (rust?.normal) {
+    WEAPON_METAL.normalMap = wrap(rust.normal, 3);
+    WEAPON_METAL.normalScale = new THREE.Vector2(0.28, 0.28);
+    WEAPON_METAL.needsUpdate = true;
+  }
+  if (leather?.normal) {
+    WEAPON_POLY.normalMap = wrap(leather.normal, 8);
+    WEAPON_POLY.normalScale = new THREE.Vector2(0.45, 0.45);
+    WEAPON_POLY.needsUpdate = true;
+  }
+  return true;
+}
 
 /**
  * Builds a weapon oriented so that -Z is "down the barrel", ready to be
@@ -76,86 +200,218 @@ const STEEL = 0x585d66;
  */
 const MODEL_CACHE = new Map();
 
-export function buildWeaponModel(id) {
-  const cached = MODEL_CACHE.get(id);
-  const g = new THREE.Group();
+/** Assemble one weapon's part list into merged metal / non-metal buffers. */
+function buildGeometry(id) {
+  const metal = new PartMesh();
+  const poly = new PartMesh();
 
-  if (cached) {
-    const mesh = new THREE.Mesh(cached.geo, GEAR_MATERIAL);
-    mesh.castShadow = true;
-    g.add(mesh);
-    const muzzle = new THREE.Object3D();
-    muzzle.position.copy(cached.muzzle);
-    muzzle.name = 'muzzle';
-    g.add(muzzle);
-    g.userData.muzzle = muzzle;
-    return g;
-  }
-
-  // Merge the whole gun into one vertex-coloured buffer on a shared metallic
-  // material: seven meshes per weapon times twenty combatants is a lot of draw
-  // calls to spend on something the size of a shoebox.
-  const part = new PartMesh();
-  const add = (geo, colour, x, y, z) => {
-    _wm.makeTranslation(x, y, z);
-    part.add(geo, _wm, colour);
+  // `m` = metal buffer, `p` = non-metal buffer. Both take an optional yaw/roll
+  // so angled parts (grips, magazines, stocks) sit where they should.
+  const put = (buf) => (geo, colour, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    _we.set(rx, ry, rz);
+    buf.add(geo, _wm.compose(_wv.set(x, y, z), _wq.setFromEuler(_we), _ws.set(1, 1, 1)), colour);
   };
+  const m = put(metal);
+  const p = put(poly);
 
-  let muzzleZ = -0.3;
+  let muzzleZ = -0.3, muzzleY = 0.04;
 
   switch (id) {
+    /* ── compact 9 mm pistol ────────────────────────────────────────
+     * The read is the step between slide and frame, the squared trigger
+     * guard, and the grip raked back about 18°.
+     */
     case 'pistol': {
-      add(box(0.055, 0.11, 0.24), GUNMETAL, 0, 0.03, -0.06);   // slide
-      add(box(0.05, 0.14, 0.07), POLYMER, 0, -0.07, 0.03);     // grip
-      add(box(0.03, 0.045, 0.05), GUNMETAL, 0, -0.02, 0.0);    // trigger guard
-      add(rod(0.031, 0.07), STEEL, 0, 0.0, -0.02);             // cylinder
-      add(rod(0.016, 0.11), STEEL, 0, 0.035, -0.2);            // barrel
-      muzzleZ = -0.26;
+      const W = 0.032;
+      // slide: flat top, dust cover stepping down at the front
+      m(profile('pist-slide', [
+        [-0.155, 0.028], [-0.155, 0.072], [-0.128, 0.078], [0.055, 0.078],
+        [0.062, 0.070], [0.062, 0.030], [-0.02, 0.026], [-0.09, 0.026],
+      ], W), GUNMETAL, 0, 0, 0);
+      // ejection port
+      m(box(W + 0.002, 0.016, 0.05), 0x101215, 0.0, 0.062, -0.03);
+      // frame with the trigger-guard loop drawn into the outline
+      p(profile('pist-frame', [
+        [-0.10, 0.026], [0.062, 0.026], [0.062, -0.01], [0.030, -0.012],
+        [0.026, -0.048], [-0.004, -0.052], [-0.010, -0.016], [-0.052, -0.014],
+        [-0.10, -0.006],
+      ], W - 0.004), POLYMER, 0, 0, 0);
+      // grip, raked back
+      p(profile('pist-grip', [
+        [-0.019, 0.0], [0.023, 0.0], [0.030, -0.125], [-0.014, -0.125],
+      ], W + 0.001), POLYMER, 0, -0.012, 0.036, 0, 0, -0.05);
+      p(box(W + 0.004, 0.008, 0.042), 0x0d0f11, 0, -0.138, 0.043);   // magazine floorplate
+      m(rod(0.0075, 0.045, 8), STEEL, 0, 0.049, -0.168);             // barrel at the crown
+      m(box(0.006, 0.011, 0.005), STEEL, 0, 0.086, -0.14);           // front sight
+      m(box(0.020, 0.011, 0.006), STEEL, 0, 0.086, 0.05);            // rear sight
+      m(box(0.004, 0.026, 0.004), STEEL, 0, -0.03, -0.006);          // trigger
+      muzzleZ = -0.19; muzzleY = 0.049;
       break;
     }
+
+    /* ── 9 mm submachine gun ────────────────────────────────────────
+     * Tube receiver, cocking-handle tube riding on top, a straight stick
+     * magazine through the grip, and a skeleton stock.
+     */
     case 'smg': {
-      add(box(0.06, 0.11, 0.34), POLYMER, 0, 0.02, -0.08);
-      add(box(0.05, 0.15, 0.07), POLYMER, 0, -0.08, 0.05);     // grip
-      add(box(0.045, 0.2, 0.06), GUNMETAL, 0, -0.11, -0.05);   // magazine
-      add(rod(0.017, 0.15), STEEL, 0, 0.035, -0.29);           // barrel
-      add(box(0.05, 0.06, 0.16), GUNMETAL, 0, 0.0, 0.16);      // stock
-      add(box(0.02, 0.03, 0.02), STEEL, 0, 0.085, -0.2);       // front sight
-      muzzleZ = -0.37;
+      const W = 0.042;
+      m(rod(0.026, 0.30, 12), GUNMETAL, 0, 0.03, -0.06);             // receiver tube
+      m(rod(0.013, 0.30, 8), GUNMETAL, -0.024, 0.052, -0.06);        // cocking tube
+      m(rod(0.0105, 0.13, 8), STEEL, 0, 0.03, -0.26);                // barrel
+      m(ring(0.017, 0.03, 10), GUNMETAL, 0, 0.03, -0.20);            // barrel nut
+      // handguard
+      p(profile('smg-hg', [
+        [-0.235, 0.004], [-0.11, 0.004], [-0.105, -0.03], [-0.232, -0.032],
+      ], W), POLYMER, 0, 0.03, 0);
+      // trigger group + pistol grip
+      p(profile('smg-grip', [
+        [-0.055, 0.006], [0.055, 0.006], [0.055, -0.03], [0.016, -0.034],
+        [0.010, -0.056], [-0.028, -0.058], [-0.034, -0.03], [-0.055, -0.028],
+      ], W - 0.002), POLYMER, 0, 0.012, 0.02);
+      p(profile('smg-pgrip', [
+        [-0.021, 0.0], [0.024, 0.0], [0.030, -0.115], [-0.010, -0.115],
+      ], W - 0.004), POLYMER, 0, -0.02, 0.052, 0, 0, -0.12);
+      m(box(0.026, 0.175, 0.040), GUNMETAL, 0, -0.10, 0.006, 0.10);  // magazine
+      m(box(0.030, 0.010, 0.046), 0x0d0f11, 0, -0.186, 0.024);       // baseplate
+      // folding stock: two rails and a butt plate
+      m(box(0.006, 0.006, 0.20), STEEL, -0.026, 0.032, 0.20);
+      m(box(0.006, 0.006, 0.20), STEEL, 0.026, 0.032, 0.20);
+      m(box(0.062, 0.052, 0.012), 0x1a1c20, 0, 0.026, 0.30);
+      m(box(0.030, 0.012, 0.008), STEEL, 0, 0.062, 0.06);            // rear aperture
+      m(box(0.008, 0.016, 0.006), STEEL, 0, 0.062, -0.215);          // front post
+      m(box(0.004, 0.024, 0.004), STEEL, 0, -0.008, 0.014);          // trigger
+      muzzleZ = -0.33; muzzleY = 0.03;
       break;
     }
+
+    /* ── 7.62 assault rifle ─────────────────────────────────────────
+     * Everything that makes this silhouette recognisable is off the boxy
+     * axis: the curved magazine, the gas tube stacked above the barrel, the
+     * slanted muzzle brake and the stock dropping away behind the receiver.
+     */
     case 'rifle': {
-      add(box(0.06, 0.1, 0.42), POLYMER, 0, 0.02, -0.1);       // receiver
-      add(box(0.05, 0.15, 0.07), POLYMER, 0, -0.08, 0.08);     // grip
-      add(box(0.05, 0.24, 0.07), GUNMETAL, 0, -0.12, -0.02);   // magazine (curved-ish)
-      add(rod(0.018, 0.25), STEEL, 0, 0.035, -0.42);           // barrel
-      add(box(0.055, 0.06, 0.16), POLYMER, 0, 0.03, -0.28);    // handguard
-      add(box(0.055, 0.08, 0.2), POLYMER, 0, -0.01, 0.24);     // stock
-      add(box(0.03, 0.05, 0.03), GUNMETAL, 0, 0.09, -0.02);    // rear sight
-      add(box(0.025, 0.05, 0.025), STEEL, 0, 0.085, -0.36);    // front post
-      muzzleZ = -0.55;
+      const W = 0.038;
+      /*
+       * Coordinates are laid out along one continuous line rather than picked
+       * per part: muzzle at -0.49, barrel back to -0.16, receiver -0.17..0.06,
+       * stock from 0.06 back. Every part below is written against that line,
+       * which is what stops handguards floating a centimetre off the barrel.
+       */
+      // receiver: shallow, flat-topped, with the magazine well cut forward
+      m(profile('rif-recv', [
+        [-0.175, 0.058], [0.062, 0.058], [0.062, -0.018], [-0.02, -0.026],
+        [-0.10, -0.026], [-0.175, -0.010],
+      ], W), GUNMETAL, 0, 0, 0);
+      m(profile('rif-dust', [
+        [-0.15, 0.058], [0.055, 0.058], [0.050, 0.080], [-0.145, 0.080],
+      ], W - 0.003), GUNMETAL, 0, 0, 0);
+
+      m(rod(0.0115, 0.305, 8), STEEL, 0, 0.038, -0.310);        // barrel
+      m(rod(0.0125, 0.140, 8), GUNMETAL, 0, 0.072, -0.245);     // gas tube, stacked above
+      m(box(0.024, 0.070, 0.030), GUNMETAL, 0, 0.045, -0.300);  // gas block ties the two
+      m(box(0.022, 0.050, 0.026), GUNMETAL, 0, 0.045, -0.170);  // rear gas-tube collar
+
+      // wooden furniture, sitting hard against the barrel line
+      p(profile('rif-hgl', [
+        [-0.300, 0.020], [-0.170, 0.020], [-0.166, -0.030], [-0.296, -0.024],
+      ], W + 0.004), WOOD, 0, 0.026, 0);
+      p(profile('rif-hgu', [
+        [-0.292, 0.058], [-0.196, 0.058], [-0.199, 0.092], [-0.288, 0.090],
+      ], 0.030), WOOD, 0, 0.026, 0);
+
+      // the banana, hung from the magazine well just forward of the trigger
+      m(curvedMag('rif-mag', 0.215, 0.090, 0.074, 0.62, 0.026),
+        GUNMETAL, 0, -0.022, -0.058);
+
+      // pistol grip, immediately behind the trigger guard
+      p(profile('rif-grip', [
+        [-0.024, 0.0], [0.028, 0.0], [0.036, -0.112], [-0.004, -0.112],
+      ], W - 0.004), POLYMER, 0, -0.020, 0.036, 0, 0, -0.22);
+      m(profile('rif-tguard', [
+        [-0.070, -0.018], [0.012, -0.018], [0.012, -0.042], [-0.066, -0.044],
+      ], W - 0.006), GUNMETAL, 0, 0, 0);
+      m(box(0.004, 0.024, 0.004), STEEL, 0, -0.032, -0.030);    // trigger
+
+      // stock: rises off the receiver's rear face and drops to the butt
+      p(profile('rif-stock', [
+        [0.062, 0.050], [0.140, 0.048], [0.288, 0.056], [0.288, 0.000],
+        [0.196, -0.008], [0.126, -0.036], [0.062, -0.022],
+      ], W - 0.008), WOOD, 0, 0, 0);
+      p(box(W - 0.004, 0.058, 0.012), 0x121316, 0, 0.028, 0.292);
+
+      // slanted brake and sights
+      m(profile('rif-brake', [
+        [-0.470, 0.018], [-0.428, 0.024], [-0.428, -0.020], [-0.470, -0.014],
+      ], 0.028), GUNMETAL, 0, 0.038, 0);
+      m(box(0.020, 0.016, 0.030), STEEL, 0, 0.082, -0.150);     // rear leaf
+      m(box(0.014, 0.030, 0.014), GUNMETAL, 0, 0.070, -0.404);  // front sight base
+      m(box(0.006, 0.014, 0.005), STEEL, 0, 0.090, -0.404);     // front post
+      muzzleZ = -0.49; muzzleY = 0.038;
       break;
     }
+
+    /* ── 12-gauge pump ──────────────────────────────────────────────
+     * Barrel over tube magazine, ribbed forend, and a stock with real drop
+     * at the comb — the drop is what stops it reading as a plank.
+     */
     case 'shotgun': {
-      add(box(0.06, 0.09, 0.4), WOOD, 0, 0.01, -0.08);
-      add(rod(0.021, 0.35), STEEL, 0, 0.05, -0.34);            // barrel
-      add(rod(0.019, 0.31), GUNMETAL, 0, 0.005, -0.32);        // tube magazine
-      add(box(0.06, 0.055, 0.12), WOOD, 0, 0.0, -0.3);         // pump
-      add(box(0.05, 0.13, 0.06), WOOD, 0, -0.06, 0.06);        // grip
-      add(box(0.055, 0.1, 0.22), WOOD, 0, -0.02, 0.24);        // stock
-      muzzleZ = -0.53;
+      const W = 0.042;
+      m(profile('sg-recv', [
+        [-0.085, 0.048], [0.085, 0.048], [0.085, -0.020], [0.02, -0.030],
+        [-0.055, -0.030], [-0.085, -0.018],
+      ], W), GUNMETAL, 0, 0.012, 0.02);
+      m(rod(0.0165, 0.44, 10), STEEL, 0, 0.042, -0.29);              // barrel
+      m(rod(0.0135, 0.34, 8), GUNMETAL, 0, 0.006, -0.25);            // tube magazine
+      m(box(0.010, 0.016, 0.012), STEEL, 0, 0.024, -0.10);           // barrel/tube bridge
+      m(box(0.010, 0.008, 0.006), BRASS, 0, 0.060, -0.49);           // bead
+      // ribbed forend
+      p(profile('sg-pump', [
+        [-0.32, 0.024], [-0.19, 0.024], [-0.185, -0.030], [-0.315, -0.028],
+      ], W + 0.004), WOOD, 0, 0.008, 0);
+      for (let i = 0; i < 5; i++) {
+        p(box(W + 0.007, 0.004, 0.008), 0x53331c, 0, 0.0, -0.30 + i * 0.026);
+      }
+      // stock: wrist, comb and butt in one profile
+      p(profile('sg-stock', [
+        [0.0, 0.046], [0.09, 0.042], [0.235, 0.060], [0.245, -0.030],
+        [0.135, -0.040], [0.055, -0.058], [0.0, -0.028],
+      ], W - 0.002), WOOD, 0, 0.012, 0.10);
+      p(box(W + 0.002, 0.092, 0.012), 0x121316, 0, 0.026, 0.352);    // recoil pad
+      p(profile('sg-grip', [
+        [-0.028, 0.0], [0.03, 0.0], [0.03, -0.045], [-0.028, -0.052],
+      ], W - 0.004), WOOD, 0, -0.02, 0.075);
+      m(box(0.004, 0.026, 0.004), STEEL, 0, -0.012, 0.028);          // trigger
+      m(box(0.030, 0.006, 0.055), GUNMETAL, 0, -0.026, 0.03);        // trigger plate
+      muzzleZ = -0.52; muzzleY = 0.042;
       break;
     }
   }
 
-  const geo = part.build();
-  const muzzlePos = new THREE.Vector3(0, 0.04, muzzleZ);
-  MODEL_CACHE.set(id, { geo, muzzle: muzzlePos });
+  return {
+    metal: metal.empty ? null : metal.build(),
+    poly: poly.empty ? null : poly.build(),
+    muzzle: new THREE.Vector3(0, muzzleY, muzzleZ),
+  };
+}
 
-  const mesh = new THREE.Mesh(geo, GEAR_MATERIAL);
-  mesh.castShadow = true;
-  g.add(mesh);
+export function buildWeaponModel(id) {
+  let entry = MODEL_CACHE.get(id);
+  if (!entry) MODEL_CACHE.set(id, (entry = buildGeometry(id)));
+
+  const g = new THREE.Group();
+  if (entry.metal) {
+    const mesh = new THREE.Mesh(entry.metal, WEAPON_METAL);
+    mesh.castShadow = true;
+    g.add(mesh);
+  }
+  if (entry.poly) {
+    const mesh = new THREE.Mesh(entry.poly, WEAPON_POLY);
+    mesh.castShadow = true;
+    g.add(mesh);
+  }
+
   const muzzle = new THREE.Object3D();
-  muzzle.position.copy(muzzlePos);
+  muzzle.position.copy(entry.muzzle);
   muzzle.name = 'muzzle';
   g.add(muzzle);
   g.userData.muzzle = muzzle;
