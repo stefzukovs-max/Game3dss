@@ -1,6 +1,17 @@
 import * as THREE from 'three';
 import { clamp, damp, angleDelta, now, makeRNG } from '../core/utils.js';
 import { CharacterModel, makeOutfit } from './character.js';
+import { SkinnedActor, actorsReady } from './actor.js';
+
+/**
+ * Build whichever body is available.
+ *
+ * The rigged pack is optional, so this is the one place that knows which rig
+ * the game is running. Both implement the same interface, so nothing below
+ * this line changes.
+ */
+const makeCharacter = (outfit) =>
+  (actorsReady() ? new SkinnedActor(outfit) : new CharacterModel(outfit));
 import { WeaponState, attachWeapon, WEAPONS } from '../systems/weapons.js';
 import { NavGraph } from '../world/navgraph.js';
 import { audio } from '../core/audio.js';
@@ -80,7 +91,7 @@ export class Agent {
     // model - the bigger archetypes get a broader build, not just a bigger scale
     const outfit = makeOutfit(faction, archetype.rank, this.rng);
     outfit.frame = archetype.health >= 150 ? 'heavy' : 'normal';
-    this.model = new CharacterModel(outfit);
+    this.model = makeCharacter(outfit);
     this.model.root.scale.setScalar(archetype.rank === 'elite' ? 1.05 : 1);
     this.model.setPosition(spawn.x, spawn.y, spawn.z);
     game.scene.add(this.model.root);

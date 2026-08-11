@@ -721,6 +721,20 @@
       "file": "models/cars/taxi.glb"
     },
     {
+      "pack": "people",
+      "slot": "body",
+      "source": "quaternius",
+      "model": "Superhero_Male_FullBody.gltf",
+      "file": "models/people/body.glb"
+    },
+    {
+      "pack": "anim",
+      "slot": "clips",
+      "source": "quaternius",
+      "model": "UAL1_Standard.glb",
+      "file": "models/anim/clips.glb"
+    },
+    {
       "pack": "nature",
       "slot": "palm1",
       "source": "quaternius",

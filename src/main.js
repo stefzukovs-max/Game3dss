@@ -14,6 +14,8 @@ import { Player } from './entities/player.js';
 import { ROSTER, FACTIONS, rosterFor, byId } from './entities/roster.js';
 import { HUD } from './ui/hud.js';
 import { setCharacterDetail, applyCharacterMaterials } from './entities/character.js';
+import { setActorSource } from './entities/actor.js';
+import { setOutfitMaterials } from './entities/outfit.js';
 import { ProceduralSky } from './core/sky.js';
 import { PostChain } from './core/post.js';
 import { AssetLibrary } from './core/assets.js';
@@ -177,6 +179,9 @@ class Game {
       applyCharacterMaterials(this.assets);
       applyWeaponMaterials(this.assets);
       setWeaponModels(this.assets);
+      // real rigged bodies when the pack is there; the capsule rig otherwise
+      setOutfitMaterials(this.assets);
+      this.skinned = setActorSource(this.assets);
     }
 
     await step(0.57, 'Waking the hillside…');

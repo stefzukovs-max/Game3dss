@@ -489,8 +489,20 @@ export function attachWeapon(character, id) {
     character.rightHand.remove(character.weaponModel);
   }
   const m = buildWeaponModel(id);
-  m.position.set(0.012, -0.055, -0.035);
-  m.rotation.set(Math.PI / 2, 0, 0); // hand hangs down: rotate barrel to forward
+  /*
+   * The rigged actor hands over a mount that is already oriented — it works its
+   * grip out from the animation library's own aim pose — so it supplies an
+   * identity pose. The capsule rig's hand is a bare pivot and needs the barrel
+   * turned up to horizontal by hand.
+   */
+  const pose = character.weaponPose;
+  if (pose) {
+    m.position.copy(pose.position);
+    m.rotation.copy(pose.rotation);
+  } else {
+    m.position.set(0.012, -0.055, -0.035);
+    m.rotation.set(Math.PI / 2, 0, 0);
+  }
   character.rightHand.add(m);
   character.weaponModel = m;
   character.muzzleNode = m.userData.muzzle;

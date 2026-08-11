@@ -116,6 +116,8 @@ still reproduces everything from a clean clone.
 | `sedan2` | NormalCar2 | [Realistic Car Pack](https://quaternius.com) | cars |
 | `suv` | SUV | [Realistic Car Pack](https://quaternius.com) | cars |
 | `taxi` | Taxi | [Realistic Car Pack](https://quaternius.com) | cars |
+| `body` | Superhero_Male_FullBody.gltf | [Realistic Car Pack](https://quaternius.com) | people |
+| `clips` | UAL1_Standard.glb | [Realistic Car Pack](https://quaternius.com) | anim |
 | `palm1` | PalmTree_1 | [Realistic Car Pack](https://quaternius.com) | nature |
 | `palm2` | PalmTree_2 | [Realistic Car Pack](https://quaternius.com) | nature |
 | `palm3` | PalmTree_3 | [Realistic Car Pack](https://quaternius.com) | nature |
@@ -155,25 +157,15 @@ rights, so: excluded.
 photorealistic, free to download — and the licence explicitly forbids
 redistribution. Unambiguous, so: excluded.
 
-**Quaternius character packs.** CC0, rigged and animated, and they would have
-been fine to ship. They are stylised low-poly characters, though, and the brief
-here was to move *away* from a blocky look, so adopting them would have worked
-against the goal even though the licence is clean.
-
 ### The characters
 
-The characters are still the procedural rig in `src/entities/character.js`,
-and that is the last thing in this project that still looks hand-made rather
-than modelled. The replacement has been found and verified, but not yet wired
-in.
-
-**What was found.** Quaternius publishes two CC0 packs through itch.io that
-together solve it:
+The characters are real rigged humans, driven by skeletal animation. Two CC0
+packs from Quaternius make it work, and neither is any use on its own:
 
 | Pack | What it gives |
 |---|---|
-| Universal Base Characters | An anatomically proportioned rigged human — 14k triangles, real hands, separate hair and eye meshes, six hairstyles |
-| Universal Animation Library | 43 named clips on the same skeleton |
+| [Universal Base Characters](https://quaternius.itch.io/universal-base-characters) | An anatomically proportioned rigged human — 12.5k triangles, real hands, separate hair and eye meshes |
+| [Universal Animation Library](https://quaternius.itch.io/universal-animation-library) | 43 named clips on the same skeleton |
 
 The clips are the ones a third-person shooter actually needs: `Idle_Loop`,
 `Walk_Loop`, `Jog_Fwd_Loop`, `Sprint_Loop`, `Crouch_Idle_Loop`,
@@ -182,16 +174,24 @@ The clips are the ones a third-person shooter actually needs: `Idle_Loop`,
 `Death01`, `Jump_Start` / `_Loop` / `_Land`, `Roll`.
 
 **The risk was retargeting**, and it was measured rather than assumed: the two
-packs share all 65 bones, and all 195 tracks of a clip bind to the base
+packs share all 65 bones, and every track of a clip binds to the base
 character's skeleton with no renaming. The animation library drives the body
 directly.
 
-**What is left is engine work, not asset hunting**: load the skinned glTF,
-drive an AnimationMixer from the locomotion state the rig already computes
-(speed, aiming, crouching, hit, dead), parent the weapon to the right-hand
-bone, and hang the police and crew kit — which already exists as geometry — off
-bones instead of the procedural pivots. That changes how every character is
-posed, so it is deliberately not half-done here.
+**The gap was clothing.** The base pack ships six bare bodies and no clothes,
+and there is no CC0 outfit set anywhere that shares this skeleton — the only
+modular outfit pack built for it is fantasy armour. So the clothing is cut out
+of the body itself, in `src/entities/outfit.js`: a garment is the region of the
+body it covers, copied and pushed a centimetre or two along its own normals,
+which means it inherits the pack's skin weights and deforms correctly with no
+rigging step. Bone weights give the soft boundaries (an armhole follows the
+shoulder), cut planes give the hard ones (hems, collars, sleeve ends). Hard kit
+that would not deform — helmets, pouches, radios, holsters, knee pads, the gold
+chain — is modelled and hung off bones instead.
+
+`npm run check:outfits` reports what every preset cut, so a garment that
+silently comes back empty is visible as a number rather than as an absence in a
+screenshot.
 
 **Still excluded** for licensing, unchanged: Mixamo (no clear redistribution
 grant, and an account is required) and Renderpeople / Human Alloy free samples

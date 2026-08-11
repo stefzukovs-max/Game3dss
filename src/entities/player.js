@@ -1,6 +1,17 @@
 import * as THREE from 'three';
 import { clamp, damp, lerp, now, angleDelta } from '../core/utils.js';
 import { CharacterModel, makeOutfit } from './character.js';
+import { SkinnedActor, actorsReady } from './actor.js';
+
+/**
+ * Build whichever body is available.
+ *
+ * The rigged pack is optional, so this is the one place that knows which rig
+ * the game is running. Both implement the same interface, so nothing below
+ * this line changes.
+ */
+const makeCharacter = (outfit) =>
+  (actorsReady() ? new SkinnedActor(outfit) : new CharacterModel(outfit));
 import { WEAPONS, WeaponState, attachWeapon } from '../systems/weapons.js';
 import { audio } from '../core/audio.js';
 
@@ -102,7 +113,7 @@ export class Player {
     outfit.visor = b.extra === 'shield' || b.extra === 'breach';
     // operators get their own cached build so they never share a body with a grunt
     outfit.preset += ':op:' + char.id;
-    this.model = new CharacterModel(outfit);
+    this.model = makeCharacter(outfit);
     this.model.root.scale.setScalar(b.frame === 'heavy' ? 1.06 : b.frame === 'light' ? 0.96 : 1);
     game.scene.add(this.model.root);
     attachWeapon(this.model, this.weaponId);

@@ -38,7 +38,8 @@ export class AssetLibrary {
     this.manifest = null;
     this.materials = new Map();   // slug → { color, normal, arm }
     this.props = new Map();       // id   → THREE.Group (template, never added to a scene)
-    this.models = new Map();      // slot → THREE.Group (weapons, vehicles)
+    this.models = new Map();      // slot → THREE.Group (weapons, vehicles, bodies)
+    this.clips = [];              // AnimationClips from the animation library
     this.env = null;              // PMREM cubemap for scene.environment
     this.background = null;       // equirect DataTexture for scene.background
     this.sun = null;              // { dir: Vector3, color: Color }
@@ -100,6 +101,8 @@ export class AssetLibrary {
             if (o.material) o.material.envMapIntensity = 1.0;
           });
           this.models.set(`${m.pack}:${m.slot}`, g.scene);
+          // the animation pack is carried for its clips, not its mesh
+          if (m.pack === 'anim' && g.animations?.length) this.clips = g.animations;
         } catch (e) {
           console.warn(`[assets] model ${m.pack}/${m.slot} failed —`, e.message);
         }

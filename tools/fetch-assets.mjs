@@ -260,7 +260,7 @@ async function buildHdri(h) {
  */
 async function buildModelPack(pack) {
   const outDir = path.join(OUT, 'models', pack.id);
-  const wanted = Object.entries(pack.pick);
+  const wanted = Object.entries(pack.pick ?? pack.files ?? {});
   const have = await Promise.all(wanted.map(([slot]) =>
     exists(path.join(outDir, `${slot}.glb`))));
   if (!FORCE && have.every(Boolean)) {
@@ -283,25 +283,48 @@ async function buildModelPack(pack) {
   await fs.mkdir(stage, { recursive: true });
   await exec('unzip', ['-o', '-q', zip, '-d', stage]);
 
-  // the OBJ folder sits at an unpredictable depth inside each pack
-  const objDir = await findDir(stage, pack.dir);
-  if (!objDir) throw new Error(`${pack.id}: no ${pack.dir} folder in the archive`);
-
-  const glbDir = path.join(stage, '_glb');
-  await exec(process.execPath, [
-    path.join(ROOT, 'tools', 'obj-to-glb.mjs'), objDir, glbDir,
-  ], { maxBuffer: 1 << 24 });
+  /*
+   * Two intake paths. OBJ packs go through three's own loaders in a browser to
+   * become glTF; packs that already ship glTF are taken as-is, because routing
+   * a rigged character through OBJ would silently drop its skeleton.
+   */
+  let glbDir;
+  if (pack.format === 'gltf') {
+    glbDir = stage;
+    /*
+     * Resolve the pack's own texture paths before reading anything.
+     *
+     * The character glTF references images by bare filename, but the archive
+     * keeps them in a sibling Textures folder — and exports some of them under
+     * a `_png` suffix the glTF does not use. Neither is worth "fixing" in the
+     * glTF; gathering every image next to the glTF, under both spellings, makes
+     * the references resolve without touching the file.
+     */
+    await resolvePackTextures(stage);
+  } else {
+    const objDir = await findDir(stage, pack.dir);
+    if (!objDir) throw new Error(`${pack.id}: no ${pack.dir} folder in the archive`);
+    glbDir = path.join(stage, '_glb');
+    await exec(process.execPath, [
+      path.join(ROOT, 'tools', 'obj-to-glb.mjs'), objDir, glbDir,
+    ], { maxBuffer: 1 << 24 });
+  }
 
   await fs.mkdir(outDir, { recursive: true });
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
   const entries = [];
   for (const [slot, src] of wanted) {
-    const from = path.join(glbDir, `${src}.glb`);
-    if (!await exists(from)) { console.error(`  ✗ ${pack.id}/${slot}: ${src} not in pack`); continue; }
+    const from = pack.format === 'gltf'
+      ? await findFile(glbDir, src)
+      : path.join(glbDir, `${src}.glb`);
+    if (!from || !await exists(from)) { console.error(`  ✗ ${pack.id}/${slot}: ${src} not in pack`); continue; }
     const doc = await io.read(from);
     await doc.transform(
       dedup(), prune({ keepAttributes: false }), weld(),
       textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [pack.size, pack.size], quality: 86 }),
+      // JOINTS/WEIGHTS are deliberately left out of the quantize pattern:
+      // quantizing skin weights is what turns a rigged character into a
+      // shredded mesh the first time a bone moves
       quantize({ pattern: /^(POSITION|TEXCOORD|NORMAL|TANGENT)/ }),
     );
     const to = path.join(outDir, `${slot}.glb`);
@@ -310,6 +333,44 @@ async function buildModelPack(pack) {
     entries.push({ pack: pack.id, slot, source: 'quaternius', model: src, file: `models/${pack.id}/${slot}.glb` });
   }
   return entries;
+}
+
+/** Copy every image in the pack next to each glTF, under both spellings. */
+async function resolvePackTextures(root) {
+  const images = [];
+  const gltfs = [];
+  const walk = async (d) => {
+    for (const e of await fs.readdir(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) await walk(p);
+      else if (/\.(png|jpe?g|webp)$/i.test(e.name)) images.push(p);
+      else if (/\.gltf$/i.test(e.name)) gltfs.push(p);
+    }
+  };
+  await walk(root);
+
+  for (const g of gltfs) {
+    const dir = path.dirname(g);
+    for (const img of images) {
+      const base = path.basename(img);
+      const ext = path.extname(base);
+      const alias = `${base.slice(0, -ext.length)}_${ext.slice(1)}${ext}`;   // T_X.png → T_X_png.png
+      for (const name of [base, alias]) {
+        const dest = path.join(dir, name);
+        if (!await exists(dest)) await fs.copyFile(img, dest).catch(() => {});
+      }
+    }
+  }
+}
+
+/** Depth-first search for a file with the given name. */
+async function findFile(root, name) {
+  for (const e of await fs.readdir(root, { withFileTypes: true })) {
+    const p = path.join(root, e.name);
+    if (e.isDirectory()) { const hit = await findFile(p, name); if (hit) return hit; }
+    else if (e.name === name) return p;
+  }
+  return null;
 }
 
 /** Depth-first search for a directory with the given name. */

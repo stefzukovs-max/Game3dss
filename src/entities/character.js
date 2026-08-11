@@ -150,9 +150,9 @@ export const GEAR_MATERIAL = new THREE.MeshStandardMaterial({
 /**
  * Give the bodies real cloth and leather microsurface.
  *
- * There is no free, redistributable, rigged photoreal human to load — see
- * CREDITS.md for what was checked and why each candidate was rejected — so the
- * characters stay procedural. What the CC0 pack can do for them is shading: a
+ * This rig is the fallback now — `entities/actor.js` puts a real rigged human
+ * on screen whenever the CC0 character pack is present, and this one stands in
+ * when it is not. It is still worth shading properly for exactly that case: a
  * measured woven-cotton normal on the bodies and a leather grain on the gear.
  *
  * Only the normal and roughness are taken. Colour stays with the per-outfit

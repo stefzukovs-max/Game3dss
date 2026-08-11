@@ -166,6 +166,28 @@ export const MODEL_PACKS = [
       taxi: 'Taxi',
     },
   },
+  /*
+   * The characters. Two packs that only work together: the base pack is a
+   * rigged human with no animation, the library is 43 clips with no character
+   * worth shipping. They share all 65 bones, so the clips drive the body with
+   * no retargeting — measured, not assumed.
+   *
+   * `files` picks named glTF out of the archive instead of converting OBJ:
+   * these ship as glTF already, and going through the OBJ path would throw the
+   * skeleton away.
+   */
+  {
+    id: 'people', user: 'quaternius', slug: 'universal-base-characters',
+    name: 'Universal Base Characters', size: 512, format: 'gltf',
+    use: 'the rigged body every character is built on',
+    files: { body: 'Superhero_Male_FullBody.gltf' },
+  },
+  {
+    id: 'anim', user: 'quaternius', slug: 'universal-animation-library',
+    name: 'Universal Animation Library', size: 256, format: 'gltf',
+    use: '43 animation clips on the same skeleton',
+    files: { clips: 'UAL1_Standard.glb' },
+  },
   {
     id: 'nature', user: 'quaternius', slug: '150-lowpoly-nature-models',
     name: 'Ultimate Nature Pack', dir: 'OBJ', size: 512,
