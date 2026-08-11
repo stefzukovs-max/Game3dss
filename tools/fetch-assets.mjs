@@ -428,19 +428,42 @@ been fine to ship. They are stylised low-poly characters, though, and the brief
 here was to move *away* from a blocky look, so adopting them would have worked
 against the goal even though the licence is clean.
 
-### What that means for the characters
+### The characters
 
-There is no free, CC0, rigged, photorealistic human model that can be fetched
-without an account. That is a real gap in the free-asset ecosystem, not an
-oversight here: scanned humans are expensive to produce and the people who make
-them sell them.
+The characters are still the procedural rig in \`src/entities/character.js\`,
+and that is the last thing in this project that still looks hand-made rather
+than modelled. The replacement has been found and verified, but not yet wired
+in.
 
-So the characters in this game are still the procedural rig in
-\`src/entities/character.js\`. What the CC0 materials above buy them is
-shading — real woven-cloth, denim-twill and leather-grain normal and roughness
-maps over the existing per-outfit vertex colours, so clothing catches light like
-fabric instead of like painted plastic. That is a genuine improvement and it is
-also honestly less than a scanned character would be.
+**What was found.** Quaternius publishes two CC0 packs through itch.io that
+together solve it:
+
+| Pack | What it gives |
+|---|---|
+| Universal Base Characters | An anatomically proportioned rigged human — 14k triangles, real hands, separate hair and eye meshes, six hairstyles |
+| Universal Animation Library | 43 named clips on the same skeleton |
+
+The clips are the ones a third-person shooter actually needs: \`Idle_Loop\`,
+\`Walk_Loop\`, \`Jog_Fwd_Loop\`, \`Sprint_Loop\`, \`Crouch_Idle_Loop\`,
+\`Crouch_Fwd_Loop\`, \`Pistol_Aim_Down\` / \`_Neutral\` / \`_Up\`,
+\`Pistol_Shoot\`, \`Pistol_Reload\`, \`Hit_Chest\`, \`Hit_Head\`,
+\`Death01\`, \`Jump_Start\` / \`_Loop\` / \`_Land\`, \`Roll\`.
+
+**The risk was retargeting**, and it was measured rather than assumed: the two
+packs share all 65 bones, and all 195 tracks of a clip bind to the base
+character's skeleton with no renaming. The animation library drives the body
+directly.
+
+**What is left is engine work, not asset hunting**: load the skinned glTF,
+drive an AnimationMixer from the locomotion state the rig already computes
+(speed, aiming, crouching, hit, dead), parent the weapon to the right-hand
+bone, and hang the police and crew kit — which already exists as geometry — off
+bones instead of the procedural pivots. That changes how every character is
+posed, so it is deliberately not half-done here.
+
+**Still excluded** for licensing, unchanged: Mixamo (no clear redistribution
+grant, and an account is required) and Renderpeople / Human Alloy free samples
+(licence forbids redistribution).
 `;
 }
 
