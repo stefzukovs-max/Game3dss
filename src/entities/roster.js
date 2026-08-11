@@ -23,24 +23,48 @@
  * All names, crews and units are invented for this game.
  */
 
+/**
+ * ── THE HILL ──
+ *
+ * Morro do Cruzeiro. Four thousand people stacked up a granite slope above the
+ * city. One road reaches the bottom of it; above that there is nothing but the
+ * Escadão — nine hundred concrete steps switchbacking to a whitewashed cross at
+ * the summit — and the lanes that branch off it.
+ *
+ * Bolted to the water tower at the top is a transmitter. It carries the
+ * Saturday baile, and it carries the lookouts: when a patrol turns off the
+ * coast road the music cuts and a voice says which gate. It is how the hill
+ * talks to itself.
+ *
+ * The eviction notices are served Monday. The Battalion is coming up tonight to
+ * take the tower before they are. The crew has until dawn.
+ *
+ * Everything here is invented — the hill, the crews, the unit, the city.
+ */
 export const FACTIONS = {
   gang: {
     id: 'gang',
-    name: 'The Hillside Crew',
-    short: 'CREW',
-    blurb: 'They grew up on these stairs. Improvised gear, total map knowledge, nothing to lose.',
+    name: 'The Lookouts',
+    short: 'LOOKOUTS',
+    motto: 'The hill sees first',
+    blurb: 'Born on these steps. No armour, no radios worth the name — but they '
+      + 'know which roof carries weight and which alley is a dead end, and the '
+      + 'tower tells them you are coming before you have parked.',
     color: 0xffd23f,
     css: '#ffd23f',
-    accent: '#ff7a2f',
+    accent: '#ff5a1f',
   },
   police: {
     id: 'police',
-    name: 'Tactical Battalion',
+    name: '9th Battalion',
     short: 'BATTALION',
-    blurb: 'Issued armour, issued rifles, no idea which alley opens onto which roof.',
+    motto: 'Up before dawn',
+    blurb: 'Issued plates, issued rifles, a printed map three years out of date. '
+      + 'Nine hundred steps of somebody else\'s ground, and every window above '
+      + 'them belongs to a stranger.',
     color: 0x4ea3ff,
-    css: '#4ea3ff',
-    accent: '#1e5fb8',
+    css: '#37b6ff',
+    accent: '#0b64c8',
   },
 };
 
@@ -62,11 +86,11 @@ export const ROSTER = [
     grenades: 2,
     build: { frame: 'light', headgear: 'cap', extra: 'kite' },
     passive: {
-      id: 'rooftops', name: 'Rooftops', icon: '🏃',
+      id: 'rooftops', name: 'Rooftops', icon: 'run',
       desc: '+40% jump height, no fall damage from short drops, and your footsteps are near-silent.',
     },
     ability: {
-      id: 'reveal', name: 'Kite Line', cooldown: 24, duration: 7, icon: '🪁', radius: 999,
+      id: 'reveal', name: 'Kite Line', cooldown: 24, duration: 7, icon: 'kite', radius: 999,
       desc: 'Send the kite up. Every hostile is outlined through walls for 7 seconds — for you and your crew.',
     },
     diff: 2,
@@ -81,11 +105,11 @@ export const ROSTER = [
     grenades: 1,
     build: { frame: 'heavy', headgear: 'bandana', extra: 'plate' },
     passive: {
-      id: 'thickHide', name: 'Thick Hide', icon: '🛡',
+      id: 'thickHide', name: 'Thick Hide', icon: 'shield',
       desc: 'Take 25% less damage and never get staggered by incoming fire.',
     },
     ability: {
-      id: 'barricade', name: 'Barricade', cooldown: 26, duration: 16, icon: '🚧',
+      id: 'barricade', name: 'Barricade', cooldown: 26, duration: 16, icon: 'barrier',
       desc: 'Drop a scrap-metal barricade where you stand. Solid cover for you and the crew.',
     },
     diff: 1,
@@ -100,11 +124,11 @@ export const ROSTER = [
     grenades: 1,
     build: { frame: 'normal', headgear: 'bandana', extra: 'sling' },
     passive: {
-      id: 'breathControl', name: 'Breath Control', icon: '🎯',
+      id: 'breathControl', name: 'Breath Control', icon: 'scope',
       desc: 'Aiming while crouched removes bullet bloom completely. +30% headshot damage.',
     },
     ability: {
-      id: 'focus', name: 'Eagle Eye', cooldown: 22, duration: 7, icon: '👁', radius: 0,
+      id: 'focus', name: 'Eagle Eye', cooldown: 22, duration: 7, icon: 'eye', radius: 0,
       desc: 'Zoom in hard. Perfect accuracy, +35% damage, and time seems to slow while you hold your breath.',
     },
     diff: 3,
@@ -119,11 +143,11 @@ export const ROSTER = [
     grenades: 4,
     build: { frame: 'normal', headgear: 'cap', extra: 'bandolier' },
     passive: {
-      id: 'pyro', name: 'Pyrotechnics', icon: '💥',
+      id: 'pyro', name: 'Pyrotechnics', icon: 'burst',
       desc: 'Carry double throwables and deal +35% explosive damage. Grenades cook faster.',
     },
     ability: {
-      id: 'molotov', name: 'Molotov', cooldown: 15, duration: 9, icon: '🔥',
+      id: 'molotov', name: 'Molotov', cooldown: 15, duration: 9, icon: 'fire',
       desc: 'Throw a bottle that leaves a pool of fire. Nothing crosses it without burning.',
     },
     diff: 2,
@@ -138,11 +162,11 @@ export const ROSTER = [
     grenades: 2,
     build: { frame: 'normal', headgear: 'none', extra: 'medbag' },
     passive: {
-      id: 'steadyHands', name: 'Steady Hands', icon: '✚',
+      id: 'steadyHands', name: 'Steady Hands', icon: 'hands',
       desc: 'Regenerate health three times faster out of combat, and start regenerating twice as soon.',
     },
     ability: {
-      id: 'medkit', name: 'Field Kit', cooldown: 20, duration: 14, icon: '🧰',
+      id: 'medkit', name: 'Field Kit', cooldown: 20, duration: 14, icon: 'kit',
       desc: 'Drop a supply kit. Heals and re-arms you and any crew standing near it.',
     },
     diff: 1,
@@ -159,11 +183,11 @@ export const ROSTER = [
     grenades: 2,
     build: { frame: 'normal', headgear: 'helmet', extra: 'radio' },
     passive: {
-      id: 'command', name: 'Command', icon: '📻',
+      id: 'command', name: 'Command', icon: 'radio',
       desc: 'Squadmates within 18 m deal +15% damage. You reload 20% faster.',
     },
     ability: {
-      id: 'surge', name: 'Push Up', cooldown: 22, duration: 7, icon: '⬆', radius: 20,
+      id: 'surge', name: 'Push Up', cooldown: 22, duration: 7, icon: 'push', radius: 20,
       desc: 'Call the push. You and every nearby squadmate get +25% movement and fire rate.',
     },
     diff: 1,
@@ -178,11 +202,11 @@ export const ROSTER = [
     grenades: 1,
     build: { frame: 'heavy', headgear: 'helmet', extra: 'shield' },
     passive: {
-      id: 'hardened', name: 'Hardened', icon: '🛡',
+      id: 'hardened', name: 'Hardened', icon: 'shield',
       desc: 'Take 30% less damage from the front. Immune to stagger and flashes.',
     },
     ability: {
-      id: 'barricade', name: 'Deployable Shield', cooldown: 24, duration: 14, icon: '🚧',
+      id: 'barricade', name: 'Deployable Shield', cooldown: 24, duration: 14, icon: 'barrier',
       desc: 'Plant the ballistic shield. Hard cover in the open, right where the squad needs it.',
     },
     diff: 1,
@@ -197,11 +221,11 @@ export const ROSTER = [
     grenades: 1,
     build: { frame: 'light', headgear: 'cap', extra: 'scope' },
     passive: {
-      id: 'coldBlood', name: 'Cold Blood', icon: '❄',
+      id: 'coldBlood', name: 'Cold Blood', icon: 'cold',
       desc: 'Aimed shots taken while standing perfectly still deal +45% damage.',
     },
     ability: {
-      id: 'thermal', name: 'Thermal Optic', cooldown: 21, duration: 8, icon: '🌡', radius: 999,
+      id: 'thermal', name: 'Thermal Optic', cooldown: 21, duration: 8, icon: 'thermal', radius: 999,
       desc: 'Switch to thermal. Hostiles glow through walls while you are aiming down sights.',
     },
     diff: 3,
@@ -216,11 +240,11 @@ export const ROSTER = [
     grenades: 2,
     build: { frame: 'normal', headgear: 'helmet', extra: 'breach' },
     passive: {
-      id: 'doorDown', name: 'Door Down', icon: '🚪',
+      id: 'doorDown', name: 'Door Down', icon: 'breach',
       desc: '+35% damage inside 8 m and you bring the sights up 40% faster.',
     },
     ability: {
-      id: 'flash', name: 'Flashbang', cooldown: 14, duration: 4, icon: '⚡',
+      id: 'flash', name: 'Flashbang', cooldown: 14, duration: 4, icon: 'bolt',
       desc: 'Throw a flashbang. Anyone looking at it is blind and useless for four seconds.',
     },
     diff: 2,
@@ -235,11 +259,11 @@ export const ROSTER = [
     grenades: 2,
     build: { frame: 'normal', headgear: 'cap', extra: 'drone' },
     passive: {
-      id: 'logistics', name: 'Logistics', icon: '🎒',
+      id: 'logistics', name: 'Logistics', icon: 'crate',
       desc: '+60% reserve ammo, and you vacuum up ammo pickups from 6 m away.',
     },
     ability: {
-      id: 'drone', name: 'Recon Drone', cooldown: 19, duration: 9, icon: '🛸', radius: 999,
+      id: 'drone', name: 'Recon Drone', cooldown: 19, duration: 9, icon: 'drone', radius: 999,
       desc: 'Put the drone up. Marks every hostile on the minimap and outlines the close ones.',
     },
     diff: 1,

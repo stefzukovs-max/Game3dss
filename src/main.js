@@ -21,6 +21,16 @@ import { scatterProps } from './world/props.js';
 
 const $ = (id) => document.getElementById(id);
 
+/**
+ * One drawn icon from the sheet in index.html.
+ *
+ * These used to be emoji, which render as whatever typeface the platform
+ * happens to ship — a different weight, colour and baseline on every machine,
+ * and instantly at odds with the rest of the interface.
+ */
+const glyph = (id) =>
+  `<svg class="glyph" aria-hidden="true"><use href="#g-${id}"/></svg>`;
+
 const DIFFICULTY = [
   { name: 'Rookie',   health: 0.80, skill: 0.70, speed: 0.92, damage: 0.55, spread: 1.55 },
   { name: 'Soldier',  health: 1.00, skill: 1.00, speed: 1.00, damage: 0.85, spread: 1.15 },
@@ -549,12 +559,12 @@ class Game {
         <span class="chip">${c.build.frame.toUpperCase()} FRAME</span>
       </div>
       <div class="od-skill">
-        <span class="ic">${c.passive.icon}</span>
+        <span class="ic">${glyph(c.passive.icon)}</span>
         <span class="tx"><b>${c.passive.name}</b><p>${c.passive.desc}</p></span>
         <span class="kbd">PASSIVE</span>
       </div>
       <div class="od-skill">
-        <span class="ic">${c.ability.icon}</span>
+        <span class="ic">${glyph(c.ability.icon)}</span>
         <span class="tx"><b>${c.ability.name}</b><p>${c.ability.desc}</p></span>
         <span class="kbd">E · ${c.ability.cooldown}s</span>
       </div>`;
@@ -583,7 +593,7 @@ class Game {
     this.hud.reset();
     this.hud.setScore(0);
     this.hud.setStreak(0);
-    $('ab-icon').textContent = char.ability.icon;
+    $('ab-icon').innerHTML = glyph(char.ability.icon);
 
     this.pickups.restock(5);
     this.waves.start();
@@ -806,7 +816,7 @@ class Game {
       `${FACTIONS[this.playerFaction].name} · ${byId(this.selected.operator).name} · ${this.difficulty.name}`;
     $('over-stats').innerHTML = this._statBlocks(true);
     $('over-build').innerHTML = this.pickedCards.length
-      ? this.pickedCards.map((c) => `<span class="chip hi">${c.icon} ${c.name}</span>`).join('')
+      ? this.pickedCards.map((c) => `<span class="chip hi">${glyph(c.icon)} ${c.name}</span>`).join('')
       : '<span class="chip">No upgrades taken</span>';
     this._showScreen('scr-over');
     audio.gameOver();
@@ -855,7 +865,7 @@ class Game {
       b.className = 'card ' + c.rarity;
       b.innerHTML =
         `<span class="cr">${c.rarity.toUpperCase()}</span>
-         <div class="ci">${c.icon}</div>
+         <div class="ci">${glyph(c.icon)}</div>
          <div class="cn">${c.name}</div>
          <div class="cd">${c.desc}</div>`;
       b.addEventListener('click', () => {

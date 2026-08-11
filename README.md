@@ -1,4 +1,23 @@
-# Cross Hill
+# ESCADÃO
+
+**Nine hundred steps to the cross.**
+
+Morro do Cruzeiro. Four thousand people up a granite slope above the city. One
+road reaches the bottom — above it there is nothing but the Escadão, nine
+hundred concrete steps switchbacking to a whitewashed cross at the summit, and
+the lanes that branch off it.
+
+Bolted to the water tower at the top is a transmitter. It carries the Saturday
+*baile*, and it carries the lookouts: when a patrol turns off the coast road the
+music cuts and a voice says which gate. It is how the hill talks to itself.
+
+The eviction notices are served Monday. The 9th Battalion is coming up tonight
+to take the tower before they are. **The Lookouts have until dawn.**
+
+Everything here is invented — the hill, the crews, the unit, the city.
+
+---
+
 
 A browser-based **third-person shooter** set on a Brazilian favela hillside.
 Two factions fight over the same hill: the **Hillside Crew** hold it, the

@@ -1,27 +1,60 @@
 /* ══════════════════════════════════════════════════════════════════
-   CROSS HILL — HUD & menu system
-   Tokens first; every surface is built from the same six.
+   ESCADÃO — HUD & menu system
+
+   The look is a Rio flyer: two-colour riso print, spray stencil, pichação,
+   photocopied and taped to a wall. That is a deliberate move away from the
+   default game-UI palette — amber on near-black, everything centred, every
+   corner the same radius — which reads as a template no matter how clean it
+   is.
+
+   Three rules hold it together:
+     · Two inks and a paper. Acid yellow and process cyan on bone, over ink
+       black. Red is reserved for damage and never used decoratively.
+     · Nothing is square to the page. Panels sit a degree or two off, edges
+       are torn or taped, and the grid is broken on purpose.
+     · Texture on every surface — halftone, grain, print misregistration —
+       because perfectly flat fills are the thing that reads as generated.
    ══════════════════════════════════════════════════════════════════ */
 :root{
-  --gang:#ffd23f;   --gang-2:#ff7a2f;
-  --cop:#4ea3ff;    --cop-2:#1e5fb8;
+  /* inks */
+  --gang:#ffd200;   --gang-2:#ff5a1f;
+  --cop:#37b6ff;    --cop-2:#0b64c8;
   --accent:var(--gang);  --accent-2:var(--gang-2);
 
-  --hp:#4ade80;  --hp-2:#16a34a;
-  --ar:#60a5fa;  --ar-2:#1d4ed8;
-  --st:#f5d547;
-  --bad:#ff4d4d;
+  --hp:#5ef08a;  --hp-2:#12a04a;
+  --ar:#37b6ff;  --ar-2:#0b64c8;
+  --st:#ffd200;
+  --bad:#ff2e2e;
 
-  --ink:#07080b;
-  --panel:rgba(12,14,19,.82);
-  --line:rgba(255,255,255,.14);
-  --text:#f1efe8;
-  --dim:rgba(241,239,232,.6);
-  --shadow:0 2px 0 rgba(0,0,0,.85), 0 0 16px rgba(0,0,0,.5);
-  --skew:-14deg;
-  --font:"Barlow Condensed","Oswald","Arial Narrow",system-ui,sans-serif;
+  /* paper & ink */
+  --ink:#0a0a0c;
+  --ink-2:#141418;
+  --paper:#efe9dc;
+  --panel:rgba(10,10,12,.86);
+  --line:rgba(239,233,220,.18);
+  --text:#efe9dc;
+  --dim:rgba(239,233,220,.55);
+  --shadow:0 2px 0 rgba(0,0,0,.9), 0 0 18px rgba(0,0,0,.55);
+  --skew:-9deg;
+
+  /* Condensed grotesques that actually ship on the platforms this runs on.
+     No webfont: there is no network at runtime and the CSP forbids one. */
+  --font:"Oswald","Barlow Condensed","Archivo Narrow","Roboto Condensed",
+         "Arial Narrow","Helvetica Neue",Impact,system-ui,sans-serif;
+
+  /* print texture, reused everywhere rather than re-declared */
+  --halftone:radial-gradient(rgba(0,0,0,.55) 1px, transparent 1.3px);
+  --halftone-size:4px 4px;
 }
 body.side-police{ --accent:var(--cop); --accent-2:var(--cop-2); }
+
+/* A fine grain over the whole interface. One element, no cost, and it is most
+   of why the panels stop looking like flat CSS rectangles. */
+body::after{
+  content:''; position:fixed; inset:0; z-index:60; pointer-events:none;
+  background:var(--halftone); background-size:var(--halftone-size);
+  opacity:.16; mix-blend-mode:overlay;
+}
 
 *{ box-sizing:border-box; margin:0; padding:0; }
 html,body{ height:100%; overflow:hidden; background:#05060a; }
@@ -558,3 +591,133 @@ label.chk input{ width:17px; height:17px; accent-color:var(--accent); }
   border-radius:6px; }
 .lockcard p{ color:var(--dim); font-size:14px; margin-top:6px; }
 .lockcard b{ color:var(--accent); }
+
+/* ══════════════════════════ BRAND ══════════════════════════
+   The wordmark, the brief and the faction tabs, built as a taped-up flyer
+   rather than a centred title block. Everything here is off-axis by a degree
+   or two; that small break is what stops the page reading as a template.
+   ═══════════════════════════════════════════════════════════ */
+.mark{ position:relative; padding:2px 0 6px; }
+.mark-word{
+  display:block; width:min(52vw,560px); height:auto;
+  transform:rotate(-1.1deg);
+  filter:drop-shadow(3px 3px 0 var(--accent-2));
+}
+/* two-colour misregistration: the fill sits slightly off its own shadow, the
+   way a cheap two-pass print does */
+.mark-fill{ fill:var(--paper); }
+.mark-til{ fill:none; stroke:var(--accent); stroke-width:11; stroke-linecap:round; }
+.mark-rule{
+  display:block; height:5px; margin:8px 0 7px; width:min(46vw,470px);
+  background:var(--accent);
+  transform:rotate(-1.1deg);
+  clip-path:polygon(0 0,100% 12%,99.4% 100%,.6% 84%);   /* torn, not ruled */
+}
+.mark-sub{
+  font-size:clamp(10px,1.05vw,13px); letter-spacing:.42em; font-weight:600;
+  color:var(--dim); text-transform:uppercase; transform:rotate(-1.1deg);
+}
+
+/* the story panel: a photocopied sheet, taped down */
+.brief{
+  position:relative; max-width:44ch; margin:16px 0 14px; padding:15px 17px 14px;
+  background:linear-gradient(180deg,rgba(239,233,220,.055),rgba(239,233,220,.02));
+  border:1px solid var(--line); border-left:3px solid var(--accent);
+  transform:rotate(.5deg);
+}
+.brief::before{                                   /* strip of tape, top-left */
+  content:''; position:absolute; top:-9px; left:16px; width:66px; height:19px;
+  background:rgba(239,233,220,.15); border:1px solid rgba(239,233,220,.12);
+  transform:rotate(-6deg);
+}
+.brief p{ font-size:13.5px; line-height:1.62; color:var(--dim); margin:0 0 8px; }
+.brief p:last-child{ margin-bottom:0; }
+.brief b{ color:var(--text); font-weight:600; }
+.brief i{ color:var(--accent); font-style:italic; }
+.brief-stamp{
+  position:absolute; top:-11px; right:-9px;
+  font-size:11px; font-weight:800; letter-spacing:.24em; padding:3px 9px;
+  color:var(--ink); background:var(--accent);
+  transform:rotate(3.5deg);
+}
+
+/* ══════════════════════════ GLYPHS ══════════════════════════ */
+.glyph{
+  width:1em; height:1em; display:inline-block; vertical-align:-.13em;
+  fill:none; stroke:currentColor; stroke-width:1.9;
+  stroke-linecap:round; stroke-linejoin:round;
+}
+.ic .glyph, .ci .glyph{ width:1.15em; height:1.15em; }
+
+/* ══════════════════════ FLYER TREATMENT ══════════════════════
+   Uniform rounded rectangles in an even grid is the single loudest tell that
+   an interface was assembled rather than designed. Everything below squares
+   the corners, cuts a corner off instead of rounding it, and lets the accent
+   run off the edge of its panel.
+   ═════════════════════════════════════════════════════════════ */
+#scr-menu .ftab,
+#scr-menu .op-card,
+#scr-menu .op-detail,
+#scr-menu .seg button,
+#scr-menu .big{ border-radius:0; }
+
+/* faction tabs: hard-edged, with the live one carrying a solid ink block */
+#scr-menu .ftab{
+  position:relative; padding:9px 20px 9px 16px; border:1px solid var(--line);
+  background:rgba(239,233,220,.03);
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 11px),calc(100% - 11px) 100%,0 100%);
+  transition:none;
+}
+#scr-menu .ftab.on{
+  border-color:var(--accent);
+  background:linear-gradient(90deg,rgba(255,210,0,.16),rgba(255,210,0,.02));
+}
+body.side-police #scr-menu .ftab.on{
+  background:linear-gradient(90deg,rgba(55,182,255,.16),rgba(55,182,255,.02));
+}
+#scr-menu .ftab.on::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--accent);
+}
+
+/* operator cards: ticket stubs, with a stencilled index down the side */
+#scr-menu .op-card{
+  position:relative; border:1px solid var(--line); border-left:0;
+  background:rgba(239,233,220,.035);
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%);
+}
+#scr-menu .op-card::after{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:rgba(239,233,220,.18);
+}
+#scr-menu .op-card.on::after{ background:var(--accent); width:5px; }
+#scr-menu .op-card.on{ background:linear-gradient(90deg,rgba(255,210,0,.10),transparent 70%); }
+body.side-police #scr-menu .op-card.on{
+  background:linear-gradient(90deg,rgba(55,182,255,.10),transparent 70%);
+}
+
+/* detail panel: a torn sheet with the accent bleeding off the top edge */
+#scr-menu .op-detail{
+  position:relative; border:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(239,233,220,.05),rgba(239,233,220,.015));
+}
+#scr-menu .op-detail::before{
+  content:''; position:absolute; left:-1px; right:-1px; top:-1px; height:4px;
+  background:var(--accent);
+  clip-path:polygon(0 0,100% 0,100% 60%,86% 100%,42% 55%,0 100%);
+}
+
+/* the play button: a solid ink slab, slightly off-axis, not a pill */
+#scr-menu .big{
+  background:var(--accent); color:var(--ink); border:0;
+  font-weight:800; letter-spacing:.28em; padding:15px 46px;
+  transform:skewX(var(--skew));
+  box-shadow:5px 5px 0 var(--accent-2);
+}
+#scr-menu .big > *{ display:inline-block; transform:skewX(calc(-1 * var(--skew))); }
+#scr-menu .big:hover{ box-shadow:2px 2px 0 var(--accent-2); translate:3px 3px; }
+
+/* difficulty: stencil chips, no pills */
+#scr-menu .seg button{ border:1px solid var(--line); background:transparent; }
+#scr-menu .seg button.on{ background:var(--accent); color:var(--ink); border-color:var(--accent); }
+
+.disclaimer{ opacity:.42; font-size:11px; letter-spacing:.06em; }
