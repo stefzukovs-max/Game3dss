@@ -116,6 +116,16 @@ still reproduces everything from a clean clone.
 | `sedan2` | NormalCar2 | [Realistic Car Pack](https://quaternius.com) | cars |
 | `suv` | SUV | [Realistic Car Pack](https://quaternius.com) | cars |
 | `taxi` | Taxi | [Realistic Car Pack](https://quaternius.com) | cars |
+| `palm1` | PalmTree_1 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `palm2` | PalmTree_2 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `palm3` | PalmTree_3 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `plant1` | Plant_1 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `plant2` | Plant_3 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `plant3` | Plant_5 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `bush1` | Bush_1 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `bush2` | Bush_2 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `tree1` | CommonTree_2 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `tree2` | CommonTree_5 | [Realistic Car Pack](https://quaternius.com) | nature |
 
 ## Environment lighting — Poly Haven
 

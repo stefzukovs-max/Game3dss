@@ -145,9 +145,16 @@ const tapBtn = async (id) => {
 const magBefore = await page.evaluate(() => window.__game.player.weapon.mag);
 const fb = await page.locator('#btn-fire').boundingBox();
 await touchDrive([{ type: 'touchstart', touches: [{ id: 5, x: fb.x + fb.width / 2, y: fb.y + fb.height / 2 }] }]);
-await page.waitForTimeout(700);
+// Hold the trigger across a fixed-step pump rather than a wall-clock wait.
+// The last of these to be left on real time, and it broke the moment the
+// scene got heavy enough that 700 ms no longer contained a simulation tick
+// under software rendering.
+const magAfter = await page.evaluate(() => {
+  const g = window.__game;
+  for (let i = 0; i < 45; i++) g._tick(1 / 60);
+  return g.player.weapon.mag;
+});
 await touchDrive([{ type: 'touchend', touches: [{ id: 5, x: fb.x + fb.width / 2, y: fb.y + fb.height / 2 }] }]);
-const magAfter = await page.evaluate(() => window.__game.player.weapon.mag);
 ok('FIRE button shoots', magAfter !== magBefore, `mag ${magBefore} → ${magAfter}`);
 
 await tapBtn('btn-aim');

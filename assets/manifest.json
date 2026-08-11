@@ -719,6 +719,76 @@
       "source": "quaternius",
       "model": "Taxi",
       "file": "models/cars/taxi.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "palm1",
+      "source": "quaternius",
+      "model": "PalmTree_1",
+      "file": "models/nature/palm1.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "palm2",
+      "source": "quaternius",
+      "model": "PalmTree_2",
+      "file": "models/nature/palm2.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "palm3",
+      "source": "quaternius",
+      "model": "PalmTree_3",
+      "file": "models/nature/palm3.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "plant1",
+      "source": "quaternius",
+      "model": "Plant_1",
+      "file": "models/nature/plant1.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "plant2",
+      "source": "quaternius",
+      "model": "Plant_3",
+      "file": "models/nature/plant2.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "plant3",
+      "source": "quaternius",
+      "model": "Plant_5",
+      "file": "models/nature/plant3.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "bush1",
+      "source": "quaternius",
+      "model": "Bush_1",
+      "file": "models/nature/bush1.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "bush2",
+      "source": "quaternius",
+      "model": "Bush_2",
+      "file": "models/nature/bush2.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "tree1",
+      "source": "quaternius",
+      "model": "CommonTree_2",
+      "file": "models/nature/tree1.glb"
+    },
+    {
+      "pack": "nature",
+      "slot": "tree2",
+      "source": "quaternius",
+      "model": "CommonTree_5",
+      "file": "models/nature/tree2.glb"
     }
   ]
 }

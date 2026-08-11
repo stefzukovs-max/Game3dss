@@ -166,6 +166,20 @@ export const MODEL_PACKS = [
       taxi: 'Taxi',
     },
   },
+  {
+    id: 'nature', user: 'quaternius', slug: '150-lowpoly-nature-models',
+    name: 'Ultimate Nature Pack', dir: 'OBJ', size: 512,
+    use: 'palms, plants and bushes on the hillside',
+    // Palms first: a Rio hillside is not a pine forest, and the cones these
+    // replace were the single most toy-like thing left on the map.
+    pick: {
+      palm1: 'PalmTree_1', palm2: 'PalmTree_2', palm3: 'PalmTree_3',
+      plant1: 'Plant_1', plant2: 'Plant_3', plant3: 'Plant_5',
+      bush1: 'Bush_1', bush2: 'Bush_2',
+      tree1: 'CommonTree_2', tree2: 'CommonTree_5',
+      grass: 'Grass_1',
+    },
+  },
 ];
 
 export const LICENSE = {

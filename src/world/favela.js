@@ -303,6 +303,15 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
 
   // no scanned equivalent: glazing is emissive and reflective rather than a
   // surface you could photograph flat
+  /*
+   * `windowDark` is the inside of an opening — not black, because a pure black
+   * hole reads as a missing polygon; a very dark warm grey reads as a room
+   * with no light on. `trim` is the render band around frames and sills, kept
+   * lighter than the wall so the opening has an edge to catch the sun.
+   */
+  B.material('windowDark', col(0x14161a, { roughness: 0.95 }));
+  B.material('trim', scan('plaster_plain', col(0xd8d2c6, { roughness: 0.85 }),
+    { color: new THREE.Color(0xd8d2c6) }));
   B.material('window', pbr(tex.window, { bump: 1.0, metalness: 0.55, rmin: 0.06, rmax: 0.3, roughMap: true }));
 
   /*
@@ -369,7 +378,7 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
   ['awning0', 'awning1', 'awning2'].forEach((k, i) =>
     B.material(k, col([0xd94f4f, 0x3f8f5f, 0x3f6f9f][i], { side: THREE.DoubleSide })));
 
-  const meta = { spawns: { gang: [], police: [] }, cover: [], pickups: [], houses: [], landmarks: [], vehicles: [] };
+  const meta = { spawns: { gang: [], police: [] }, cover: [], pickups: [], houses: [], landmarks: [], vehicles: [], foliage: [] };
 
   onProgress(0.08, 'Carving the hillside…');
   buildTerrain(B, rng);
@@ -439,6 +448,9 @@ function buildTerrain(B, rng) {
   const wall = (x, y, z, sw, sh, sd) => {
     B.box('rock', x, y, z, sw, sh, sd, { texScale: 0.16 });
     // scrub along the top edge so it reads as hillside
+    // Skipped entirely when the model pack is loaded: real palms do this job,
+    // and a band of cones behind them just reads as a green fence.
+    if (B.useModels) return;
     for (let i = -0.5; i <= 0.5; i += 0.055) {
       const px = x + (sw > sd ? i * sw : 0) + (sw > sd ? 0 : rng.range(-1, 1));
       const pz = z + (sw > sd ? rng.range(-1, 1) : i * sd);
@@ -839,81 +851,274 @@ function infillTerrace(B, rng, index, meta) {
 }
 
 /* ── the block house ────────────────────────────────────────────── */
+/**
+ * Openings.
+ *
+ * The single biggest reason the old houses read as toys: a window was a flat
+ * quad pasted on the wall, and a painted-on rectangle is a sticker no matter
+ * how good the texture is. A real opening is a hole with depth — a dark recess
+ * set back from the face, a frame around it, and a sill jutting out to catch
+ * the sun and throw a shadow line. Three extra boxes per window buys the whole
+ * difference, and they merge into the same batch as everything else so they
+ * cost no draw calls at all.
+ */
+function punchWindow(B, rng, px, py, pz, face, nx, nz, ww, wh, opts = {}) {
+  const along = (u) => [px + Math.cos(face) * u, pz - Math.sin(face) * u];
+  const flat = Math.abs(nz) > 0.5;
+  const dims = (aw, ad) => (flat ? [aw, ad] : [ad, aw]);
+  const bx = (mat, u, y, aw, ah, ad, inset) => {
+    const [cx, cz] = along(u);
+    const [sx, sz] = dims(aw, ad);
+    B.box(mat, cx + nx * inset, y, cz + nz * inset, sx, ah, sz,
+      { solid: false, texScale: 0.9, tag: 'trim' });
+  };
+
+  // the recess itself, pushed into the wall so the opening reads as a hole
+  bx('windowDark', 0, py, ww, wh, 0.14, -0.10);
+  // frame: two jambs, a head and the sill
+  const t = 0.075;
+  bx('trim', -(ww / 2 + t / 2), py, t, wh + t * 2, 0.13, 0.02);
+  bx('trim', (ww / 2 + t / 2), py, t, wh + t * 2, 0.13, 0.02);
+  bx('trim', 0, py + wh / 2 + t / 2, ww + t * 2, t, 0.13, 0.02);
+  bx('trim', 0, py - wh / 2 - 0.045, ww + t * 3, 0.09, 0.22, 0.06);   // sill, proud
+
+  if (opts.glass !== false) bx('window', 0, py, ww - 0.04, wh - 0.04, 0.02, -0.055);
+
+  // a security grille on about a third of them, which is both accurate and
+  // the cheapest way to break up a repeated opening
+  if (rng.chance(0.34)) {
+    for (let i = 1; i <= 3; i++) {
+      bx('metalDark', -ww / 2 + (ww * i) / 4, py, 0.025, wh - 0.05, 0.03, 0.045);
+    }
+  }
+  if (rng.chance(0.22)) {                         // laundry rail under the sill
+    bx('metalDark', 0, py - wh / 2 - 0.22, ww + 0.1, 0.035, 0.035, 0.16);
+  }
+}
+
+/** A doorway: taller, sits on the floor, sometimes a roller shutter instead. */
+function punchDoor(B, rng, px, py, pz, face, nx, nz) {
+  const flat = Math.abs(nz) > 0.5;
+  const dims = (aw, ad) => (flat ? [aw, ad] : [ad, aw]);
+  const bx = (mat, u, y, aw, ah, ad, inset) => {
+    const [sx, sz] = dims(aw, ad);
+    B.box(mat, px + Math.cos(face) * u + nx * inset, y, pz - Math.sin(face) * u + nz * inset,
+      sx, ah, sz, { solid: false, texScale: 0.9, tag: 'trim' });
+  };
+  const dw = 0.95, dh = 2.05, cy = py + dh / 2;
+  bx('windowDark', 0, cy, dw, dh, 0.16, -0.11);
+  bx(rng.chance(0.5) ? 'wood' : 'metalDark', 0, cy, dw - 0.06, dh - 0.06, 0.05, -0.045);
+  const t = 0.08;
+  bx('trim', -(dw / 2 + t / 2), cy, t, dh + t, 0.14, 0.02);
+  bx('trim', (dw / 2 + t / 2), cy, t, dh + t, 0.14, 0.02);
+  bx('trim', 0, cy + dh / 2 + t / 2, dw + t * 2, t, 0.14, 0.02);
+  bx('concreteDark', 0, py + 0.04, dw + 0.3, 0.08, 0.34, 0.10);      // step
+}
+
+/**
+ * A house.
+ *
+ * Favela houses are accreted rather than designed: a ground floor gets built,
+ * then a second is added on top a little larger or a little offset, then a
+ * room is tacked onto the side, then an outside staircase to reach the roof
+ * that will one day be the next floor. Modelling that accretion — instead of
+ * extruding one box per plot — is what stops a street reading as a row of
+ * shoeboxes, and it costs nothing because everything still merges into the
+ * same batched mesh.
+ */
 function buildHouse(B, rng, x, baseY, z, w, d, floors, meta, terraceIndex, opts = {}) {
+  /*
+   * A house draws from its own stream, seeded from its plot.
+   *
+   * Everything in this map is generated from one shared RNG, so any change to
+   * how many numbers a house consumes shifts every staircase, shack and spawn
+   * built after it — which is how adding balconies quietly moved a climb into
+   * a wall. Seeding per plot makes a house's detail independent of what came
+   * before it: the rest of the map is unaffected by anything changed in here,
+   * and a given plot looks the same every run.
+   */
+  const hr = makeRNG(((x * 7349) ^ (z * 9161) ^ (baseY * 733)) >>> 0 || 1);
   const h = floors * FLOOR_H;
-  const wallMat = opts.wall || (rng.chance(0.26) ? (rng.chance(0.4) ? 'brickAlt' : 'brick')
-    : 'plaster' + rng.int(0, FAVELA_COLORS.length - 1));
+  const wallMat = opts.wall || (hr.chance(0.26) ? (hr.chance(0.4) ? 'brickAlt' : 'brick')
+    : 'plaster' + hr.int(0, FAVELA_COLORS.length - 1));
 
-  B.box(wallMat, x, baseY + h / 2, z, w, h, d, { texScale: 0.42, tag: 'building' });
+  /*
+   * A few degrees of yaw. Real plots are not square to a grid, and the eye
+   * picks up a perfectly aligned row instantly. Kept small — the collision box
+   * grows with rotation, and a large angle would start eating the lanes.
+   */
+  const rotY = opts.rotY ?? hr.range(-0.055, 0.055);
+  const cos = Math.cos(rotY), sin = Math.sin(rotY);
+  const world = (ox, oz) => [x + ox * cos + oz * sin, z - ox * sin + oz * cos];
 
-  for (const face of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-    const nx = Math.sin(face), nz = Math.cos(face);
-    const faceW = Math.abs(nz) > 0.5 ? w : d;
-    const off = (Math.abs(nz) > 0.5 ? d : w) / 2 + 0.03;
-    const px = x + nx * off, pz = z + nz * off;
-    const perFloor = Math.max(1, Math.floor(faceW / 3.2));
+  // ground mass
+  B.box(wallMat, x, baseY + h / 2, z, w, h, d, { rotY, texScale: 0.42, tag: 'building' });
 
-    for (let f = 0; f < floors; f++) {
-      for (let i = 0; i < perFloor; i++) {
-        if (rng.chance(0.26)) continue;
-        const u = (i + 0.5) / perFloor - 0.5;
-        const wx = px + Math.cos(face) * u * faceW * 0.86;
-        const wz = pz - Math.sin(face) * u * faceW * 0.86;
-        const wy = baseY + f * FLOOR_H + 1.7;
-        B.quad('window', wx, wy, wz, 1.0, 1.15, face);
-        if (rng.chance(0.3)) {
-          B.box('metalDark', wx + nx * 0.06, wy, wz + nz * 0.06,
-            Math.abs(nz) > 0.5 ? 1.1 : 0.06, 0.07, Math.abs(nz) > 0.5 ? 0.06 : 1.1,
-            { solid: false, texScale: 1 });
+  /*
+   * The added floor. Either overhanging the street on a couple of corbels —
+   * which is the most characteristic favela silhouette there is — or set back
+   * to leave a roof terrace. Different render colour, because it was built in
+   * a different year with whatever paint was going.
+   */
+  let topY = baseY + h;
+  let topW = w, topD = d, topX = x, topZ = z;
+  if (floors >= 2 && hr.chance(0.62)) {
+    const addH = FLOOR_H * hr.range(0.85, 1.0);
+    const over = hr.chance(0.55);
+    const grow = over ? hr.range(0.5, 1.0) : -hr.range(0.8, 1.8);
+    const shiftZ = over ? hr.range(0.3, 0.9) : hr.range(-0.6, 0.6);
+    topW = Math.max(2.2, w + grow);
+    topD = Math.max(2.2, d + grow * 0.6);
+    const [ax, az] = world(hr.range(-0.4, 0.4), shiftZ);
+    topX = ax; topZ = az;
+    const addMat = hr.chance(0.4) ? 'brick' : 'plaster' + hr.int(0, FAVELA_COLORS.length - 1);
+    B.box(addMat, topX, topY + addH / 2, topZ, topW, addH, topD,
+      { rotY, texScale: 0.42, tag: 'building' });
+    if (over) {
+      // corbels under the overhang, so it is carried rather than floating
+      for (const u of [-topW * 0.34, topW * 0.34]) {
+        const [bx2, bz2] = world(u, topD / 2 - 0.25);
+        B.box('concreteDark', bx2, topY - 0.22, bz2, 0.22, 0.44, 0.9,
+          { rotY, solid: false, texScale: 1, tag: 'trim' });
+      }
+    }
+    topY += addH;
+  }
+
+  /* ── openings, on every exposed face of both masses ── */
+  const punchFace = (cx, cz, fw, fd, fromY, nFloors) => {
+    for (const face of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+      const fa = face + rotY;
+      const nx = Math.sin(fa), nz = Math.cos(fa);
+      const flat = Math.abs(Math.cos(face)) > 0.5;
+      const faceW = flat ? fw : fd;
+      const off = (flat ? fd : fw) / 2 + 0.02;
+      const px = cx + nx * off, pz = cz + nz * off;
+      const perFloor = Math.max(1, Math.floor(faceW / 2.9));
+
+      for (let f = 0; f < nFloors; f++) {
+        const groundFloor = f === 0 && Math.abs(fromY - baseY) < 0.01;
+        for (let i = 0; i < perFloor; i++) {
+          if (hr.chance(0.20)) continue;
+          const u = ((i + 0.5) / perFloor - 0.5) * faceW * 0.84;
+          const [wx, wz] = [px + Math.cos(fa) * u, pz - Math.sin(fa) * u];
+          const wy = fromY + f * FLOOR_H;
+          // one opening per ground-floor face becomes the door
+          if (groundFloor && i === (perFloor >> 1) && hr.chance(0.5)) {
+            punchDoor(B, rng, wx, wy + 0.02, wz, fa, nx, nz);
+          } else {
+            punchWindow(B, rng, wx, wy + 1.62, wz, fa, nx, nz,
+              hr.range(0.85, 1.15), hr.range(1.05, 1.35));
+          }
         }
       }
     }
-    if (rng.chance(0.28)) {
-      B.quad('graf' + rng.int(0, 2), px + nx * 0.02, baseY + 1.5, pz + nz * 0.02,
-        Math.min(faceW * 0.8, 5), 2.4, face);
+  };
+  punchFace(x, z, w, d, baseY, Math.min(floors, 2));
+  if (topY > baseY + h) punchFace(topX, topZ, topW, topD, baseY + h, 1);
+
+  /*
+   * A balcony on the downhill face. Cheap, and it does two things at once: it
+   * breaks the wall's silhouette, and it reads as somewhere a person lives
+   * rather than a surface with holes in it.
+   */
+  if (floors >= 2 && hr.chance(0.4)) {
+    const by = baseY + FLOOR_H + 0.06;
+    const bw = Math.min(w * 0.62, 3.0);
+    const [bx2, bz2] = world(hr.range(-0.2, 0.2), d / 2 + 0.55);
+    B.box('concreteDark', bx2, by, bz2, bw, 0.14, 1.1, { rotY, solid: false, texScale: 0.8, tag: 'trim' });
+    for (let i = 0; i <= 6; i++) {
+      const [rx, rz] = world(-bw / 2 + (bw * i) / 6 + (bx2 - x) * 0, d / 2 + 1.05);
+      B.box('metalDark', rx, by + 0.48, rz, 0.045, 0.85, 0.045,
+        { rotY, solid: false, texScale: 1, tag: 'trim' });
     }
+    const [hx, hz] = world(hr.range(-0.2, 0.2), d / 2 + 1.05);
+    B.box('metalDark', hx, by + 0.92, hz, bw, 0.055, 0.055, { rotY, solid: false, texScale: 1, tag: 'trim' });
   }
 
-  const roofY = baseY + h;
-  B.box('concrete', x, roofY + 0.13, z, w + 0.5, 0.26, d + 0.5, { texScale: 0.5, tag: 'roof' });
+  /*
+   * An external staircase up the flank. Every other house on a real hillside
+   * has one, because the roof is the next floor's floor and nobody is putting
+   * an internal stairwell in until they have to.
+   */
+  if (floors >= 2 && hr.chance(0.34)) {
+    const side = hr.chance(0.5) ? -1 : 1;
+    const steps = Math.round(FLOOR_H / 0.26);
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const [sx2, sz2] = world(side * (w / 2 + 0.55), -d / 2 + 0.6 + t * (d - 1.2));
+      /*
+       * Decorative, not solid. These hang off the flank of a house and can
+       * land anywhere the plot happens to be — including across the mouth of
+       * a staircase, which silently walls off a whole terrace from the AI.
+       * They are set dressing for the silhouette; the map's own climbs are the
+       * routes, and those are the ones that have to stay walkable.
+       */
+      B.box('concreteDark', sx2, baseY + 0.13 + i * 0.26, sz2, 1.05, 0.26, (d - 1.2) / steps + 0.06,
+        { rotY, solid: false, texScale: 0.9, tag: 'trim' });
+    }
+    const [lx, lz] = world(side * (w / 2 + 1.1), 0);
+    B.box('metalDark', lx, baseY + FLOOR_H * 0.5, lz, 0.05, FLOOR_H, 0.05,
+      { rotY, solid: false, texScale: 1, tag: 'trim' });
+  }
 
-  if (rng.chance(0.72)) {
-    const ph = rng.range(0.6, 1.0);
-    const pw = w + 0.5, pd = d + 0.5;
-    for (const [sx, sz2, bw, bd] of [
+  // graffiti still goes on last, over whatever ended up on the wall
+  for (const face of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    if (!hr.chance(0.22)) continue;
+    const fa = face + rotY;
+    const nx = Math.sin(fa), nz = Math.cos(fa);
+    const flat = Math.abs(Math.cos(face)) > 0.5;
+    const faceW = flat ? w : d;
+    const off = (flat ? d : w) / 2 + 0.05;
+    B.quad('graf' + hr.int(0, 2), x + nx * off, baseY + 1.4, z + nz * off,
+      Math.min(faceW * 0.7, 4.5), 2.2, fa);
+  }
+
+  // the roof caps the topmost mass, which is the added floor when there is one
+  const roofY = topY;
+  const rw = topW, rd = topD, rx = topX, rz2 = topZ;
+  B.box('concrete', rx, roofY + 0.13, rz2, rw + 0.5, 0.26, rd + 0.5,
+    { rotY, texScale: 0.5, tag: 'roof' });
+
+  if (hr.chance(0.72)) {
+    const ph = hr.range(0.6, 1.0);
+    const pw = rw + 0.5, pd = rd + 0.5;
+    for (const [ox, oz, bw, bd] of [
       [0, -pd / 2, pw, 0.26], [0, pd / 2, pw, 0.26],
       [-pw / 2, 0, 0.26, pd], [pw / 2, 0, 0.26, pd]]) {
-      if (rng.chance(0.2)) continue;
-      B.box(rng.chance(0.5) ? (rng.chance(0.4) ? 'brickAlt' : 'brick') : 'concreteDark', x + sx, roofY + 0.26 + ph / 2, z + sz2,
-        bw, ph, bd, { texScale: 0.6, tag: 'parapet' });
+      if (hr.chance(0.2)) continue;
+      const [wx2, wz2] = world(ox, oz);
+      B.box(hr.chance(0.5) ? (hr.chance(0.4) ? 'brickAlt' : 'brick') : 'concreteDark',
+        wx2 + (rx - x), roofY + 0.26 + ph / 2, wz2 + (rz2 - z),
+        bw, ph, bd, { rotY, texScale: 0.6, tag: 'parapet' });
     }
   }
 
   const roofTop = roofY + 0.26;
-  if (rng.chance(0.75)) {
-    const tx = x + rng.range(-w / 3, w / 3), tz = z + rng.range(-d / 3, d / 3);
-    B.cylinder(rng.chance(0.6) ? 'tankBlue' : 'tankBlack', tx, roofTop + 0.75, tz, 0.72, 0.72, 1.5, 12,
+  if (hr.chance(0.75)) {
+    const tx = rx + hr.range(-rw / 3, rw / 3), tz = rz2 + hr.range(-rd / 3, rd / 3);
+    B.cylinder(hr.chance(0.6) ? 'tankBlue' : 'tankBlack', tx, roofTop + 0.75, tz, 0.72, 0.72, 1.5, 12,
       { solid: true, tag: 'prop' });
     B.cylinder('tankBlack', tx, roofTop + 1.56, tz, 0.5, 0.62, 0.16, 12, {});
   }
-  if (rng.chance(0.5)) {
-    const dx = x + rng.range(-w / 3, w / 3), dz = z + rng.range(-d / 3, d / 3);
+  if (hr.chance(0.5)) {
+    const dx = rx + hr.range(-rw / 3, rw / 3), dz = rz2 + hr.range(-rd / 3, rd / 3);
     B.box('metal', dx, roofTop + 0.4, dz, 0.1, 0.8, 0.1, { solid: false, texScale: 1 });
     B.cylinder('copWhite', dx, roofTop + 0.85, dz, 0.42, 0.42, 0.07, 12, { rotY: rng() * 3 });
   }
-  if (rng.chance(0.55)) {
-    for (let i = 0; i < rng.int(3, 7); i++) {
-      B.box('rust', x + rng.range(-w / 2.4, w / 2.4), roofTop + 0.45, z + rng.range(-d / 2.4, d / 2.4),
+  if (hr.chance(0.55)) {
+    for (let i = 0; i < hr.int(3, 7); i++) {
+      B.box('rust', x + hr.range(-w / 2.4, w / 2.4), roofTop + 0.45, z + hr.range(-d / 2.4, d / 2.4),
         0.06, 0.9, 0.06, { solid: false, texScale: 1 });
     }
   }
-  if (rng.chance(0.28)) {
-    B.box('woodDark', x + rng.range(-w / 3, w / 3), roofTop + 0.35, z + rng.range(-d / 3, d / 3),
+  if (hr.chance(0.28)) {
+    B.box('woodDark', x + hr.range(-w / 3, w / 3), roofTop + 0.35, z + hr.range(-d / 3, d / 3),
       1.1, 0.7, 0.9, { texScale: 0.8, tag: 'prop' });
     meta.cover.push(new THREE.Vector3(x, roofTop, z));
   }
 
-  if (opts.forceStair || rng.chance(0.45)) buildExternalStair(B, rng, x, baseY, z, w, d, h);
+  if (opts.forceStair || hr.chance(0.45)) buildExternalStair(B, rng, x, baseY, z, w, d, h);
 
   meta.houses.push({ x, z, w, d, y: baseY, h, roof: roofTop, terraceIndex });
   const hw = w / 2 + 1.0, hd = d / 2 + 1.0;
@@ -1118,11 +1323,18 @@ function buildDressing(B, rng, meta) {
     if (rng.chance(0.25)) meta.cover.push(new THREE.Vector3(x, y, z));
   }
 
+  /*
+   * Foliage along the terrace lips. The spots are chosen here, because this is
+   * where the map knows which edges are exposed — but the actual planting
+   * happens in src/world/props.js when the model pack is loaded, so these read
+   * as palms and scrub rather than as green cones. The cone fallback stays for
+   * the asset-free build.
+   */
   for (let i = 0; i < 55; i++) {
     const t = TERRACES[rng.int(1, TERRACES.length - 1)];
     const x = rng.range(WORLD.x0 + 3, WORLD.x1 - 3);
     const z = t.z1 - rng.range(0.5, 2.5);
-    // bushes: narrow at the crown, wide at the base
+    if (B.useModels) { meta.foliage.push({ x, z, y: t.y, seed: rng() }); continue; }
     const bh = rng.range(1.4, 3.2);
     B.cylinder('vegetation', x, t.y - rng.range(0.4, 1.8) + bh / 2, z,
       0.22, rng.range(0.7, 1.8), bh, 6, { rotY: rng() * 3 });
@@ -1294,20 +1506,87 @@ function buildStall(B, rng, x, y, z) {
 }
 
 /* ── backdrop ───────────────────────────────────────────────────── */
+/**
+ * The hills across the valley.
+ *
+ * These were 24 cones in two flat colours with fog switched off, which is
+ * exactly how a horizon reads as cardboard: real distant terrain has no hard
+ * silhouette, no saturation and no visible facets, because forty kilometres of
+ * air has washed all three out.
+ *
+ * Three changes fix it. The ridges are built as irregular lathed masses rather
+ * than cones, so no two profiles match and none of them come to a point. They
+ * are tinted toward the sky at the horizon and given a vertical gradient
+ * through vertex colours, so the base of a ridge is hazier than its crest —
+ * which is what aerial perspective actually looks like. And they sit in two
+ * bands at different distances, so the horizon has depth instead of being one
+ * cut-out.
+ */
 function buildBackdrop(B, rng, scene) {
   const g = new THREE.Group();
   g.name = 'backdrop';
-  const near = new THREE.MeshBasicMaterial({ color: 0x4a6b78, fog: false });
-  const far = new THREE.MeshBasicMaterial({ color: 0x395663, fog: false });
-  for (let i = 0; i < 24; i++) {
-    const a = (i / 24) * Math.PI * 2 + rng.range(-0.12, 0.12);
-    const dist = rng.range(240, 350);
-    const r = rng.range(45, 100), h = rng.range(40, 115);
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), rng.chance(0.5) ? near : far);
-    cone.position.set(Math.cos(a) * dist, h / 2 - 28, Math.sin(a) * dist);
-    cone.rotation.y = rng() * 3;
-    g.add(cone);
+
+  // unlit on purpose: these are beyond any light that matters, and shading
+  // them would only reintroduce the facets the haze is meant to remove
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
+  const haze = new THREE.Color(0x9fb6c4);      // the sky just above the horizon
+  const rock = new THREE.Color(0x2f4a57);
+
+  const positions = [];
+  const colours = [];
+  const push = (p, c) => { positions.push(p.x, p.y, p.z); colours.push(c.r, c.g, c.b); };
+  const _a = new THREE.Vector3(), _b2 = new THREE.Vector3(), _c2 = new THREE.Vector3();
+  const tint = new THREE.Color();
+
+  /** One ridge: a closed fan of irregular spurs around a centre. */
+  const ridge = (cx, cz, radius, height, band) => {
+    const seg = 11;
+    const rim = [];
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      const rr = radius * rng.range(0.62, 1.0);
+      rim.push(new THREE.Vector3(cx + Math.cos(a) * rr, -30, cz + Math.sin(a) * rr));
+    }
+    // a broken crest rather than a single apex
+    const crest = [];
+    for (let i = 0; i < seg; i++) {
+      const a = ((i + 0.5) / seg) * Math.PI * 2;
+      const rr = radius * rng.range(0.10, 0.34);
+      crest.push(new THREE.Vector3(
+        cx + Math.cos(a) * rr, -30 + height * rng.range(0.55, 1.0), cz + Math.sin(a) * rr));
+    }
+    for (let i = 0; i < seg; i++) {
+      const j = (i + 1) % seg;
+      _a.copy(rim[i]); _b2.copy(rim[j]); _c2.copy(crest[i]);
+      // haze strength: heavier at the base and on the farther band
+      const low = tint.copy(rock).lerp(haze, 0.55 + band * 0.28);
+      const lowC = low.clone();
+      const hiC = tint.copy(rock).lerp(haze, 0.24 + band * 0.30).clone();
+      push(_a, lowC); push(_b2, lowC); push(_c2, hiC);
+      // fill between adjacent crests so the ridge line is continuous
+      _a.copy(crest[i]); _b2.copy(rim[j]); _c2.copy(crest[j]);
+      push(_a, hiC); push(_b2, lowC); push(_c2, hiC);
+    }
+  };
+
+  for (let band = 0; band < 2; band++) {
+    const count = band ? 20 : 14;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + rng.range(-0.16, 0.16);
+      const dist = band ? rng.range(360, 470) : rng.range(230, 320);
+      ridge(Math.cos(a) * dist, Math.sin(a) * dist,
+        rng.range(60, 130), rng.range(band ? 55 : 35, band ? 150 : 105), band);
+    }
   }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = -900;          // behind everything, in front of the sky
+  g.add(mesh);
   scene.add(g);
 }
 

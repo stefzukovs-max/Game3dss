@@ -400,6 +400,61 @@ export function scatterProps(scene, assets, world, opts = {}) {
       (rng.chance(0.5) ? 0 : Math.PI) + rng.range(-0.05, 0.05));
   }
 
+  /* ── vegetation ─────────────────────────────────────────────────────
+   * Palms, not conifers. The hillside is in Rio, and the green cones these
+   * replace were the most toy-like thing left in frame — a cone reads as a
+   * placeholder at any distance, where a palm with real fronds reads as a
+   * place even at fifty metres.
+   *
+   * Planted on the slopes and terrace edges rather than the lanes: vegetation
+   * in the middle of a fighting space is cover the AI cannot reason about, and
+   * on the fringes it does its job of softening the boxes anyway.
+   */
+  const PALMS = ['palm1', 'palm2', 'palm3'];
+  const SCRUB = ['plant1', 'plant2', 'plant3', 'bush1', 'bush2'];
+  const plant = (slot, x, y, z, yaw, scale) => {
+    const src = assets.models.get(`nature:${slot}`);
+    if (!src) return false;
+    _q.setFromAxisAngle(_up, yaw);
+    B.placeObject(`veg:${slot}`, src, _m.compose(_v.set(x, y, z), _q, _s.set(scale, scale, scale)));
+    return true;
+  };
+
+  for (let i = 0; i < Math.round(70 * density); i++) {
+    const edge = rng.chance(0.55);
+    // either hard against the perimeter, or tucked along a terrace lip
+    const x = edge ? (rng.chance(0.5) ? -1 : 1) * rng.range(58, 74) : rng.range(-70, 70);
+    const z = edge ? rng.range(-74, 74) : (rng.chance(0.5) ? -1 : 1) * rng.range(56, 74);
+    if (!free(x, z, 1.6)) continue;
+    const y = surface(x, z, 40);
+    if (y == null) continue;
+    const palm = rng.chance(0.42);
+    plant(palm ? PALMS[rng.int(0, 2)] : SCRUB[rng.int(0, SCRUB.length - 1)],
+      x, y, z, rng() * Math.PI * 2, palm ? rng.range(0.9, 1.5) : rng.range(0.7, 1.3));
+  }
+
+  // the terrace-lip spots the map picked out
+  for (const f of meta.foliage ?? []) {
+    if (!free(f.x, f.z, 1.2)) continue;
+    const y = ground(f.x, f.z, f.y, 2.2);
+    if (y == null) continue;
+    const palm = f.seed < 0.38;
+    plant(palm ? PALMS[(f.seed * 97 | 0) % 3] : SCRUB[(f.seed * 131 | 0) % SCRUB.length],
+      f.x, y, f.z, f.seed * 44, palm ? 0.85 + f.seed : 0.6 + f.seed * 0.8);
+  }
+
+  // a few palms inside the map, on terrace corners where they will not block a lane
+  for (const t of houses) {
+    if (rng() > 0.16 * density) continue;
+    const x = t.x + (rng.chance(0.5) ? -1 : 1) * (t.w / 2 + rng.range(1.4, 2.6));
+    const z = t.z + (rng.chance(0.5) ? -1 : 1) * (t.d / 2 + rng.range(1.4, 2.6));
+    if (!free(x, z, 1.5)) continue;
+    const y = ground(x, z, t.y, 1.0);
+    if (y == null) continue;
+    plant(rng.chance(0.6) ? PALMS[rng.int(0, 2)] : 'tree1', x, y, z,
+      rng() * Math.PI * 2, rng.range(0.85, 1.25));
+  }
+
   const built = B.build();
   return { ...built, group: built.root };
 }
