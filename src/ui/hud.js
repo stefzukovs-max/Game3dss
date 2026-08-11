@@ -25,6 +25,7 @@ export class HUD {
       waveLabel: $('wave-label'), waveSub: $('wave-sub'),
       enemiesLeft: $('enemies-left'), enemiesNum: $('enemies-num'),
       score: $('score'), streak: $('streak'), combo: $('combo'),
+      radio: $('radio-line'), objective: $('objective-card'),
       killfeed: $('killfeed'), popups: $('popups'), banner: $('banner'),
       dmgRing: $('dmg-ring'), vignette: $('lowhp-vignette'),
       flash: $('flash-overlay'), burn: $('burn-overlay'),
@@ -265,6 +266,42 @@ export class HUD {
       this.el.combo.classList.add('bump');
     }
     return this.comboCount;
+  }
+
+  /**
+   * A line of radio traffic. Queued rather than replaced: two events landing in
+   * the same second would otherwise show only the second one, and the first is
+   * usually the one that explained why something happened.
+   */
+  radio(text) {
+    const el = this.el.radio;
+    if (!el) return;
+    this._radioQ = this._radioQ || [];
+    this._radioQ.push(text);
+    if (this._radioBusy) return;
+    const next = () => {
+      const line = this._radioQ.shift();
+      if (line == null) { this._radioBusy = false; el.classList.remove('on'); return; }
+      this._radioBusy = true;
+      el.textContent = line;
+      el.classList.add('on');
+      setTimeout(() => { el.classList.remove('on'); setTimeout(next, 260); }, 3400);
+    };
+    next();
+  }
+
+  /** The current objective, or null to clear it. */
+  setObjective(title, sub = '') {
+    const el = this.el.objective;
+    if (!el) return;
+    el.classList.toggle('hidden', !title);
+    if (title) el.innerHTML = `<b>${title}</b><span>${sub}</span>`;
+  }
+
+  /** Extra camera kick on top of whatever the sim is already doing. */
+  shake(amount) {
+    const g = this.game;
+    if (g?.camera) g.camera.userData.shake = Math.max(g.camera.userData.shake || 0, amount);
   }
 
   setScore(n) { this.el.score.textContent = n.toLocaleString('en-US'); }

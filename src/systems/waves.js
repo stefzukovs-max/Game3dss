@@ -122,6 +122,20 @@ export class WaveDirector {
       this.isBossWave ? `WAVE ${this.wave} — HEAVY PUSH` : `WAVE ${this.wave}`,
       label);
     audio.waveStart();
+
+    /*
+     * Give the wave a target. The spotter is picked a beat after the wave
+     * starts rather than at spawn time, so there is a crowd to hide in — being
+     * marked at the instant the first enemy walks out would make it a
+     * whack-a-mole rather than a hunt.
+     */
+    this.game.spotter = null;
+    this.game.hud.setObjective(null);
+    if (this.wave >= 2 && !this.isBossWave) {
+      setTimeout(() => {
+        if (this.phase === PHASE.ACTIVE) this.game._markSpotter();
+      }, 5200);
+    }
   }
 
   endWave() {

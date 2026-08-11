@@ -707,6 +707,9 @@ class Game {
 
   applyDamage(target, amount, source, zone, point) {
     if (!target?.alive) return;
+    // remembered so the kill handler can pay out a headshot without the death
+    // path needing to know how the shot was resolved
+    target.lastHitHead = zone === 'head';
     const isPlayerVictim = target.isPlayer;
     const fromPlayer = source === this.player;
 
@@ -739,6 +742,48 @@ class Game {
 
   onPlayerHit() { /* per-shot feedback lives in applyDamage */ }
 
+  /**
+   * A line over the hill's transmitter.
+   *
+   * The story's whole hook is that the tower is how the hill talks to itself,
+   * so the game should actually use it: streaks, spotters and wave changes come
+   * through as radio traffic rather than as a system message. It costs one DOM
+   * node and it is most of what gives the run a narrator.
+   */
+  radio(text) {
+    this.hud.radio(text);
+  }
+
+  /**
+   * Each wave one enemy is a spotter, calling the player's position in.
+   *
+   * This is the objective layer the game was missing. Surviving a wave is a
+   * timer; hunting a specific target across the terraces is a decision, and it
+   * gives the map's verticality something to be *for*. While a spotter lives
+   * the rest of the wave tracks the player harder; killing them pays out and
+   * calls off the hunt.
+   */
+  _markSpotter() {
+    const pool = this.agents.filter((a) => a.alive && a.faction === this.enemyFaction && !a.isBoss);
+    if (pool.length < 3) return;
+    const pick = pool[(Math.random() * pool.length) | 0];
+    pick.isMarked = true;
+    this.spotter = pick;
+    this.hud.setObjective('SPOTTER ON THE HILL', 'They are calling your position — find them');
+    this.radio('Somebody is calling us in. Find their radio.');
+  }
+
+  _spotterDown(agent) {
+    if (this.spotter === agent) this.spotter = null;
+    agent.isMarked = false;
+    const p = this.player;
+    p.weapon.reserve = Math.min(p.weapon.reserve + p.weapon.def.mag * 2, p.weapon.def.maxReserve);
+    p.grenades = Math.min(p.grenades + 1, 4);
+    this.hud.banner('SPOTTER DOWN', 'ammunition recovered');
+    this.hud.setObjective(null);
+    this.radio('Their radio is off. We are blind to them again.');
+  }
+
   onAgentDeath(agent, from) {
     agent.model.update(0.016, { speed: 0, dead: true, aiming: false, crouching: false, pitch: 0 });
 
@@ -748,17 +793,48 @@ class Game {
       p.streak++;
       p.bestStreak = Math.max(p.bestStreak, p.streak);
       const combo = this.hud.addCombo();
-      const gain = Math.round(agent.scoreValue * (1 + (combo - 1) * 0.22));
+
+      /*
+       * Scoring rewards the things that are hard rather than the things that
+       * are frequent: a chained kill, a headshot, and the marked spotter. A
+       * flat per-kill value makes every fight worth the same and there is
+       * nothing to chase.
+       */
+      const head = !!agent.lastHitHead;
+      let mult = 1 + (combo - 1) * 0.22 + (head ? 0.5 : 0);
+      if (agent.isMarked) mult += 1.5;
+      const gain = Math.round(agent.scoreValue * mult);
       this.score += gain;
       this.hud.setScore(this.score);
       this.hud.setStreak(p.streak);
-      this.hud.hitmarker(true, false);
-      this.hud.popup('+' + gain, '#ffd23f', 30);
+      this.hud.hitmarker(true, head);
+      this.hud.popup((head ? 'HEAD  +' : '+') + gain, head ? '#ff5a1f' : '#ffd200', head ? 36 : 30);
       audio.hitmarker(true);
-      this.hud.killfeed('YOU', agent.nameTag, p.weapon.def.short, false, true);
+      this.hud.killfeed('YOU', agent.nameTag, p.weapon.def.short, head, true);
+      this.hud.shake(head ? 0.5 : 0.32);
+
+      this._hitstop = head ? 0.10 : 0.07;
+      this.camera.userData.shake = Math.max(this.camera.userData.shake, head ? 0.55 : 0.34);
+
+      if (agent.isMarked) this._spotterDown(agent);
       if (agent.isBoss) this.hud.banner('TARGET DOWN', 'heavy push broken');
       this.pickups.dropFrom(agent);
-      if (p.streak > 0 && p.streak % 5 === 0) this.hud.banner(`${p.streak} STREAK`, 'keep it up');
+
+      /*
+       * Streak rewards, not just streak text. Every fifth kill without dying
+       * tops the magazine back up and calls it over the tower — the run gets
+       * materially easier the better you are playing, which is the loop that
+       * makes a wave shooter worth pushing.
+       */
+      if (p.streak > 0 && p.streak % 5 === 0) {
+        p.weapon.mag = p.weapon.def.mag;
+        p.grenades = Math.min(p.grenades + 1, 4);
+        this.hud.banner(`${p.streak} STREAK`, 'resupplied — the tower has you');
+        this.radio(p.streak >= 15 ? 'They are not getting past you.'
+          : p.streak >= 10 ? 'Whoever that is, keep them there.'
+            : 'Reloaded off the drop. Keep going.');
+        audio.pickup?.();
+      }
     } else if (from && !from.isPlayer) {
       this.hud.killfeed(from.nameTag ?? '—', agent.nameTag, from.weapon?.def.short ?? '', false, false);
     }
@@ -922,6 +998,22 @@ class Game {
   }
 
   _tick(dt) {
+    /*
+     * Hitstop.
+     *
+     * On a kill the whole simulation drops to a crawl for about seventy
+     * milliseconds. It is the single cheapest thing that makes a shooter feel
+     * like it has weight: the brain reads the hitch as impact, and without it
+     * a body just stops existing. Kept short and scaled rather than frozen, so
+     * animation and audio keep moving and it reads as a punch rather than a
+     * stutter.
+     */
+    if (this._hitstop > 0) {
+      const bite = Math.min(this._hitstop, dt);
+      this._hitstop -= dt;
+      dt = dt * 0.12 + (dt - bite) * 0.88;
+    }
+
     advanceClock(dt);
     const p = this.player;
 
@@ -975,13 +1067,31 @@ class Game {
     const revealed = this.abilities.revealUntil > now();
     let n = 0;
     for (const m of this.revealMarkers) m.visible = false;
-    if (!revealed || !this.player) return;
+    if (!this.player) return;
+
+    /*
+     * The marked spotter is always drawn through walls, whether or not a
+     * reveal is up. An objective you cannot locate is not an objective, and
+     * the whole point of marking one enemy is that the player goes hunting
+     * across the terraces instead of holding a corner.
+     */
+    if (this.spotter?.alive && n < this.revealMarkers.length) {
+      const m = this.revealMarkers[n++];
+      m.position.set(this.spotter.pos.x, this.spotter.pos.y + 2.5, this.spotter.pos.z);
+      m.quaternion.copy(this.camera.quaternion);
+      m.scale.setScalar(1.6 + Math.sin(now() * 5) * 0.18);
+      m.visible = true;
+      this.spotter.revealed = 0.4;
+    }
+
+    if (!revealed) return;
     for (const a of this.agents) {
-      if (!a.alive || a.faction === this.playerFaction) continue;
+      if (!a.alive || a.faction === this.playerFaction || a === this.spotter) continue;
       if (n >= this.revealMarkers.length) break;
       const m = this.revealMarkers[n++];
       m.position.set(a.pos.x, a.pos.y + 2.25, a.pos.z);
       m.quaternion.copy(this.camera.quaternion);
+      m.scale.setScalar(1);
       m.visible = true;
       a.revealed = 0.4;
     }
