@@ -5,3 +5,6 @@ package-lock.json
 
 # harness output: screenshots are written next to the tools when SHOT_DIR is unset
 /*.png
+
+# generated single-file preview
+/cutscene-preview.html

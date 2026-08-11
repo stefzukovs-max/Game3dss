@@ -59,6 +59,15 @@ ok('menu fits the viewport', !overflow.bodyScroll && overflow.scrollW <= overflo
 
 /* ── start a run: no pointer lock should be involved ── */
 await page.tap('#btn-play');
+// the opening plays first on a fresh session; skipping it is part of the path
+// a real player takes, so the check goes through it rather than around it
+await page.waitForTimeout(600);
+const sawIntro = await page.evaluate(() => !!document.querySelector('.cut'));
+if (sawIntro) {
+  await page.tap('.cut-skip');
+  await page.waitForTimeout(700);
+}
+ok('opening plays, and skips', sawIntro);
 await page.waitForTimeout(700);
 const started = await page.evaluate(() => ({
   state: window.__game.state,

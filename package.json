@@ -15,7 +15,8 @@
     "shots:chars": "node tools/character-shots.mjs",
     "assets": "node tools/fetch-assets.mjs",
     "props": "node tools/prop-info.mjs",
-    "shots:guns": "node tools/weapon-shots.mjs"
+    "shots:guns": "node tools/weapon-shots.mjs",
+    "cutscene:preview": "node tools/build-cutscene-preview.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.4.2",

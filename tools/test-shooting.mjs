@@ -23,6 +23,7 @@ const out = await page.evaluate(async () => {
   const { Agent } = await import('/src/entities/ai.js');
 
   g.selected.operator = 'kite';           // SMG primary
+  window.__game.settings.intro = false;   // harnesses drive the game directly
   g.startRun();
   g._tick(1 / 60);
 

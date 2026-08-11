@@ -8,7 +8,11 @@ const page = await browser.newPage({ viewport: { width: 800, height: 480 } });
 page.on('pageerror', (e) => console.log('PAGEERROR', e.message, e.stack));
 await page.goto('http://localhost:8080/', { waitUntil: 'load' });
 await page.waitForSelector('#scr-menu:not(.hidden)', { timeout: 120000 });
-await page.evaluate(() => window.__game.startRun());
+await page.evaluate(() => {
+  // harnesses drive the game directly and must not sit through the opening
+  window.__game.settings.intro = false;
+  window.__game.startRun();
+});
 for (let i = 0; i < 8; i++) {
   await page.evaluate(() => { for (let k = 0; k < 600; k++) window.__game._tick(1 / 60); });
 }

@@ -28,6 +28,7 @@ await page.evaluate((op) => {
   const g = window.__game;
   g.selected.operator = op;
   g.selected.faction = window.__roster ? 'gang' : g.selected.faction;
+  window.__game.settings.intro = false;   // harnesses drive the game directly
   g.startRun();
 }, OP);
 await page.waitForTimeout(400);

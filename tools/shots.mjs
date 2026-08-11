@@ -35,6 +35,7 @@ await page.evaluate(() => {
   const g = window.__game;
   g.selected.faction = 'gang';
   g.selected.operator = 'boulder';
+  window.__game.settings.intro = false;   // harnesses drive the game directly
   g.startRun();
   for (let i = 0; i < 60 * 30; i++) {
     g._tick(1 / 60);

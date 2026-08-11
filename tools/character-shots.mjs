@@ -13,6 +13,7 @@ const shot = async (name, faction) => {
     const g = window.__game;
     g.selected.faction = fac;
     g.selected.operator = fac === 'gang' ? 'boulder' : 'stone';
+    window.__game.settings.intro = false;   // harnesses drive the game directly
     g.startRun();
     g._tick(1/60);
     g.state = 'paused';

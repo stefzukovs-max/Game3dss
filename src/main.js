@@ -18,6 +18,7 @@ import { ProceduralSky } from './core/sky.js';
 import { PostChain } from './core/post.js';
 import { AssetLibrary } from './core/assets.js';
 import { scatterProps } from './world/props.js';
+import { playCutscene } from './ui/cutscene.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -293,7 +294,7 @@ class Game {
     const d = {
       sens: 1, tsens: 1, fov: IS_TOUCH ? 82 : 78, vol: 70, invert: false,
       shadows: true, blood: true, dmgnum: true, res: 100,
-      quality: 'auto', assist: true, lefty: false,
+      quality: 'auto', assist: true, lefty: false, intro: true,
     };
     try { return { ...d, ...JSON.parse(localStorage.getItem('hillcross.settings') || '{}') }; }
     catch { return d; }
@@ -311,6 +312,7 @@ class Game {
     $('set-tsens').value = s.tsens; $('lbl-tsens').textContent = (+s.tsens).toFixed(2);
     $('set-invert').checked = s.invert;
     $('set-shadows').checked = s.shadows;
+    $('set-intro').checked = s.intro !== false;
     $('set-blood').checked = s.blood;
     $('set-dmgnum').checked = s.dmgnum;
     $('set-assist').checked = s.assist;
@@ -486,6 +488,7 @@ class Game {
       if (this.state === STATE.PLAYING) this.pause();
     });
     bind('set-shadows', 'shadows');
+    bind('set-intro', 'intro');
     bind('set-blood', 'blood');
     bind('set-dmgnum', 'dmgnum');
 
@@ -571,12 +574,31 @@ class Game {
   }
 
   /* ══════════════════ run lifecycle ══════════════════ */
-  startRun() {
+  /**
+   * Press GO UP.
+   *
+   * The opening plays first, over a black screen, while nothing else is
+   * happening — the level is already built by this point, so the cutscene costs
+   * nothing but the time the player chooses to give it. Skipped runs and
+   * retries go straight in: watching the same forty seconds after every death
+   * is how an intro turns into a tax.
+   */
+  startRun(opts = {}) {
     audio.init(); audio.resume();
+
+    const char = byId(this.selected.operator);
+    const side = char.faction;
+    if (this.settings.intro !== false && !opts.skipIntro && !this._seenIntro?.[side]) {
+      (this._seenIntro ??= {})[side] = true;
+      this._showScreen(null);
+      document.body.classList.toggle('side-police', side === 'police');
+      playCutscene(side, { onLine: () => audio.click?.(null, 620, 0.12, 0.03) })
+        .then(() => this.startRun({ skipIntro: true }));
+      return;
+    }
 
     this._teardownRun();
 
-    const char = byId(this.selected.operator);
     this.playerFaction = char.faction;
     this.enemyFaction = char.faction === 'gang' ? 'police' : 'gang';
     this.difficulty = DIFFICULTY[this.selected.difficulty];

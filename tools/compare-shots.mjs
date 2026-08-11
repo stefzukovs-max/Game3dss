@@ -26,6 +26,7 @@ await p.evaluate(() => {
   g._applySettings?.();
   g.selected.faction = 'gang';
   g.selected.operator = 'boulder';
+  window.__game.settings.intro = false;   // harnesses drive the game directly
   g.startRun();
   for (let i = 0; i < 60 * 20; i++) { g._tick(1 / 60); if (g.state === 'draft') g._closeDraft(); }
   g.state = 'paused';
