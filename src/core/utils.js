@@ -97,6 +97,40 @@ export function texturedBox(w, h, d, texelsPerMeter = 0.5) {
   return g;
 }
 
+/**
+ * CylinderGeometry with the same world-unit UV treatment.
+ *
+ * Three's cylinder UVs run 0..1 around the circumference and 0..1 up the side
+ * whatever the radius, so a shared tiling material stretches to whatever the
+ * object happens to be — a 15 m bandstand roof and a 0.7 m water tank get the
+ * same number of repeats. On a corrugated-steel scan that reads as smeared
+ * dark streaks rather than sheeting. Rescaling to metres makes every cylinder
+ * agree with every box.
+ */
+export function texturedCylinder(rTop, rBot, h, seg = 10, texelsPerMeter = 0.5) {
+  const g = new THREE.CylinderGeometry(rTop, rBot, h, seg);
+  const uv = g.attributes.uv;
+  const pos = g.attributes.position;
+  const circ = Math.PI * (rTop + rBot);      // mean circumference
+  const s = texelsPerMeter;
+
+  for (let i = 0; i < uv.count; i++) {
+    // The caps are generated after the side wall and use a disc-shaped UV
+    // layout centred on 0.5; scaling them by circumference would swirl the
+    // texture, so they get scaled by diameter about their own centre instead.
+    const y = pos.getY(i);
+    const onCap = Math.abs(Math.abs(y) - h / 2) < 1e-6 &&
+      Math.hypot(pos.getX(i), pos.getZ(i)) < Math.max(rTop, rBot) - 1e-6;
+    if (onCap) {
+      const r = (y > 0 ? rTop : rBot) * 2;
+      uv.setXY(i, (uv.getX(i) - 0.5) * r * s + 0.5, (uv.getY(i) - 0.5) * r * s + 0.5);
+    } else {
+      uv.setXY(i, uv.getX(i) * circ * s, uv.getY(i) * h * s);
+    }
+  }
+  return g;
+}
+
 /* ── misc ─────────────────────────────────────────────────────── */
 export function disposeObject(root) {
   root.traverse((o) => {

@@ -12,9 +12,11 @@ import { drawCards } from './systems/upgrades.js';
 import { Player } from './entities/player.js';
 import { ROSTER, FACTIONS, rosterFor, byId } from './entities/roster.js';
 import { HUD } from './ui/hud.js';
-import { setCharacterDetail } from './entities/character.js';
+import { setCharacterDetail, applyCharacterMaterials } from './entities/character.js';
 import { ProceduralSky } from './core/sky.js';
 import { PostChain } from './core/post.js';
+import { AssetLibrary } from './core/assets.js';
+import { scatterProps } from './world/props.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -99,7 +101,8 @@ class Game {
     this.scene.add(this.skyDome);
     this.scene.environment = this.sky.generateEnvironment(this.renderer, 256);
 
-    this.scene.add(this.sky.makeAmbient());
+    this.ambient = this.sky.makeAmbient();
+    this.scene.add(this.ambient);
 
     this.sun = this.sky.makeSun();
     this.sun.castShadow = true;
@@ -117,9 +120,9 @@ class Game {
     this.scene.add(this.sun.target);
 
     // cool bounce from the opposite side so shadowed faces keep their form
-    const fill = new THREE.DirectionalLight(0x9fc4e8, 0.22);
-    fill.position.set(60, 34, -46);
-    this.scene.add(fill);
+    this.fill = new THREE.DirectionalLight(0x9fc4e8, 0.22);
+    this.fill.position.set(60, 34, -46);
+    this.scene.add(this.fill);
 
     this.post = new PostChain(this.renderer, this.scene, this.camera);
 
@@ -142,12 +145,41 @@ class Game {
       requestAnimationFrame(() => setTimeout(r, 0));
     });
 
-    await step(0.04, 'Waking the hillside…');
-    this.world = buildFavela(this.scene, 20240607, (p, m) => {
+    const bar = (p, m) => {
       $('loadfill').style.width = (p * 100) + '%';
       $('loadmsg').textContent = m;
-    }, { detail: this.materialDetail !== false });
+    };
+
+    /*
+     * Assets first, because the world is built out of them. If assets/ is
+     * absent the library reports not-ready in a few milliseconds and every
+     * consumer below falls back to the procedural path — the game still runs,
+     * it just looks like it did before the pack existed.
+     */
+    await step(0.02, 'Opening the crates…');
+    this.assets = new AssetLibrary(this.renderer);
+    // 0 → 0.55 of the bar: on a cold cache this genuinely is most of the wait
+    await this.assets.load(this._tier(), (p, m) => bar(p * 0.55, m));
+    if (this.assets.ready) {
+      this._applyEnvironment();
+      applyCharacterMaterials(this.assets);
+    }
+
+    await step(0.57, 'Waking the hillside…');
+    this.world = buildFavela(this.scene, 20240607, (p, m) => bar(0.57 + p * 0.33, m),
+      { detail: this.materialDetail !== false, assets: this.assets });
     this.world.bounds = { x0: WORLD.x0 + 7, x1: WORLD.x1 - 7, z0: WORLD.z0 + 7, z1: WORLD.z1 - 7 };
+
+    /*
+     * Props go down before the nav graph is plotted and before the broadphase
+     * grid is rebuilt: a gas bottle that blocks a doorway has to be something
+     * the AI knows about, or it will path straight into it and stall. The
+     * collision world rebuilds its grid from scratch, so re-running build()
+     * after adding the prop boxes is all that is needed.
+     */
+    await step(0.91, 'Dressing the hillside…');
+    this.props = scatterProps(this.scene, this.assets, this.world, { tier: this._tier() });
+    if (this.props) this.world.collision.build();
 
     await step(0.94, 'Plotting the alleys…');
     this.nav = new NavGraph(this.world.collision);
@@ -166,6 +198,64 @@ class Game {
     this._lastT = performance.now();
     requestAnimationFrame((t) => this._frame(t));
   }
+
+  /**
+   * Swap the analytic sky for the photographed one.
+   *
+   * The HDRI does three jobs at once and they have to stay consistent: it is
+   * the visible background, it is the pre-filtered environment every surface
+   * samples for ambient and specular, and its brightest pixel tells the
+   * directional light where to stand. Driving all three from one file is why
+   * the shadows fall the way the sky says they should — set the sun by hand
+   * and the scene reads as objects composited onto a photo.
+   */
+  _applyEnvironment() {
+    const a = this.assets;
+    if (!a.env) return;
+
+    this.scene.environment?.dispose?.();
+    this.scene.environment = a.env;
+    this.scene.background = a.background;
+    this.scene.backgroundIntensity = 1.0;
+
+    // the procedural dome would now be drawing over the real sky
+    this.skyDome.visible = false;
+
+    if (a.sun) {
+      this.sun.position.copy(a.sun.dir).multiplyScalar(100);
+      this.sun.color.copy(a.sun.color);
+    }
+
+    /*
+     * Re-balance for a photographed sky.
+     *
+     * The procedural dome was a dim analytic gradient, so it needed a strong
+     * key light and generous exposure to read at all. A real HDRI carries the
+     * full outdoor range — the sky alone lights the scene to a sensible level —
+     * so leaving the old numbers in place blows every surface to white. The
+     * key drops to roughly a real sun's contribution over that ambient, the
+     * two crutch lights that existed to stop shadows going black are almost
+     * off (the environment does that job properly now), and exposure comes
+     * down to where the sky's own highlights stop clipping.
+     */
+    this.sun.intensity = 2.8;
+    this.fill.intensity = 0.05;
+    this.ambient.intensity = 0.0;
+    this.scene.environmentIntensity = 0.6;
+    this._exposure = 0.45;
+    this.renderer.toneMappingExposure = this._exposure;
+
+    // fog tinted to the horizon of the sky actually in use, so distance still
+    // reads as air rather than as a grey card in front of a photograph
+    this.scene.fog.color.set(0xbcc6cf);
+    this.renderer.setClearColor(0xbcc6cf);
+  }
+
+  /**
+   * The resolved tier. `_applyQuality()` runs from the constructor, so this is
+   * already settled by the time the asset library asks how much to load.
+   */
+  _tier() { return this.quality ?? 'medium'; }
 
   _initRevealMarkers() {
     // "spotted" chevrons that draw through geometry
@@ -283,7 +373,9 @@ class Game {
 
     // post-processing: GTAO is the expensive one, so only the top tier gets it
     this.post?.build(low ? 'minimal' : med ? 'lite' : 'full');
-    this.renderer.toneMappingExposure = low ? 1.0 : 0.94;
+    // `_exposure` is set by whichever sky is in use; the low tier skips GTAO,
+    // which costs it a little apparent contrast, so it gets a touch more light
+    this.renderer.toneMappingExposure = (this._exposure ?? 0.94) * (low ? 1.06 : 1);
   }
 
   /** Portrait on a phone is unplayable - gate it rather than squeeze it. */

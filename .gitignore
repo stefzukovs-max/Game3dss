@@ -2,3 +2,6 @@ node_modules/
 package-lock.json
 .DS_Store
 *.log
+
+# harness output: screenshots are written next to the tools when SHOT_DIR is unset
+/*.png

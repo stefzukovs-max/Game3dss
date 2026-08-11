@@ -165,17 +165,29 @@ ok('JUMP registers', await page.evaluate(() => {
 
 const cdBefore = await page.evaluate(() => window.__game.player.abilityCd);
 await tapBtn('btn-ability');
-await page.waitForTimeout(300);
-ok('ability button fires', await page.evaluate((b) => window.__game.player.abilityCd > b, cdBefore));
+ok('ability button fires', await page.evaluate((b) => {
+  const g = window.__game;
+  for (let i = 0; i < 6; i++) g._tick(1 / 60);
+  return g.player.abilityCd > b;
+}, cdBefore));
 
 const nadeBefore = await page.evaluate(() => window.__game.player.grenades);
 await tapBtn('btn-nade');
-await page.waitForTimeout(300);
-ok('grenade button throws', await page.evaluate((b) => window.__game.player.grenades < b, nadeBefore));
+// same fixed-step pump as the jump check: the press is consumed inside _tick,
+// and under software rendering a wall-clock wait can pass without one running
+ok('grenade button throws', await page.evaluate((b) => {
+  const g = window.__game;
+  for (let i = 0; i < 6; i++) g._tick(1 / 60);
+  return g.player.grenades < b;
+}, nadeBefore));
 
 await tapBtn('btn-crouch');
-await page.waitForTimeout(200);
-ok('crouch toggles', await page.evaluate(() => window.__game.player.crouching));
+// and again: crouch is applied inside _tick, so pump rather than wait
+ok('crouch toggles', await page.evaluate(() => {
+  const g = window.__game;
+  for (let i = 0; i < 6; i++) g._tick(1 / 60);
+  return g.player.crouching;
+}));
 await tapBtn('btn-crouch');
 
 await page.screenshot({ path: `${OUT}/mob-2-hud.png` });

@@ -73,9 +73,12 @@ for (const [name, pos, look] of views) {
     g.camera.fov = 62;
     g.camera.updateProjectionMatrix();
     if (g.skyDome) g.skyDome.position.copy(g.camera.position);
-    // keep the sun shadow box on what we're looking at
+    // Keep the shadow box on what we're looking at, without changing the sun's
+    // direction — that comes from the HDRI now, and overriding it here would
+    // light the scene from somewhere the sky does not agree with.
+    const dir = g.sun.position.clone().sub(g.sun.target.position).normalize();
     g.sun.target.position.set(l[0], l[1], l[2]);
-    g.sun.position.set(l[0] - 55, l[1] + 70, l[2] + 45);
+    g.sun.position.set(l[0], l[1], l[2]).addScaledVector(dir, 90);
     g.sun.target.updateMatrixWorld();
     (g.renderFrame ? g.renderFrame() : g.renderer.render(g.scene, g.camera));
   }, [pos, look]);

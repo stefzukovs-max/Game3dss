@@ -12,10 +12,16 @@
     "check:shooting": "node tools/test-shooting.mjs",
     "shots": "node tools/shots.mjs",
     "check:mobile": "node tools/mobile-check.mjs",
-    "shots:chars": "node tools/character-shots.mjs"
+    "shots:chars": "node tools/character-shots.mjs",
+    "assets": "node tools/fetch-assets.mjs",
+    "props": "node tools/prop-info.mjs"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/extensions": "^4.4.2",
+    "@gltf-transform/functions": "^4.4.2",
     "playwright": "^1.56.0",
+    "sharp": "^0.35.3",
     "three": "0.185.1"
   }
 }

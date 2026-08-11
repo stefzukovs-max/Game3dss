@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeRNG, texturedBox, GeometryBatcher } from '../core/utils.js';
+import { makeRNG, texturedBox, texturedCylinder, GeometryBatcher } from '../core/utils.js';
 import { CollisionWorld } from '../core/collision.js';
 import { buildTextureLibrary, FAVELA_COLORS, deriveNormalMap, deriveRoughnessMap } from './textures.js';
 
@@ -180,8 +180,9 @@ class WorldBuilder {
   }
 
   cylinder(matKey, x, y, z, rTop, rBot, h, seg = 10, opts = {}) {
+    const { texScale = 0.5 } = opts;
     const b = this.batches.get(matKey);
-    const geo = new THREE.CylinderGeometry(rTop, rBot, h, seg);
+    const geo = texturedCylinder(rTop, rBot, h, seg, texScale);
     _m.compose(_v.set(x, y, z), _q.setFromAxisAngle(_up, opts.rotY || 0), _s.set(1, 1, 1));
     b.batcher.add(geo, _m);
     geo.dispose();
@@ -202,6 +203,15 @@ class WorldBuilder {
     }
     return meshes;
   }
+}
+
+/**
+ * Which sheeting a roof gets. Weighted to bare galvanised because that is what
+ * most of a real hillside is; the painted variants exist to break up the run.
+ */
+function roofSheet(rng) {
+  const r = rng();
+  return r < 0.62 ? 'corrugated' : r < 0.83 ? 'corrugatedRed' : 'corrugatedGreen';
 }
 
 const _m = new THREE.Matrix4();
@@ -227,6 +237,7 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
    * fetches per fragment cost more than they're worth on a phone.
    */
   const detail = opts.detail !== false;
+  const assets = opts.assets?.ready ? opts.assets : null;
 
   const pbr = (map, o = {}) => () => {
     const { roughness = 0.92, metalness = 0, bump = 2.2, bumpScale = 1,
@@ -251,43 +262,105 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
   };
   const lam = pbr;   // every registration below goes through the PBR path
 
-  B.material('brick', pbr(tex.brick, { bump: 3.0, rmin: 0.72, rmax: 1.0 }));
-  B.material('concrete', pbr(tex.concrete, { bump: 1.6, rmin: 0.7, rmax: 0.98 }));
-  B.material('concreteDark', pbr(tex.concreteDark, { bump: 1.8, rmin: 0.72, rmax: 0.98 }));
-  B.material('corrugated', pbr(tex.corrugated, { bump: 3.6, metalness: 0.72, rmin: 0.3, rmax: 0.78, env: 0.95 }));
-  B.material('asphalt', pbr(tex.asphalt, { bump: 1.4, rmin: 0.78, rmax: 1.0 }));
-  B.material('dirt', pbr(tex.dirt, { bump: 1.8, rmin: 0.88, rmax: 1.0 }));
+  /*
+   * ── real surfaces ──
+   * When the CC0 pack is present, `scan` swaps a painted canvas texture for a
+   * photogrammetry set: albedo, a measured normal map and an ARM map carrying
+   * occlusion, roughness and metalness. That is the single biggest difference
+   * between this and the procedural build — a Sobel normal derived from a
+   * painted albedo can only invent relief that correlates with brightness,
+   * whereas a scanned normal knows that mortar is recessed and a dark stain is
+   * not. Fall through to the canvas path when the pack is missing.
+   *
+   * `tile` is metres of real surface per repeat. The map's UVs are already
+   * world-scaled at 0.5/m, so `repeat = 2 / tile` puts every surface at its
+   * true size no matter what geometry it lands on.
+   */
+  const scan = (slug, fallback, o = {}) => () => {
+    if (!assets) return fallback();
+    const entry = assets.manifest.materials.find((m) => m.slug === slug);
+    const m = assets.standard(slug, { repeat: 2 / (entry?.tile ?? 1), ...o });
+    return m ?? fallback();
+  };
+
+  B.material('brick', scan('brick_red', pbr(tex.brick, { bump: 3.0, rmin: 0.72, rmax: 1.0 })));
+  B.material('brickAlt', scan('brick_orange', pbr(tex.brick, { bump: 3.0, rmin: 0.72, rmax: 1.0 })));
+  B.material('concrete', scan('concrete_wall', pbr(tex.concrete, { bump: 1.6, rmin: 0.7, rmax: 0.98 })));
+  B.material('concreteDark', scan('concrete_slab', pbr(tex.concreteDark, { bump: 1.8, rmin: 0.72, rmax: 0.98 })));
+  const sheet = (slug) => scan(slug,
+    pbr(tex.corrugated, { bump: 3.6, metalness: 0.72, rmin: 0.3, rmax: 0.78, env: 0.95 }),
+    { metalness: 0.5 });
+  B.material('corrugated', sheet('corrugated'));
+  B.material('corrugatedRed', sheet('corrugated_red'));
+  B.material('corrugatedGreen', sheet('corrugated_green'));
+  B.material('asphalt', scan('asphalt', pbr(tex.asphalt, { bump: 1.4, rmin: 0.78, rmax: 1.0 })));
+  B.material('dirt', scan('dirt', pbr(tex.dirt, { bump: 1.8, rmin: 0.88, rmax: 1.0 })));
+  B.material('paving', scan('paving_brick', pbr(tex.concrete, { bump: 1.6, rmin: 0.7, rmax: 0.98 })));
+  B.material('stair', scan('paving_stone', pbr(tex.concrete, { bump: 1.6, rmin: 0.7, rmax: 0.98 })));
+  B.material('azulejo', scan('azulejo', pbr(tex.concrete, { bump: 1.0, rmin: 0.2, rmax: 0.6 })));
+
+  // no scanned equivalent: glazing is emissive and reflective rather than a
+  // surface you could photograph flat
   B.material('window', pbr(tex.window, { bump: 1.0, metalness: 0.55, rmin: 0.06, rmax: 0.3, roughMap: true }));
-  FAVELA_COLORS.forEach((_, i) => B.material('plaster' + i,
-    pbr(tex.plaster[i], { bump: 1.5, rmin: 0.66, rmax: 0.97 })));
+
+  /*
+   * The hillside's paint palette has to survive the swap. There is no scanned
+   * material per colour and there never could be, so painted walls tint one
+   * weathered-plaster scan by the palette entry — real dirt and crumbling
+   * relief, the authored colour. Every third house instead gets one of the
+   * three "render peeling back to brick" scans untinted, because those carry
+   * their own colour and are the most characteristic surface on a favela.
+   */
+  const PEELING = ['plaster_orange', 'plaster_yellow', 'plaster_worn'];
+  FAVELA_COLORS.forEach((hex, i) => {
+    const canvasFallback = pbr(tex.plaster[i], { bump: 1.5, rmin: 0.66, rmax: 0.97 });
+    // every third house peels back to bare block; the rest are tinted render
+    B.material('plaster' + i, i % 3 === 2
+      ? scan(PEELING[(i / 3 | 0) % PEELING.length], canvasFallback)
+      : scan('plaster_plain', canvasFallback, { color: new THREE.Color(hex) }));
+  });
+  /*
+   * The heavily damaged white render. Registered but deliberately unused on
+   * houses: its blotches are large enough that tiling them across a wall reads
+   * as camouflage rather than as peeling paint. Kept for small surfaces where
+   * a single tile covers the whole face.
+   */
+  B.material('plasterBare', scan('plaster_white',
+    pbr(tex.plaster[8], { bump: 1.5, rmin: 0.66, rmax: 0.97 })));
+
   tex.graffiti.forEach((t, i) => B.material('graf' + i,
     pbr(t, { side: THREE.DoubleSide, bump: 1.2, rmin: 0.5, rmax: 0.95 })));
-  B.material('wood', col(0x8a6141, { roughness: 0.88 }));
-  B.material('woodDark', col(0x5c3f28, { roughness: 0.9 }));
+  B.material('wood', scan('planks', col(0x8a6141, { roughness: 0.88 })));
+  B.material('woodDark', scan('planks', col(0x5c3f28, { roughness: 0.9 }),
+    { color: new THREE.Color(0x8a7358) }));
   B.material('metal', col(0x8d9199, { metalness: 0.88, roughness: 0.38, env: 1.0 }));
   B.material('metalDark', col(0x3a3f47, { metalness: 0.85, roughness: 0.45, env: 1.0 }));
-  B.material('rust', col(0x8b4a2b, { metalness: 0.35, roughness: 0.9 }));
-  B.material('tankBlue', col(0x2f6fb0, { roughness: 0.55, metalness: 0.12 }));
+  B.material('rust', scan('rust', col(0x8b4a2b, { metalness: 0.35, roughness: 0.9 })));
+  B.material('tankBlue', scan('plaster_white', col(0x2f6fb0, { roughness: 0.55, metalness: 0.12 }),
+    { color: new THREE.Color(0x2f6fb0), roughness: 0.55, metalness: 0 }));
   B.material('tankBlack', col(0x24262b, { roughness: 0.6, metalness: 0.15 }));
   B.material('vegetation', col(0x2f5d34, { roughness: 0.95 }));
-  B.material('rock', col(0x3c4a38, { roughness: 1.0 }));
+  B.material('rock', scan('rock', col(0x3c4a38, { roughness: 1.0 })));
   B.material('copBlue', col(0x1b2a4a, { roughness: 0.42, metalness: 0.2 }));
   B.material('copWhite', col(0xd9dde3, { roughness: 0.45, metalness: 0.15 }));
   B.material('lightRed', col(0xd62828, { emissive: 0xd62828, emissiveIntensity: 2.2, roughness: 0.4 }));
   B.material('lightBlue', col(0x2b6cd6, { emissive: 0x2b6cd6, emissiveIntensity: 2.2, roughness: 0.4 }));
   B.material('glass', col(0x1d2733, { roughness: 0.08, metalness: 0.6, env: 1.3 }));
   B.material('tire', col(0x1c1c1e, { roughness: 0.95 }));
-  B.material('paint', col(0xf0ede2, { side: THREE.DoubleSide }));
+  B.material('paint', scan('concrete_wall', col(0xf0ede2, { side: THREE.DoubleSide }),
+    { color: new THREE.Color(0xf0ede2), side: THREE.DoubleSide }));
   B.material('paintYellow', col(0xf2c33d, { side: THREE.DoubleSide }));
   B.material('pitch', col(0x2f6b45, { roughness: 0.92 }));
   B.material('pitchLine', col(0xe8e8e0, { side: THREE.DoubleSide }));
   B.material('fence', col(0x9aa0a6, { transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
-  B.material('chapel', col(0xf2ece0, { roughness: 0.85 }));
+  B.material('chapel', scan('plaster_plain', col(0xf2ece0, { roughness: 0.85 }),
+    { color: new THREE.Color(0xf2ece0) }));
   B.material('chapelTrim', col(0x5b7fb0));
-  B.material('cross', col(0xe8e4d8, { roughness: 0.8 }));
+  B.material('cross', scan('concrete_wall', col(0xe8e4d8, { roughness: 0.8 }),
+    { color: new THREE.Color(0xe8e4d8) }));
   B.material('speaker', col(0x1a1a1c, { roughness: 0.7 }));
   B.material('bulb', col(0xffe9a8, { emissive: 0xffcc55, emissiveIntensity: 3.0 }));
-  B.material('van', col(0xe8e2d0, { roughness: 0.4, metalness: 0.2 }));
+  B.material('van', col(0xe8e2d0, { roughness: 0.32, metalness: 0.25 }));
   B.material('vanTrim', col(0x3f8f7f));
   ['cloth0', 'cloth1', 'cloth2', 'cloth3'].forEach((k, i) =>
     B.material(k, col([0xe94f37, 0x3ac4c4, 0xf5d547, 0xf1f1e6][i], { side: THREE.DoubleSide })));
@@ -342,7 +415,7 @@ function buildTerrain(B, rng) {
     // Only deep enough to reach past the terrace below - any more and the
     // exposed side becomes a huge blank retaining wall filling the view.
     const h = 6.5;
-    const mat = t.id === 'plaza' ? 'asphalt' : t.id === 'market' ? 'concrete' : 'dirt';
+    const mat = t.id === 'plaza' ? 'paving' : t.id === 'market' ? 'concreteDark' : 'dirt';
     B.box(mat, cx, t.y - h / 2, cz, w, h, d, { texScale: 0.2, tag: 'ground' });
     // faced in block so the drop between terraces reads as built, not carved
     B.box('brick', cx, t.y - 1.9, t.z1 - 0.06, w, 3.8, 0.14, { solid: false, texScale: 0.45 });
@@ -766,7 +839,8 @@ function infillTerrace(B, rng, index, meta) {
 /* ── the block house ────────────────────────────────────────────── */
 function buildHouse(B, rng, x, baseY, z, w, d, floors, meta, terraceIndex, opts = {}) {
   const h = floors * FLOOR_H;
-  const wallMat = opts.wall || (rng.chance(0.26) ? 'brick' : 'plaster' + rng.int(0, FAVELA_COLORS.length - 1));
+  const wallMat = opts.wall || (rng.chance(0.26) ? (rng.chance(0.4) ? 'brickAlt' : 'brick')
+    : 'plaster' + rng.int(0, FAVELA_COLORS.length - 1));
 
   B.box(wallMat, x, baseY + h / 2, z, w, h, d, { texScale: 0.42, tag: 'building' });
 
@@ -808,7 +882,7 @@ function buildHouse(B, rng, x, baseY, z, w, d, floors, meta, terraceIndex, opts 
       [0, -pd / 2, pw, 0.26], [0, pd / 2, pw, 0.26],
       [-pw / 2, 0, 0.26, pd], [pw / 2, 0, 0.26, pd]]) {
       if (rng.chance(0.2)) continue;
-      B.box(rng.chance(0.5) ? 'brick' : 'concreteDark', x + sx, roofY + 0.26 + ph / 2, z + sz2,
+      B.box(rng.chance(0.5) ? (rng.chance(0.4) ? 'brickAlt' : 'brick') : 'concreteDark', x + sx, roofY + 0.26 + ph / 2, z + sz2,
         bw, ph, bd, { texScale: 0.6, tag: 'parapet' });
     }
   }
@@ -876,9 +950,9 @@ function buildExternalStair(B, rng, x, baseY, z, w, d, h) {
 
 function buildShack(B, rng, x, baseY, z) {
   const w = rng.range(3.2, 4.8), d = rng.range(3, 4.6), h = rng.range(2.4, 3.0);
-  const mat = rng.chance(0.45) ? 'corrugated' : rng.chance(0.5) ? 'wood' : 'brick';
+  const mat = rng.chance(0.45) ? roofSheet(rng) : rng.chance(0.5) ? 'wood' : 'brick';
   B.box(mat, x, baseY + h / 2, z, w, h, d, { texScale: 0.6, tag: 'shack' });
-  B.box('corrugated', x, baseY + h + 0.1, z, w + 0.7, 0.2, d + 0.7, { texScale: 0.7, tag: 'roof' });
+  B.box(roofSheet(rng), x, baseY + h + 0.1, z, w + 0.7, 0.2, d + 0.7, { texScale: 0.7, tag: 'roof' });
   if (rng.chance(0.5)) B.cylinder('tire', x + w / 2 + 0.1, baseY + h + 0.3, z, 0.5, 0.5, 0.2, 10, {});
 }
 
@@ -924,7 +998,7 @@ function buildStair(B, rng, x, yLow, yHigh, zTop, grand) {
   for (let i = 0; i < steps; i++) {
     const top = riser * (i + 1);
     const z = zTop + tread * (steps - i) - tread / 2;
-    B.box(grand && i % 2 === 0 ? 'paint' : 'concreteDark', x, yLow + top / 2, z, width, top, tread,
+    B.box(grand && i % 2 === 0 ? 'paint' : 'stair', x, yLow + top / 2, z, width, top, tread,
       { texScale: 0.7, tag: 'stair' });
   }
   const run = steps * tread;

@@ -1,0 +1,659 @@
+{
+  "version": 1,
+  "license": {
+    "name": "CC0 1.0 Universal (Public Domain Dedication)",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "materials": [
+    {
+      "slug": "brick_red",
+      "source": "ambientcg",
+      "id": "Bricks097",
+      "size": 1024,
+      "tile": 1,
+      "use": "primary exposed-brick walls",
+      "maps": {
+        "color": "materials/brick_red/color.webp",
+        "normal": "materials/brick_red/normal.webp",
+        "arm": "materials/brick_red/arm.webp"
+      }
+    },
+    {
+      "slug": "brick_orange",
+      "source": "ambientcg",
+      "id": "Bricks051",
+      "size": 1024,
+      "tile": 1,
+      "use": "newer brick walls",
+      "maps": {
+        "color": "materials/brick_orange/color.webp",
+        "normal": "materials/brick_orange/normal.webp",
+        "arm": "materials/brick_orange/arm.webp"
+      }
+    },
+    {
+      "slug": "plaster_orange",
+      "source": "ambientcg",
+      "id": "PaintedPlaster013",
+      "size": 1024,
+      "tile": 2,
+      "use": "orange render peeling to brick",
+      "maps": {
+        "color": "materials/plaster_orange/color.webp",
+        "normal": "materials/plaster_orange/normal.webp",
+        "arm": "materials/plaster_orange/arm.webp"
+      }
+    },
+    {
+      "slug": "plaster_yellow",
+      "source": "ambientcg",
+      "id": "PaintedPlaster007",
+      "size": 1024,
+      "tile": 2,
+      "use": "yellow render peeling to brick",
+      "maps": {
+        "color": "materials/plaster_yellow/color.webp",
+        "normal": "materials/plaster_yellow/normal.webp",
+        "arm": "materials/plaster_yellow/arm.webp"
+      }
+    },
+    {
+      "slug": "plaster_worn",
+      "source": "ambientcg",
+      "id": "PaintedPlaster008",
+      "size": 1024,
+      "tile": 2,
+      "use": "blue-grey render peeling to brick",
+      "maps": {
+        "color": "materials/plaster_worn/color.webp",
+        "normal": "materials/plaster_worn/normal.webp",
+        "arm": "materials/plaster_worn/arm.webp"
+      }
+    },
+    {
+      "slug": "plaster_blue",
+      "source": "ambientcg",
+      "id": "PaintedPlaster002",
+      "size": 512,
+      "tile": 2,
+      "use": "painted blue walls",
+      "maps": {
+        "color": "materials/plaster_blue/color.webp",
+        "normal": "materials/plaster_blue/normal.webp",
+        "arm": "materials/plaster_blue/arm.webp"
+      }
+    },
+    {
+      "slug": "plaster_green",
+      "source": "ambientcg",
+      "id": "PaintedPlaster003",
+      "size": 512,
+      "tile": 2,
+      "use": "painted green walls",
+      "maps": {
+        "color": "materials/plaster_green/color.webp",
+        "normal": "materials/plaster_green/normal.webp",
+        "arm": "materials/plaster_green/arm.webp"
+      }
+    },
+    {
+      "slug": "plaster_white",
+      "source": "ambientcg",
+      "id": "PaintedPlaster016",
+      "size": 512,
+      "tile": 2,
+      "use": "weathered white walls",
+      "maps": {
+        "color": "materials/plaster_white/color.webp",
+        "normal": "materials/plaster_white/normal.webp",
+        "arm": "materials/plaster_white/arm.webp"
+      }
+    },
+    {
+      "slug": "plaster_plain",
+      "source": "ambientcg",
+      "id": "Plaster006",
+      "size": 1024,
+      "tile": 2.5,
+      "use": "neutral render, tinted per house colour",
+      "maps": {
+        "color": "materials/plaster_plain/color.webp",
+        "normal": "materials/plaster_plain/normal.webp",
+        "arm": "materials/plaster_plain/arm.webp"
+      }
+    },
+    {
+      "slug": "concrete_wall",
+      "source": "ambientcg",
+      "id": "Concrete034",
+      "size": 1024,
+      "tile": 2,
+      "use": "raw concrete walls and stair flanks",
+      "maps": {
+        "color": "materials/concrete_wall/color.webp",
+        "normal": "materials/concrete_wall/normal.webp",
+        "arm": "materials/concrete_wall/arm.webp"
+      }
+    },
+    {
+      "slug": "concrete_slab",
+      "source": "ambientcg",
+      "id": "Concrete031",
+      "size": 1024,
+      "tile": 2,
+      "use": "terrace slabs and rooftops",
+      "maps": {
+        "color": "materials/concrete_slab/color.webp",
+        "normal": "materials/concrete_slab/normal.webp",
+        "arm": "materials/concrete_slab/arm.webp"
+      }
+    },
+    {
+      "slug": "corrugated",
+      "source": "ambientcg",
+      "id": "CorrugatedSteel005",
+      "size": 1024,
+      "tile": 1.2,
+      "use": "bare galvanised roof sheeting",
+      "maps": {
+        "color": "materials/corrugated/color.webp",
+        "normal": "materials/corrugated/normal.webp",
+        "arm": "materials/corrugated/arm.webp"
+      }
+    },
+    {
+      "slug": "corrugated_red",
+      "source": "ambientcg",
+      "id": "CorrugatedSteel002",
+      "size": 512,
+      "tile": 1.2,
+      "use": "red-painted roof sheeting",
+      "maps": {
+        "color": "materials/corrugated_red/color.webp",
+        "normal": "materials/corrugated_red/normal.webp",
+        "arm": "materials/corrugated_red/arm.webp"
+      }
+    },
+    {
+      "slug": "corrugated_green",
+      "source": "ambientcg",
+      "id": "CorrugatedSteel006A",
+      "size": 512,
+      "tile": 1.2,
+      "use": "green-painted roof sheeting",
+      "maps": {
+        "color": "materials/corrugated_green/color.webp",
+        "normal": "materials/corrugated_green/normal.webp",
+        "arm": "materials/corrugated_green/arm.webp"
+      }
+    },
+    {
+      "slug": "asphalt",
+      "source": "ambientcg",
+      "id": "Asphalt033",
+      "size": 1024,
+      "tile": 2,
+      "use": "the road at the foot of the hill",
+      "maps": {
+        "color": "materials/asphalt/color.webp",
+        "normal": "materials/asphalt/normal.webp",
+        "arm": "materials/asphalt/arm.webp"
+      }
+    },
+    {
+      "slug": "paving_brick",
+      "source": "ambientcg",
+      "id": "PavingStones092",
+      "size": 1024,
+      "tile": 1,
+      "use": "plaza and market paving",
+      "maps": {
+        "color": "materials/paving_brick/color.webp",
+        "normal": "materials/paving_brick/normal.webp",
+        "arm": "materials/paving_brick/arm.webp"
+      }
+    },
+    {
+      "slug": "paving_stone",
+      "source": "ambientcg",
+      "id": "PavingStones128",
+      "size": 512,
+      "tile": 2,
+      "use": "stair treads and landings",
+      "maps": {
+        "color": "materials/paving_stone/color.webp",
+        "normal": "materials/paving_stone/normal.webp",
+        "arm": "materials/paving_stone/arm.webp"
+      }
+    },
+    {
+      "slug": "dirt",
+      "source": "ambientcg",
+      "id": "Ground079S",
+      "size": 1024,
+      "tile": 2,
+      "use": "dirt alleys and unpaved ground",
+      "maps": {
+        "color": "materials/dirt/color.webp",
+        "normal": "materials/dirt/normal.webp",
+        "arm": "materials/dirt/arm.webp"
+      }
+    },
+    {
+      "slug": "rock",
+      "source": "ambientcg",
+      "id": "Rock030",
+      "size": 512,
+      "tile": 2,
+      "use": "exposed hillside rock",
+      "maps": {
+        "color": "materials/rock/color.webp",
+        "normal": "materials/rock/normal.webp",
+        "arm": "materials/rock/arm.webp"
+      }
+    },
+    {
+      "slug": "planks",
+      "source": "ambientcg",
+      "id": "Planks023A",
+      "size": 512,
+      "tile": 2,
+      "use": "timber shack walls, doors, market stalls",
+      "maps": {
+        "color": "materials/planks/color.webp",
+        "normal": "materials/planks/normal.webp",
+        "arm": "materials/planks/arm.webp"
+      }
+    },
+    {
+      "slug": "rust",
+      "source": "ambientcg",
+      "id": "Metal021",
+      "size": 512,
+      "tile": 2,
+      "use": "rusted metal, water tanks, railings",
+      "maps": {
+        "color": "materials/rust/color.webp",
+        "normal": "materials/rust/normal.webp",
+        "arm": "materials/rust/arm.webp"
+      }
+    },
+    {
+      "slug": "azulejo",
+      "source": "ambientcg",
+      "id": "Tiles101",
+      "size": 512,
+      "tile": 0.6,
+      "use": "tiled shopfronts",
+      "maps": {
+        "color": "materials/azulejo/color.webp",
+        "normal": "materials/azulejo/normal.webp",
+        "arm": "materials/azulejo/arm.webp"
+      }
+    },
+    {
+      "slug": "cloth",
+      "source": "ambientcg",
+      "id": "Fabric030",
+      "size": 512,
+      "tile": 0.25,
+      "use": "shirt and trouser weave",
+      "maps": {
+        "normal": "materials/cloth/normal.webp",
+        "arm": "materials/cloth/arm.webp"
+      }
+    },
+    {
+      "slug": "denim",
+      "source": "ambientcg",
+      "id": "Fabric077",
+      "size": 512,
+      "tile": 0.25,
+      "use": "jeans twill",
+      "maps": {
+        "normal": "materials/denim/normal.webp",
+        "arm": "materials/denim/arm.webp"
+      }
+    },
+    {
+      "slug": "leather",
+      "source": "ambientcg",
+      "id": "Leather028",
+      "size": 512,
+      "tile": 0.3,
+      "use": "vests, boots, holsters, gear straps",
+      "maps": {
+        "normal": "materials/leather/normal.webp",
+        "arm": "materials/leather/arm.webp"
+      }
+    }
+  ],
+  "props": [
+    {
+      "id": "modular_chainlink_fence",
+      "source": "polyhaven",
+      "file": "props/modular_chainlink_fence.glb",
+      "use": "court cage, alley fencing, rooftop edges",
+      "authors": {
+        "name": "Modular Chainlink Fence",
+        "authors": [
+          "James Ray Cock",
+          "Amal Kumar"
+        ]
+      }
+    },
+    {
+      "id": "modular_electricity_poles",
+      "source": "polyhaven",
+      "file": "props/modular_electricity_poles.glb",
+      "use": "power poles along the lanes",
+      "authors": {
+        "name": "Modular Electricity Poles",
+        "authors": [
+          "James Ray Cock"
+        ]
+      }
+    },
+    {
+      "id": "modular_electric_cables",
+      "source": "polyhaven",
+      "file": "props/modular_electric_cables.glb",
+      "use": "the overhead cable tangle between poles",
+      "authors": {
+        "name": "Modular Electric Cables",
+        "authors": [
+          "Kuutti Siitonen"
+        ]
+      }
+    },
+    {
+      "id": "modular_metal_gutter",
+      "source": "polyhaven",
+      "file": "props/modular_metal_gutter.glb",
+      "use": "downpipes and gutters on the facades",
+      "authors": {
+        "name": "Modular Metal Gutter",
+        "authors": [
+          "Maxim Domnin"
+        ]
+      }
+    },
+    {
+      "id": "modular_pipes",
+      "source": "polyhaven",
+      "file": "props/modular_pipes.glb",
+      "use": "surface plumbing runs up the walls",
+      "authors": {
+        "name": "Modular Pipes",
+        "authors": [
+          "Kuutti Siitonen"
+        ]
+      }
+    },
+    {
+      "id": "modular_fire_escape",
+      "source": "polyhaven",
+      "file": "props/modular_fire_escape.glb",
+      "use": "external stair runs on the taller blocks",
+      "authors": {
+        "name": "Modular Fire Escape",
+        "authors": [
+          "Juniix"
+        ]
+      }
+    },
+    {
+      "id": "exterior_aircon_unit",
+      "source": "polyhaven",
+      "file": "props/exterior_aircon_unit.glb",
+      "use": "wall-mounted air conditioners",
+      "authors": {
+        "name": "Exterior Aircon Unit",
+        "authors": [
+          "Monsta3D"
+        ]
+      }
+    },
+    {
+      "id": "rollershutter_door",
+      "source": "polyhaven",
+      "file": "props/rollershutter_door.glb",
+      "use": "closed shopfronts at street level",
+      "authors": {
+        "name": "Rollershutter Door",
+        "authors": [
+          "MP"
+        ]
+      }
+    },
+    {
+      "id": "rollershutter_window_01",
+      "source": "polyhaven",
+      "file": "props/rollershutter_window_01.glb",
+      "use": "graffitied shutters",
+      "authors": {
+        "name": "Rollershutter Window 01",
+        "authors": [
+          "MP"
+        ]
+      }
+    },
+    {
+      "id": "rollershutter_window_03",
+      "source": "polyhaven",
+      "file": "props/rollershutter_window_03.glb",
+      "use": "graffitied shutters (variant)",
+      "authors": {
+        "name": "Rollershutter Window 03",
+        "authors": [
+          "MP"
+        ]
+      }
+    },
+    {
+      "id": "utility_box_01",
+      "source": "polyhaven",
+      "file": "props/utility_box_01.glb",
+      "use": "street-side utility cabinets",
+      "authors": {
+        "name": "Utility Box 01",
+        "authors": [
+          "James Ray Cock"
+        ]
+      }
+    },
+    {
+      "id": "utility_box_02",
+      "source": "polyhaven",
+      "file": "props/utility_box_02.glb",
+      "use": "street-side utility cabinets (large)",
+      "authors": {
+        "name": "Utility Box 02",
+        "authors": [
+          "James Ray Cock"
+        ]
+      }
+    },
+    {
+      "id": "water_manhole_cover",
+      "source": "polyhaven",
+      "file": "props/water_manhole_cover.glb",
+      "use": "manholes in the plaza and road",
+      "authors": {
+        "name": "Water Manhole Cover",
+        "authors": [
+          "Raunox"
+        ]
+      }
+    },
+    {
+      "id": "propane_tank",
+      "source": "polyhaven",
+      "file": "props/propane_tank.glb",
+      "use": "gas bottles beside doorways",
+      "authors": {
+        "name": "Propane Tank",
+        "authors": [
+          "Slinc"
+        ]
+      }
+    },
+    {
+      "id": "small_lpg_tank",
+      "source": "polyhaven",
+      "file": "props/small_lpg_tank.glb",
+      "use": "gas bottles beside doorways (small)",
+      "authors": {
+        "name": "Small Lpg Tank",
+        "authors": [
+          "Ulan Cabanilla"
+        ]
+      }
+    },
+    {
+      "id": "Barrel_01",
+      "source": "polyhaven",
+      "file": "props/Barrel_01.glb",
+      "use": "steel drums used as cover",
+      "authors": {
+        "name": "Barrel_01",
+        "authors": [
+          "Jorge Camacho"
+        ]
+      }
+    },
+    {
+      "id": "Barrel_02",
+      "source": "polyhaven",
+      "file": "props/Barrel_02.glb",
+      "use": "blue plastic water drums",
+      "authors": {
+        "name": "Barrel 02",
+        "authors": [
+          "Jorge Camacho"
+        ]
+      }
+    },
+    {
+      "id": "barrel_stove",
+      "source": "polyhaven",
+      "file": "props/barrel_stove.glb",
+      "use": "burnt-out oil drums",
+      "authors": {
+        "name": "Barrel Stove",
+        "authors": [
+          "MP"
+        ]
+      }
+    },
+    {
+      "id": "metal_trash_can",
+      "source": "polyhaven",
+      "file": "props/metal_trash_can.glb",
+      "use": "bins along the lanes",
+      "authors": {
+        "name": "Metal Trash Can",
+        "authors": [
+          "GurJas Studios"
+        ]
+      }
+    },
+    {
+      "id": "old_tyre",
+      "source": "polyhaven",
+      "file": "props/old_tyre.glb",
+      "use": "tyre piles",
+      "authors": {
+        "name": "Old Tyre",
+        "authors": [
+          "MP"
+        ]
+      }
+    },
+    {
+      "id": "cardboard_box_01",
+      "source": "polyhaven",
+      "file": "props/cardboard_box_01.glb",
+      "use": "stacked boxes behind the market",
+      "authors": {
+        "name": "Cardboard Box 01",
+        "authors": [
+          "Rahul Chaudhary"
+        ]
+      }
+    },
+    {
+      "id": "concrete_road_barrier",
+      "source": "polyhaven",
+      "file": "props/concrete_road_barrier.glb",
+      "use": "police roadblock at the foot of the hill",
+      "authors": {
+        "name": "Concrete Road Barrier",
+        "authors": [
+          "Amal Kumar"
+        ]
+      }
+    },
+    {
+      "id": "covered_car",
+      "source": "polyhaven",
+      "file": "props/covered_car.glb",
+      "use": "the tarped car on the lower street",
+      "authors": {
+        "name": "Covered Car",
+        "authors": [
+          "MP"
+        ]
+      }
+    },
+    {
+      "id": "ladder_sectioned_01",
+      "source": "polyhaven",
+      "file": "props/ladder_sectioned_01.glb",
+      "use": "ladders against the roof edges",
+      "authors": {
+        "name": "Ladder Sectioned 01",
+        "authors": [
+          "MP"
+        ]
+      }
+    },
+    {
+      "id": "wooden_ladder",
+      "source": "polyhaven",
+      "file": "props/wooden_ladder.glb",
+      "use": "ladders against the roof edges (timber)",
+      "authors": {
+        "name": "Wooden Ladder",
+        "authors": [
+          "Miroslav Turura"
+        ]
+      }
+    },
+    {
+      "id": "SchoolChair_01",
+      "source": "polyhaven",
+      "file": "props/SchoolChair_01.glb",
+      "use": "plastic chairs outside the bar",
+      "authors": {
+        "name": "School Chair 01",
+        "authors": [
+          "Ethan Place"
+        ]
+      }
+    }
+  ],
+  "hdris": [
+    {
+      "id": "autumn_field_puresky",
+      "source": "polyhaven",
+      "file": "hdri/autumn_field_puresky_1k.hdr",
+      "use": "sky dome, image-based lighting and sun direction",
+      "name": "Autumn Field (Pure Sky)",
+      "authors": [
+        "Jarod Guest",
+        "Sergej Majboroda"
+      ]
+    }
+  ]
+}

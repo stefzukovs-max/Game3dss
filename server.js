@@ -20,6 +20,10 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.webmanifest': 'application/manifest+json',
+  '.webp': 'image/webp',
+  '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.hdr': 'image/vnd.radiance',
 };
 
 const server = http.createServer((req, res) => {

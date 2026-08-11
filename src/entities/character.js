@@ -74,22 +74,39 @@ const torsoGeo = (broad) =>
 
 /* ── merged, vertex-coloured parts ────────────────────────────────── */
 export class PartMesh {
-  constructor() { this.pos = []; this.nor = []; this.col = []; }
+  constructor() { this.pos = []; this.nor = []; this.col = []; this.uv = []; }
 
   /** @param {THREE.BufferGeometry} geo @param {THREE.Matrix4} m @param {number} hex */
   add(geo, m, hex) {
     const g = geo.index ? geo.toNonIndexed() : geo;
     const p = g.attributes.position.array;
     const n = g.attributes.normal.array;
+    const uv = g.attributes.uv?.array;
     const nm = _nm.getNormalMatrix(m);
     _c.setHex(hex, THREE.SRGBColorSpace);
 
-    for (let i = 0; i < p.length; i += 3) {
+    /*
+     * UVs get rescaled into world units, for the same reason the level's boxes
+     * do. Every primitive here — capsule, sphere, lathe — has UVs running 0..1
+     * whatever its size, so a shared fabric texture would come out at a
+     * different weave density on a forearm than on a torso. Approximating u as
+     * the transformed circumference and v as the transformed height puts every
+     * part on the same scale, and the material's repeat then sets the weave.
+     */
+    g.computeBoundingBox();
+    const bb = g.boundingBox;
+    _v.subVectors(bb.max, bb.min);
+    const sx = m.elements[0], sy = m.elements[5], sz = m.elements[10];
+    const su = Math.PI * (Math.abs(_v.x * sx) + Math.abs(_v.z * sz)) / 2;
+    const sv = Math.abs(_v.y * sy);
+
+    for (let i = 0, k = 0; i < p.length; i += 3, k += 2) {
       _v.set(p[i], p[i + 1], p[i + 2]).applyMatrix4(m);
       this.pos.push(_v.x, _v.y, _v.z);
       _v.set(n[i], n[i + 1], n[i + 2]).applyMatrix3(nm).normalize();
       this.nor.push(_v.x, _v.y, _v.z);
       this.col.push(_c.r, _c.g, _c.b);
+      this.uv.push(uv ? uv[k] * su : 0, uv ? uv[k + 1] * sv : 0);
     }
   }
 
@@ -100,6 +117,7 @@ export class PartMesh {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     g.computeBoundingSphere();
     return g;
   }
@@ -121,6 +139,56 @@ export const BODY_MATERIAL = new THREE.MeshStandardMaterial({
 export const GEAR_MATERIAL = new THREE.MeshStandardMaterial({
   vertexColors: true, roughness: 0.38, metalness: 0.82, envMapIntensity: 1.0,
 });
+
+/**
+ * Give the bodies real cloth and leather microsurface.
+ *
+ * There is no free, redistributable, rigged photoreal human to load — see
+ * CREDITS.md for what was checked and why each candidate was rejected — so the
+ * characters stay procedural. What the CC0 pack can do for them is shading: a
+ * measured woven-cotton normal on the bodies and a leather grain on the gear.
+ *
+ * Only the normal and roughness are taken. Colour stays with the per-outfit
+ * vertex tint, because the whole roster's identity is in those palettes and a
+ * scanned albedo would flatten ten distinct operators into one grey crowd.
+ *
+ * The maps land on skin and hair as well as clothing — one merged mesh per
+ * character is what keeps the crowd affordable, and splitting it in two to
+ * mask a sub-millimetre normal perturbation on a 12 cm head would double the
+ * draw calls for something invisible at gameplay distance. `normalScale` is
+ * kept low for the same reason: this is meant to stop fabric reading as
+ * painted plastic, not to make anyone look knitted.
+ */
+export function applyCharacterMaterials(assets) {
+  if (!assets?.ready) return false;
+  const cloth = assets.material('cloth');
+  const leather = assets.material('leather');
+
+  const wrap = (t, repeat) => {
+    if (!t) return null;
+    const c = t.clone();
+    c.needsUpdate = true;
+    c.wrapS = c.wrapT = THREE.RepeatWrapping;
+    c.repeat.set(repeat, repeat);
+    return c;
+  };
+
+  if (cloth?.normal) {
+    BODY_MATERIAL.normalMap = wrap(cloth.normal, 4);
+    BODY_MATERIAL.normalScale = new THREE.Vector2(0.35, 0.35);
+    BODY_MATERIAL.needsUpdate = true;
+  }
+  if (leather?.normal) {
+    GEAR_MATERIAL.normalMap = wrap(leather.normal, 6);
+    GEAR_MATERIAL.normalScale = new THREE.Vector2(0.5, 0.5);
+    GEAR_MATERIAL.needsUpdate = true;
+  }
+  // a real environment lights these properly now; the old values were dialled
+  // down to compensate for the analytic sky being too dim to flatter anything
+  BODY_MATERIAL.envMapIntensity = 0.9;
+  GEAR_MATERIAL.envMapIntensity = 1.2;
+  return true;
+}
 
 /* ── outfits ──────────────────────────────────────────────────────────
  * A small preset table rather than free randomisation: the crew reads as a

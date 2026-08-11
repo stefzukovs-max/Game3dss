@@ -34,6 +34,16 @@ const out = await page.evaluate(async () => {
    * genuinely open stretch on the map. Benching among the houses measures how
    * often the cone clips a wall, not how accurate the weapon is.
    */
+  /*
+   * Take the set dressing out of the field of fire. A gas bottle standing
+   * where the dummy should be turns an accuracy measurement into a test of
+   * where the props happened to land, which is not what this bench is for —
+   * and unlike the houses, the props move whenever their seed or density
+   * changes, so the numbers would stop being comparable between runs.
+   */
+  g.props?.root && (g.props.root.visible = false);
+  for (const b of g.world.collision.boxes) if (b.tag === 'prop') b.off = true;
+
   const reset = () => {
     for (const a of g.agents) a.dispose();
     g.agents.length = 0;

@@ -39,18 +39,34 @@ const VIEWS = [
   ['c-alley',   [-40, 9, 4],   [-30, 6, -12]],
   ['d-summit',  [22, 22, -30], [0, 17, -56]],
   ['e-tower',   [-16, 14, -18],[-2, 13, -30]],
+  // Eye level in a lane — the only views that show whether the set dressing
+  // sits on the ground properly and reads at the scale a player sees it.
+  // `eye` means "1.65 m above whatever the ground turns out to be here", so
+  // these stay valid when the terraces move.
+  ['f-lane',    [4, 'eye', 34],   [2, 'eye', 10]],
+  ['g-doorway', [-34, 'eye', 20], [-26, 'eye', 6]],
 ];
 
 for (const [name, pos, look] of VIEWS) {
   await p.evaluate(([q, l]) => {
     const g = window.__game;
+    const eye = (a) => {
+      if (a[1] !== 'eye') return a;
+      const y = g.world.collision.groundHeight(a[0], a[2], 60, 0.4);
+      return [a[0], (y > -5.9 ? y : 0) + 1.65, a[2]];
+    };
+    q = eye(q); l = eye(l);
     g.camera.position.set(q[0], q[1], q[2]);
     g.camera.lookAt(l[0], l[1], l[2]);
     g.camera.fov = 60;
     g.camera.updateProjectionMatrix();
+    // Re-anchor the shadow frustum on whatever we are looking at, without
+    // changing the sun's *direction* — read it back off the light itself
+    // rather than off the procedural preset, so this stays correct once the
+    // direction is coming from the HDRI instead.
+    const dir = g.sun.position.clone().sub(g.sun.target.position).normalize();
     g.sun.target.position.set(l[0], l[1], l[2]);
-    if (g.sky) g.sun.position.set(l[0], l[1], l[2]).addScaledVector(g.sky.preset.sunDir, 90);
-    else g.sun.position.set(l[0] - 55, l[1] + 70, l[2] + 45);
+    g.sun.position.set(l[0], l[1], l[2]).addScaledVector(dir, 90);
     g.sun.target.updateMatrixWorld();
     if (g.world?.sky) g.world.sky.position.copy(g.camera.position);
     if (g.skyDome) g.skyDome.position.copy(g.camera.position);
