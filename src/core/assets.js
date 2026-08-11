@@ -38,6 +38,7 @@ export class AssetLibrary {
     this.manifest = null;
     this.materials = new Map();   // slug → { color, normal, arm }
     this.props = new Map();       // id   → THREE.Group (template, never added to a scene)
+    this.models = new Map();      // slot → THREE.Group (weapons, vehicles)
     this.env = null;              // PMREM cubemap for scene.environment
     this.background = null;       // equirect DataTexture for scene.background
     this.sun = null;              // { dir: Vector3, color: Color }
@@ -65,7 +66,8 @@ export class AssetLibrary {
     // Weight the progress bar by real work, not by item count: the HDRI is one
     // file but a tenth of the wait, and a bar that sticks at 4% then jumps is
     // worse than no bar.
-    const units = 8 + (this.manifest.materials?.length ?? 0) * (detail ? 3 : 1) + props.length * 3;
+    const units = 8 + (this.manifest.materials?.length ?? 0) * (detail ? 3 : 1)
+      + props.length * 3 + (this.manifest.models?.length ?? 0);
     let done = 0;
     const tick = (n, msg) => { done += n; onProgress(Math.min(done / units, 1), msg); };
 
@@ -81,6 +83,26 @@ export class AssetLibrary {
       for (const p of props) {
         await this._loadProp(gltf, p);
         tick(3, 'Dressing the hillside…');
+      }
+    }
+
+    // Weapons and vehicles are small and always needed — a player without a
+    // gun is not a playable state, so these load on every tier.
+    if (this.manifest.models?.length) {
+      const gltf = new GLTFLoader();
+      for (const m of this.manifest.models) {
+        try {
+          const g = await gltf.loadAsync(BASE + m.file);
+          g.scene.traverse((o) => {
+            if (!o.isMesh) return;
+            o.castShadow = true;
+            o.receiveShadow = true;
+            if (o.material) o.material.envMapIntensity = 1.0;
+          });
+          this.models.set(`${m.pack}:${m.slot}`, g.scene);
+        } catch (e) {
+          console.warn(`[assets] model ${m.pack}/${m.slot} failed —`, e.message);
+        }
       }
     }
 
@@ -157,6 +179,12 @@ export class AssetLibrary {
   }
 
   /* ── accessors ────────────────────────────────────────────────────── */
+
+  /** A fresh instance of a packed model, e.g. `model('guns', 'rifle')`. */
+  model(pack, slot) {
+    const t = this.models.get(`${pack}:${slot}`);
+    return t ? t.clone(true) : null;
+  }
 
   /** The raw texture set for a slug, or null when the pack is absent. */
   material(slug) { return this.materials.get(slug) ?? null; }

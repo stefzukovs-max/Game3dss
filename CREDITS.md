@@ -90,6 +90,33 @@ WebP and vertex-quantized into a single `.glb`.
 | [Wooden Ladder](https://polyhaven.com/a/wooden_ladder) | Miroslav Turura | ladders against the roof edges (timber) |
 | [School Chair 01](https://polyhaven.com/a/SchoolChair_01) | Ethan Place | plastic chairs outside the bar |
 
+## Weapons and vehicles — Quaternius
+
+<https://quaternius.com> · licence: CC0 1.0, stated in each pack's
+`License.txt`
+
+Quaternius hand-models and releases large game-asset packs under CC0. These are
+the only two things neither photogrammetry library carries — firearms and
+vehicles — and a third-person shooter needs both on screen constantly.
+
+The packs ship as OBJ, FBX and .blend with no glTF, and are distributed through
+itch.io, which has no plain file URLs. `tools/itch-fetch.mjs` performs the
+download handshake and `tools/obj-to-glb.mjs` converts the OBJ sets by running
+them through three.js's own loaders in a headless browser, so `npm run assets`
+still reproduces everything from a clean clone.
+
+| In-game slot | Model | Pack | Kind |
+|---|---|---|---|
+| `pistol` | Pistol_2 | [Ultimate Gun Pack](https://quaternius.com) | guns |
+| `smg` | SubmachineGun_1 | [Ultimate Gun Pack](https://quaternius.com) | guns |
+| `rifle` | AssaultRifle_1 | [Ultimate Gun Pack](https://quaternius.com) | guns |
+| `shotgun` | Shotgun_1 | [Ultimate Gun Pack](https://quaternius.com) | guns |
+| `police` | Cop | [Realistic Car Pack](https://quaternius.com) | cars |
+| `sedan` | NormalCar1 | [Realistic Car Pack](https://quaternius.com) | cars |
+| `sedan2` | NormalCar2 | [Realistic Car Pack](https://quaternius.com) | cars |
+| `suv` | SUV | [Realistic Car Pack](https://quaternius.com) | cars |
+| `taxi` | Taxi | [Realistic Car Pack](https://quaternius.com) | cars |
+
 ## Environment lighting — Poly Haven
 
 | HDRI | Author(s) | Used for |

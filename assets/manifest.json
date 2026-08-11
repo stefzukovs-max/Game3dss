@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "license": {
     "name": "CC0 1.0 Universal (Public Domain Dedication)",
     "url": "https://creativecommons.org/publicdomain/zero/1.0/"
@@ -654,6 +654,71 @@
         "Jarod Guest",
         "Sergej Majboroda"
       ]
+    }
+  ],
+  "models": [
+    {
+      "pack": "guns",
+      "slot": "pistol",
+      "source": "quaternius",
+      "model": "Pistol_2",
+      "file": "models/guns/pistol.glb"
+    },
+    {
+      "pack": "guns",
+      "slot": "smg",
+      "source": "quaternius",
+      "model": "SubmachineGun_1",
+      "file": "models/guns/smg.glb"
+    },
+    {
+      "pack": "guns",
+      "slot": "rifle",
+      "source": "quaternius",
+      "model": "AssaultRifle_1",
+      "file": "models/guns/rifle.glb"
+    },
+    {
+      "pack": "guns",
+      "slot": "shotgun",
+      "source": "quaternius",
+      "model": "Shotgun_1",
+      "file": "models/guns/shotgun.glb"
+    },
+    {
+      "pack": "cars",
+      "slot": "police",
+      "source": "quaternius",
+      "model": "Cop",
+      "file": "models/cars/police.glb"
+    },
+    {
+      "pack": "cars",
+      "slot": "sedan",
+      "source": "quaternius",
+      "model": "NormalCar1",
+      "file": "models/cars/sedan.glb"
+    },
+    {
+      "pack": "cars",
+      "slot": "sedan2",
+      "source": "quaternius",
+      "model": "NormalCar2",
+      "file": "models/cars/sedan2.glb"
+    },
+    {
+      "pack": "cars",
+      "slot": "suv",
+      "source": "quaternius",
+      "model": "SUV",
+      "file": "models/cars/suv.glb"
+    },
+    {
+      "pack": "cars",
+      "slot": "taxi",
+      "source": "quaternius",
+      "model": "Taxi",
+      "file": "models/cars/taxi.glb"
     }
   ]
 }

@@ -394,7 +394,69 @@ function buildGeometry(id) {
   };
 }
 
+/*
+ * ── real weapon models ──
+ * When the CC0 pack is present the procedural guns are replaced outright by
+ * hand-modelled ones. They are authored lying along +X at roughly four times
+ * life size, so each needs a turn onto -Z (down the barrel) and a scale down
+ * to a believable length. `len` is the real-world length in metres the model
+ * is scaled to; `grip` shifts the model so the hand lands on the grip rather
+ * than on the model's arbitrary origin.
+ */
+const PACKED = {
+  pistol:  { len: 0.21, grip: [-0.055, 0.020, 0.020] },
+  smg:     { len: 0.52, grip: [-0.140, 0.028, 0.020] },
+  rifle:   { len: 0.90, grip: [-0.250, 0.030, 0.020] },
+  shotgun: { len: 1.05, grip: [-0.300, 0.028, 0.020] },
+};
+
+let PACK = null;
+/** Hand the weapon system the loaded model pack. Safe to call with null. */
+export function setWeaponModels(assets) {
+  PACK = assets?.ready && assets.models.size ? assets : null;
+  MODEL_CACHE.clear();
+  return !!PACK;
+}
+
+function packedModel(id) {
+  const spec = PACKED[id];
+  const src = spec && PACK?.model('guns', id);
+  if (!src) return null;
+
+  const g = new THREE.Group();
+  const inner = new THREE.Group();
+  // +X → -Z puts the barrel down the shooting axis
+  inner.rotation.y = Math.PI / 2;
+  inner.add(src);
+  g.add(inner);
+
+  // scale from the model's own length, so a pack update cannot silently
+  // produce a rifle the size of a car
+  src.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(src);
+  const size = box.getSize(new THREE.Vector3());
+  const k = spec.len / Math.max(size.x, 1e-6);
+  inner.scale.setScalar(k);
+
+  // recentre on the grip, then find where the barrel actually ends
+  inner.position.set(
+    spec.grip[0] - box.min.x * k, spec.grip[1] - box.min.y * k, spec.grip[2]);
+  g.updateMatrixWorld(true);
+  const world = new THREE.Box3().setFromObject(g);
+
+  const muzzle = new THREE.Object3D();
+  muzzle.position.set(0, (world.min.y + world.max.y) / 2, world.min.z);
+  muzzle.name = 'muzzle';
+  g.add(muzzle);
+  g.userData.muzzle = muzzle;
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
+
 export function buildWeaponModel(id) {
+  const packed = packedModel(id);
+  if (packed) return packed;
+
   let entry = MODEL_CACHE.get(id);
   if (!entry) MODEL_CACHE.set(id, (entry = buildGeometry(id)));
 

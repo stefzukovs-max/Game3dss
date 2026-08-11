@@ -133,12 +133,48 @@ export const HDRIS = [
   { id: 'autumn_field_puresky', res: '1k', use: 'sky dome, image-based lighting and sun direction' },
 ];
 
+/* ── Quaternius model packs (CC0, via itch.io) ───────────────────────────
+ * Hand-modelled rather than scanned, and the only source of the two things
+ * photogrammetry libraries do not carry: firearms and vehicles. Poly Haven has
+ * neither, and a shooter needs both.
+ *
+ * `pick` maps a game slot to a model in the pack. The gun pack ships 40
+ * weapons and 15 attachments; the game uses four, chosen for silhouette —
+ * they have to be distinguishable from each other at a glance in a fight.
+ */
+export const MODEL_PACKS = [
+  {
+    id: 'guns', user: 'quaternius', slug: '50-lowpoly-guns',
+    name: 'Ultimate Gun Pack', dir: 'OBJ', size: 512,
+    use: 'the four carried weapons',
+    pick: {
+      pistol: 'Pistol_2',
+      smg: 'SubmachineGun_1',
+      rifle: 'AssaultRifle_1',
+      shotgun: 'Shotgun_1',
+    },
+  },
+  {
+    id: 'cars', user: 'quaternius', slug: 'lowpoly-cars',
+    name: 'Realistic Car Pack', dir: 'OBJ', size: 512,
+    use: 'the police patrol car and civilian traffic',
+    pick: {
+      police: 'Cop',
+      sedan: 'NormalCar1',
+      sedan2: 'NormalCar2',
+      suv: 'SUV',
+      taxi: 'Taxi',
+    },
+  },
+];
+
 export const LICENSE = {
   name: 'CC0 1.0 Universal (Public Domain Dedication)',
   url: 'https://creativecommons.org/publicdomain/zero/1.0/',
 };
 
 export const SOURCES = {
+  quaternius: { name: 'Quaternius', url: 'https://quaternius.com', license: 'https://creativecommons.org/publicdomain/zero/1.0/' },
   ambientcg: { name: 'ambientCG', url: 'https://ambientcg.com', license: 'https://ambientcg.com/license' },
   polyhaven: { name: 'Poly Haven', url: 'https://polyhaven.com', license: 'https://polyhaven.com/license' },
 };

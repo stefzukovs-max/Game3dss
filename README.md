@@ -119,7 +119,8 @@ npm run assets           # ~29 MB into assets/, and regenerates CREDITS.md
 ```
 
 25 scanned PBR material sets from [ambientCG](https://ambientcg.com), 26 scanned
-props from [Poly Haven](https://polyhaven.com), and one Poly Haven HDRI that
+props from [Poly Haven](https://polyhaven.com), nine hand-modelled weapons and
+vehicles from [Quaternius](https://quaternius.com), and one Poly Haven HDRI that
 serves as sky, image-based lighting and the source of the sun's direction — the
 brightest region of the HDR is measured at load and the directional light is
 placed there, so the shadows agree with the sky instead of being aimed by hand.
@@ -130,6 +131,13 @@ names every author. It also records what was rejected and why — the short
 version is that no free, redistributable, rigged, photorealistic *human* model
 exists that can be fetched without an account, so the characters are still the
 procedural rig and only their shading improved.
+
+The Quaternius packs are distributed through itch.io, which has no plain file
+URLs — a download is a three-step handshake ending in a signed, short-lived
+link — and they ship as OBJ/FBX/.blend with no glTF. `tools/itch-fetch.mjs`
+performs the handshake and `tools/obj-to-glb.mjs` converts the OBJ sets by
+running them through three.js's own loaders in a headless browser, so the whole
+pack still reproduces from a clean clone with one command.
 
 `assets/` is committed, so a clone plays without running the build step. If it
 is missing or a fetch fails, `src/core/assets.js` reports not-ready and the
@@ -148,7 +156,10 @@ models, the characters, and all the audio (synthesised through WebAudio —
 gunshots are a noise burst through a swept resonant filter plus a low body
 thump, distance-attenuated and low-passed).
 
-**Weapons** are built from 2D side-view profiles extruded across the gun's
+**Weapons** are real models from the CC0 pack, scaled from their own measured
+length and turned onto the shooting axis so a pack update cannot silently
+produce a rifle the size of a car. Without the pack they fall back to
+procedural guns built from 2D side-view profiles extruded across the gun's
 width. A firearm read in silhouette *is* its side view — the banana curve of a
 7.62 magazine, the step where a pistol slide meets the frame, the drop of a
 shotgun stock — so extruding that profile gets the shapes right for no more

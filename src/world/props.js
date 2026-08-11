@@ -78,6 +78,20 @@ class PropBatcher {
     return true;
   }
 
+  /**
+   * Place a template the batcher did not resolve from the prop map — the
+   * weapon and vehicle models live in a different collection, but they batch
+   * exactly the same way.
+   */
+  placeObject(key, source, matrix) {
+    if (!source) return false;
+    let e = this.queued.get(key);
+    if (!e) this.queued.set(key, (e = { source, matrices: [] }));
+    e.matrices.push(matrix.clone());
+    this.count++;
+    return true;
+  }
+
   /** Convenience: stand a prop upright at a point with a yaw and scale. */
   stand(id, part, x, y, z, yaw = 0, scale = 1) {
     _q.setFromAxisAngle(_up, yaw);
@@ -340,6 +354,50 @@ export function scatterProps(scene, assets, world, opts = {}) {
       B.stand(id, null, x, y, z, rng.int(0, 3) * Math.PI / 2);
       collision.addBox(x, y + 0.56, z, 0.95, 1.12, 0.5, 'prop');
     }
+  }
+
+  /* ── vehicles ───────────────────────────────────────────────────────
+   * The map records where a marked patrol car belongs; the model goes down
+   * here because only this module has the asset library. Civilian traffic is
+   * parked along the lower street from the same pack, which does more for the
+   * "this is a real place" read than any amount of extra clutter: a street
+   * with cars on it is inhabited.
+   */
+  const placeCar = (slot, x, y, z, yaw) => {
+    const src = assets.models.get(`cars:${slot}`);
+    if (!src) return false;
+    _q.setFromAxisAngle(_up, yaw);
+    B.placeObject(`car:${slot}`, src, _m.compose(_v.set(x, y, z), _q, _s.set(1, 1, 1)));
+    // a car is roughly 1.85 × 4.3 m; the rotated footprint is squared off for
+    // the broadphase, and being generous keeps the AI from clipping through
+    const c = Math.abs(Math.cos(yaw)), sn = Math.abs(Math.sin(yaw));
+    collision.addBox(x, y + 0.62, z, 1.85 * c + 4.3 * sn, 1.25, 1.85 * sn + 4.3 * c, 'vehicle');
+    return true;
+  };
+
+  for (const v of meta.vehicles ?? []) {
+    const y = surface(v.x, v.z, 30);
+    if (y != null) placeCar(v.kind, v.x, y, v.z, v.rotY);
+  }
+
+  /*
+   * Parked civilian traffic along the road at the foot of the hill.
+   *
+   * The height test is the load-bearing part. Sampling the surface is not
+   * enough on its own — the map's perimeter wall runs along the same z, and
+   * `groundHeight` happily reports its coping as ground, which parks a saloon
+   * on top of a ten-metre wall. Requiring the spot to be at road level keeps
+   * the cars on the road.
+   */
+  const CIVIL = ['sedan', 'sedan2', 'suv', 'taxi'];
+  const ROAD_Y = 1.2;
+  for (let i = 0; i < Math.round(16 * density); i++) {
+    const x = rng.range(-52, 52), z = 62 + rng.range(-2.5, 2.5);
+    if (!free(x, z, 3.4)) continue;
+    const y = surface(x, z, 30);
+    if (y == null || y > ROAD_Y) continue;
+    placeCar(CIVIL[rng.int(0, CIVIL.length - 1)], x, y, z,
+      (rng.chance(0.5) ? 0 : Math.PI) + rng.range(-0.05, 0.05));
   }
 
   const built = B.build();

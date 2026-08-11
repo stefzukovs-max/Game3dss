@@ -229,6 +229,8 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
   const tex = buildTextureLibrary();
   const collision = new CollisionWorld();
   const B = new WorldBuilder(collision);
+  // when real models are available the box-built stand-ins step aside
+  B.useModels = !!(opts.assets?.ready && opts.assets.models.size);
 
   /*
    * PBR materials. `detail` adds a Sobel-derived normal map and a luminance
@@ -367,7 +369,7 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
   ['awning0', 'awning1', 'awning2'].forEach((k, i) =>
     B.material(k, col([0xd94f4f, 0x3f8f5f, 0x3f6f9f][i], { side: THREE.DoubleSide })));
 
-  const meta = { spawns: { gang: [], police: [] }, cover: [], pickups: [], houses: [], landmarks: [] };
+  const meta = { spawns: { gang: [], police: [] }, cover: [], pickups: [], houses: [], landmarks: [], vehicles: [] };
 
   onProgress(0.08, 'Carving the hillside…');
   buildTerrain(B, rng);
@@ -502,7 +504,7 @@ function buildPlaza(B, rng, meta) {
 
   // ── squad cars nosed in at the foot of the hill ──
   const spots = [[-34, 36, 0.15], [-14, 34, -0.1], [10, 36, 0.2], [34, 35, -0.25]];
-  spots.forEach(([vx, vz, r], i) => buildPoliceVehicle(B, rng, vx, 0, vz, r, i === 1));
+  spots.forEach(([vx, vz, r], i) => buildPoliceVehicle(B, rng, vx, 0, vz, r, i === 1, meta));
 
   // ── minibus stop shelter ──
   const kx = 40, kz = 54;
@@ -1161,7 +1163,21 @@ function drawWire(B, a, b) {
  * painted on it; the step down from cabin roof to bonnet is what makes it a
  * vehicle.
  */
-function buildPoliceVehicle(B, rng, x, y, z, rotY, armoured) {
+function buildPoliceVehicle(B, rng, x, y, z, rotY, armoured, meta) {
+  /*
+   * The marked patrol car is a real model when the pack is loaded — a hand
+   * modelled saloon beats anything assembled from boxes, and a police car is
+   * the one vehicle a player looks straight at while spawning. Record the spot
+   * and let src/world/props.js instance the glTF there.
+   *
+   * The armoured carrier stays procedural: there is no CC0 model of one, and
+   * a caveirão is specific enough that a generic van would be worse than the
+   * boxes.
+   */
+  if (!armoured && meta) {
+    meta.vehicles.push({ x, z, rotY, kind: 'police' });
+    if (B.useModels) return;
+  }
   const cos = Math.cos(rotY), sin = Math.sin(rotY);
   const at = (ox, oy, oz) => [x + ox * cos + oz * sin, y + oy, z - ox * sin + oz * cos];
   const put = (mat, ox, oy, oz, w, h, d, o = {}) => {

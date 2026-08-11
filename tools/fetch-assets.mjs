@@ -29,7 +29,8 @@ import sharp from 'sharp';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, weld, textureCompress, quantize } from '@gltf-transform/functions';
-import { MATERIALS, PROPS, HDRIS, LICENSE, SOURCES } from './asset-manifest.js';
+import { fetchItchPack } from './itch-fetch.mjs';
+import { MATERIALS, PROPS, HDRIS, MODEL_PACKS, LICENSE, SOURCES } from './asset-manifest.js';
 
 const exec = promisify(execFile);
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -38,7 +39,7 @@ const CACHE = path.join(os.tmpdir(), 'crosshill-asset-cache');
 
 const argv = process.argv.slice(2);
 const FORCE = argv.includes('--force');
-const ONLY = (argv.find((a) => a.startsWith('--only='))?.slice(7) ?? 'materials,props,hdri').split(',');
+const ONLY = (argv.find((a) => a.startsWith('--only='))?.slice(7) ?? 'materials,props,hdri,models').split(',');
 const want = (kind) => ONLY.includes(kind);
 
 const log = (...a) => console.log(...a);
@@ -246,6 +247,83 @@ async function buildHdri(h) {
   return { id: h.id, source: 'polyhaven', file: `hdri/${h.id}_${h.res}.hdr`, use: h.use, ...await propAuthors(h.id) };
 }
 
+/* ── model packs ─────────────────────────────────────────────────────────
+ * Guns and vehicles, which neither photogrammetry library carries. Quaternius
+ * publishes these CC0 through itch.io in OBJ/FBX/.blend — no glTF — so the
+ * pipeline unzips them, runs the OBJ sets through three's own loaders in a
+ * headless browser to get GLB, then applies the same optimisation the Poly
+ * Haven props get.
+ *
+ * Only the models named in each pack's `pick` map are kept. The gun pack alone
+ * is forty weapons; shipping all of them to every player to use four would be
+ * three megabytes of nothing.
+ */
+async function buildModelPack(pack) {
+  const outDir = path.join(OUT, 'models', pack.id);
+  const wanted = Object.entries(pack.pick);
+  const have = await Promise.all(wanted.map(([slot]) =>
+    exists(path.join(outDir, `${slot}.glb`))));
+  if (!FORCE && have.every(Boolean)) {
+    log(`  · ${pack.id} (cached)`);
+    return wanted.map(([slot, src]) => ({
+      pack: pack.id, slot, source: 'quaternius', model: src,
+      file: `models/${pack.id}/${slot}.glb`,
+    }));
+  }
+
+  const zip = path.join(CACHE, 'itch', `${pack.slug}.zip`);
+  if (!await exists(zip)) {
+    await fs.mkdir(path.dirname(zip), { recursive: true });
+    const got = await fetchItchPack(pack.user, pack.slug, zip);
+    log(`    downloaded ${got.name} (${mb(got.bytes)})`);
+  }
+
+  const stage = path.join(CACHE, 'itch-x', pack.id);
+  await fs.rm(stage, { recursive: true, force: true });
+  await fs.mkdir(stage, { recursive: true });
+  await exec('unzip', ['-o', '-q', zip, '-d', stage]);
+
+  // the OBJ folder sits at an unpredictable depth inside each pack
+  const objDir = await findDir(stage, pack.dir);
+  if (!objDir) throw new Error(`${pack.id}: no ${pack.dir} folder in the archive`);
+
+  const glbDir = path.join(stage, '_glb');
+  await exec(process.execPath, [
+    path.join(ROOT, 'tools', 'obj-to-glb.mjs'), objDir, glbDir,
+  ], { maxBuffer: 1 << 24 });
+
+  await fs.mkdir(outDir, { recursive: true });
+  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
+  const entries = [];
+  for (const [slot, src] of wanted) {
+    const from = path.join(glbDir, `${src}.glb`);
+    if (!await exists(from)) { console.error(`  ✗ ${pack.id}/${slot}: ${src} not in pack`); continue; }
+    const doc = await io.read(from);
+    await doc.transform(
+      dedup(), prune({ keepAttributes: false }), weld(),
+      textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [pack.size, pack.size], quality: 86 }),
+      quantize({ pattern: /^(POSITION|TEXCOORD|NORMAL|TANGENT)/ }),
+    );
+    const to = path.join(outDir, `${slot}.glb`);
+    await fs.writeFile(to, await io.writeBinary(doc));
+    log(`  ✓ ${(pack.id + '/' + slot).padEnd(20)} ${src.padEnd(18)} ${mb((await fs.stat(to)).size)}`);
+    entries.push({ pack: pack.id, slot, source: 'quaternius', model: src, file: `models/${pack.id}/${slot}.glb` });
+  }
+  return entries;
+}
+
+/** Depth-first search for a directory with the given name. */
+async function findDir(root, name) {
+  for (const e of await fs.readdir(root, { withFileTypes: true })) {
+    if (!e.isDirectory()) continue;
+    const p = path.join(root, e.name);
+    if (e.name.toLowerCase() === name.toLowerCase()) return p;
+    const hit = await findDir(p, name);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 /* ── credits ─────────────────────────────────────────────────────────────*/
 function writeCredits(manifest) {
   const rows = (list, cols) => [
@@ -258,6 +336,8 @@ function writeCredits(manifest) {
     `| \`${m.slug}\` | [${m.id}](https://ambientcg.com/view?id=${m.id}) | ${m.size}px | ${m.use} |`);
   const props = manifest.props.map((p) =>
     `| [${p.authors?.name ?? p.id}](https://polyhaven.com/a/${p.id}) | ${(p.authors?.authors ?? []).join(', ') || '—'} | ${p.use} |`);
+  const models = (manifest.models ?? []).map((m) =>
+    `| \`${m.slot}\` | ${m.model} | [${m.pack === 'guns' ? 'Ultimate Gun Pack' : 'Realistic Car Pack'}](https://quaternius.com) | ${m.pack} |`);
   const hdris = manifest.hdris.map((h) =>
     `| [${h.name ?? h.id}](https://polyhaven.com/a/${h.id}) | ${(h.authors ?? []).join(', ') || '—'} | ${h.use} |`);
 
@@ -299,6 +379,23 @@ Each prop is downloaded as glTF, then welded, pruned, texture-compressed to
 WebP and vertex-quantized into a single \`.glb\`.
 
 ${rows(props, ['Asset', 'Author(s)', 'Used for'])}
+
+## Weapons and vehicles — ${SOURCES.quaternius.name}
+
+<${SOURCES.quaternius.url}> · licence: CC0 1.0, stated in each pack's
+\`License.txt\`
+
+Quaternius hand-models and releases large game-asset packs under CC0. These are
+the only two things neither photogrammetry library carries — firearms and
+vehicles — and a third-person shooter needs both on screen constantly.
+
+The packs ship as OBJ, FBX and .blend with no glTF, and are distributed through
+itch.io, which has no plain file URLs. \`tools/itch-fetch.mjs\` performs the
+download handshake and \`tools/obj-to-glb.mjs\` converts the OBJ sets by running
+them through three.js's own loaders in a headless browser, so \`npm run assets\`
+still reproduces everything from a clean clone.
+
+${rows(models, ['In-game slot', 'Model', 'Pack', 'Kind'])}
 
 ## Environment lighting — ${SOURCES.polyhaven.name}
 
@@ -356,7 +453,7 @@ async function dirSize(dir) {
 }
 
 /* ── main ────────────────────────────────────────────────────────────────*/
-const manifest = { version: 1, license: LICENSE, materials: [], props: [], hdris: [] };
+const manifest = { version: 2, license: LICENSE, materials: [], props: [], hdris: [], models: [] };
 const prev = await fs.readFile(path.join(OUT, 'manifest.json'), 'utf8').then(JSON.parse, () => null);
 
 if (want('materials')) {
@@ -377,6 +474,14 @@ if (want('props')) {
   }
 } else if (prev) manifest.props = prev.props;
 
+if (want('models')) {
+  log(`\nModels — Quaternius (CC0), ${MODEL_PACKS.length} packs`);
+  for (const pk of MODEL_PACKS) {
+    try { manifest.models.push(...await buildModelPack(pk)); }
+    catch (e) { console.error(`  ✗ ${pk.id}: ${e.message}`); }
+  }
+} else if (prev) manifest.models = prev.models ?? [];
+
 await fs.mkdir(OUT, { recursive: true });
 await fs.writeFile(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2));
 await fs.writeFile(path.join(ROOT, 'CREDITS.md'), writeCredits(manifest));
@@ -390,6 +495,6 @@ const total = await (async function walk(d) {
   return n;
 })(OUT);
 
-log(`\n${manifest.materials.length} materials · ${manifest.props.length} props · ${manifest.hdris.length} HDRI`);
+log(`\n${manifest.materials.length} materials · ${manifest.props.length} props · ${manifest.hdris.length} HDRI · ${manifest.models.length} models`);
 log(`assets/ total: ${mb(total)}`);
 log('wrote assets/manifest.json and CREDITS.md');
