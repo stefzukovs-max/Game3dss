@@ -658,34 +658,6 @@
   ],
   "models": [
     {
-      "pack": "guns",
-      "slot": "pistol",
-      "source": "quaternius",
-      "model": "Pistol_2",
-      "file": "models/guns/pistol.glb"
-    },
-    {
-      "pack": "guns",
-      "slot": "smg",
-      "source": "quaternius",
-      "model": "SubmachineGun_1",
-      "file": "models/guns/smg.glb"
-    },
-    {
-      "pack": "guns",
-      "slot": "rifle",
-      "source": "quaternius",
-      "model": "AssaultRifle_1",
-      "file": "models/guns/rifle.glb"
-    },
-    {
-      "pack": "guns",
-      "slot": "shotgun",
-      "source": "quaternius",
-      "model": "Shotgun_1",
-      "file": "models/guns/shotgun.glb"
-    },
-    {
       "pack": "cars",
       "slot": "police",
       "source": "quaternius",
@@ -1198,6 +1170,76 @@
       "scale": 1,
       "name": "Police interceptor sedan",
       "use": "the patrol cars at the foot of the hill",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "people",
+      "slot": "armored",
+      "source": "supplied",
+      "file": "models/people/armored.glb",
+      "scale": 1,
+      "name": "Armoured police officer",
+      "use": "every police character — a finished figure, so it wears no cut clothing",
+      "note": "supplied by the project owner; re-bound onto the game rig with tools/rebind-character.py"
+    },
+    {
+      "pack": "guns",
+      "slot": "pistol",
+      "source": "supplied",
+      "file": "models/guns/pistol.glb",
+      "scale": 1,
+      "name": "Makarov PM",
+      "use": "the sidearm",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "smg",
+      "source": "supplied",
+      "file": "models/guns/smg.glb",
+      "scale": 1,
+      "name": "Compact SMG",
+      "use": "the submachine gun",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "rifle",
+      "source": "supplied",
+      "file": "models/guns/rifle.glb",
+      "scale": 1,
+      "name": "AK-74",
+      "use": "the assault rifle",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "shotgun",
+      "source": "supplied",
+      "file": "models/guns/shotgun.glb",
+      "scale": 1,
+      "name": "Wood-stocked carbine",
+      "use": "the shotgun slot — the pack has no pump gun, and this is the closest silhouette it has",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "dmr",
+      "source": "supplied",
+      "file": "models/guns/dmr.glb",
+      "scale": 1,
+      "name": "SVD Dragunov",
+      "use": "the marksman rifle",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "launcher",
+      "source": "supplied",
+      "file": "models/guns/launcher.glb",
+      "scale": 1,
+      "name": "RPG-7",
+      "use": "the rocket launcher",
       "note": "supplied by the project owner; not from the CC0 libraries above"
     }
   ]

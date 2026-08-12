@@ -13,7 +13,9 @@
  */
 import { chromium } from 'playwright';
 
-const FILE = process.argv[2] ?? 'assets/models/slums/kit.glb';
+const args = process.argv.slice(2);
+const BY_NODE = args.includes('--nodes');
+const FILE = args.find((a) => !a.startsWith('--')) ?? 'assets/models/slums/kit.glb';
 const OUT = process.env.SHOT_DIR || '.';
 const NAME = process.env.NAME || 'kit-sheet';
 const CELL = 210;
@@ -30,7 +32,7 @@ p.on('pageerror', (e) => console.log('ERR', e.message));
 await p.goto('http://localhost:8080/index.html', { waitUntil: 'domcontentloaded' });
 await p.waitForTimeout(200);
 
-const names = await p.evaluate(async ([file, cell, cols]) => {
+const names = await p.evaluate(async ([file, cell, cols, byNode]) => {
   document.querySelectorAll('#overlay, #hud, #scene, #rotate-gate').forEach((el) => el.remove());
   document.body.style.cssText = `margin:0;background:#eceef1;font:12px/1.4 monospace;color:#111;
     display:grid;grid-template-columns:repeat(${cols},${cell}px);gap:12px;padding:12px`;
@@ -55,8 +57,15 @@ const names = await p.evaluate(async ([file, cell, cols]) => {
   scene.add(sun);
 
   const gltf = await new GLTFLoader().loadAsync('http://localhost:8080/' + file);
+  /*
+   * By node, not by mesh, when asked. glTF splits a multi-material object into
+   * one primitive per material, so a gun with a wooden stock and a steel barrel
+   * arrives as two meshes with the same name and a suffix — rendering those
+   * separately shows half a rifle per cell and says nothing about the pack.
+   */
   const meshes = [];
-  gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  if (byNode) for (const c of gltf.scene.children) { if (c.isMesh || c.children.length) meshes.push(c); }
+  else gltf.scene.traverse((o) => { if (o.isMesh) meshes.push(o); });
   meshes.sort((a, c) => (a.name || '').localeCompare(c.name || ''));
 
   const cam = new THREE.PerspectiveCamera(32, 1, 0.02, 500);
@@ -69,10 +78,12 @@ const names = await p.evaluate(async ([file, cell, cols]) => {
      * meshes carry a scale of their own, so the local box and the real one
      * disagree by a factor of four.
      */
-    m.updateWorldMatrix(true, false);
-    const solo = m.clone();
+    m.updateWorldMatrix(true, true);
+    const solo = m.clone(true);
     solo.matrix.copy(m.matrixWorld).setPosition(0, 0, 0);
+    solo.matrixAutoUpdate = false;
     solo.matrix.decompose(solo.position, solo.quaternion, solo.scale);
+    solo.matrixAutoUpdate = true;
     scene.add(solo);
     const box = new THREE.Box3().setFromObject(solo);
     const size = box.getSize(new THREE.Vector3());
@@ -97,7 +108,7 @@ const names = await p.evaluate(async ([file, cell, cols]) => {
   }
   await Promise.all([...document.images].map((i) => i.decode().catch(() => {})));
   return out;
-}, [FILE, CELL, COLS]);
+}, [FILE, CELL, COLS, BY_NODE]);
 
 console.log(`${names.length} pieces: ${names.join(' ')}`);
 await p.screenshot({ path: `${OUT}/${NAME}.png`, fullPage: true, timeout: 120000 });

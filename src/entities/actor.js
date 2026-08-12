@@ -44,7 +44,20 @@ export function setActorSource(assets) {
 
   const clips = new Map();
   for (const c of assets.clips) clips.set(c.name, c);
-  SOURCE = { body, clips, grip: gripFromAimPose(body, clips) };
+  /*
+   * Two bodies on one skeleton.
+   *
+   * `armored` is the supplied police figure, re-bound onto this exact rig by
+   * `tools/rebind-character.py` — same 65 bones, same names, same rest pose —
+   * so every clip in the library drives it without a retarget, and the grip
+   * measured off the base body is valid on it too. Absent, the police fall
+   * back to the base body in cut clothing, exactly as before.
+   */
+  const bodies = { base: body };
+  const armored = assets.models.get('people:armored');
+  if (armored) bodies.armored = armored;
+
+  SOURCE = { body, bodies, clips, grip: gripFromAimPose(body, clips) };
   return true;
 }
 
@@ -146,7 +159,15 @@ export class SkinnedActor {
      * It was invisible in the character harnesses because they set
      * `root.rotation.y` directly and never went through a caller.
      */
-    const body = cloneSkinned(SOURCE.body);
+    /*
+     * A finished figure wears no cut clothing and takes no skin tint. The
+     * armoured police model arrives fully dressed and fully textured, so both
+     * of those passes are for the bare body only — running them on the
+     * armoured one would recolour a plate carrier as though it were forearm.
+     */
+    const kind = SOURCE.bodies[outfit.body] ? outfit.body : 'base';
+    const dressed = kind === 'base';
+    const body = cloneSkinned(SOURCE.bodies[kind]);
     this.root.add(body);
     this.body = body;
 
@@ -155,7 +176,7 @@ export class SkinnedActor {
       o.castShadow = true;
       o.receiveShadow = false;          // self-shadowing on a 14k body is noise
       o.frustumCulled = false;          // skinned bounds go stale as it moves
-      o.material = this._skin(o.material);
+      if (dressed) o.material = this._skin(o.material);
     });
 
     /*
@@ -163,7 +184,7 @@ export class SkinnedActor {
      * CC0 outfit set that shares this skeleton. `dress` cuts the clothing out
      * of the body itself so it inherits the skin weights; see outfit.js.
      */
-    this.worn = dress(body, outfit);
+    this.worn = dressed ? dress(body, outfit) : [];
 
     /*
      * Weapons hang off a calibrated mount rather than off the bone itself, so

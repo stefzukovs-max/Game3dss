@@ -282,6 +282,17 @@ export function makeOutfit(faction, rank, rng = makeRNG((Math.random() * 1e9) | 
     hasVest: !!table[pi].vest,
     strap: 0x1b1d20,
     frame: 'normal',
+    /*
+     * Which body the skinned actor should wear.
+     *
+     * The police get the supplied armoured model, which is a finished figure —
+     * plate carrier, helmet, kneepads, all modelled and textured — so it wants
+     * none of the cut-from-the-body clothing the rest of this file builds. The
+     * crew stay on the bare body plus cut clothing, which is what gives five
+     * gang members five different outfits from one mesh. One model for both
+     * would either put the crew in riot gear or the police in a t-shirt.
+     */
+    body: faction === 'police' ? 'armored' : 'base',
   };
 }
 

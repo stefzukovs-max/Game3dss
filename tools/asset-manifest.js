@@ -202,20 +202,48 @@ export const LOCAL_MODELS = [
     scale: 1,
     note: 'supplied by the project owner; not from the CC0 libraries above',
   },
+
+  {
+    pack: 'people', slot: 'armored',
+    file: 'models/people/armored.glb',
+    source: 'supplied', name: 'Armoured police officer',
+    use: 'every police character — a finished figure, so it wears no cut clothing',
+    note: 'supplied by the project owner; re-bound onto the game rig with tools/rebind-character.py',
+  },
+
+  /*
+   * The carried weapons, split out of the supplied low-poly gun pack by
+   * `tools/gun-split.py`. Six of the pack's twelve are used; the rest are
+   * variants of these silhouettes and would only cost download.
+   *
+   * No `scale`: the weapon system measures each model's own length and scales
+   * it to the real-world length the stats sheet says the gun is, so a pack
+   * modelled at eight times life size costs nothing to integrate and a future
+   * pack modelled in millimetres will also just work.
+   */
+  ...[
+    ['pistol', 'Makarov PM', 'the sidearm'],
+    ['smg', 'Compact SMG', 'the submachine gun'],
+    ['rifle', 'AK-74', 'the assault rifle'],
+    ['shotgun', 'Wood-stocked carbine', 'the shotgun slot — the pack has no pump gun, and this is the closest silhouette it has'],
+    ['dmr', 'SVD Dragunov', 'the marksman rifle'],
+    ['launcher', 'RPG-7', 'the rocket launcher'],
+  ].map(([slot, name, use]) => ({
+    pack: 'guns', slot, file: `models/guns/${slot}.glb`,
+    source: 'supplied', name, use,
+    note: 'supplied by the project owner; not from the CC0 libraries above',
+  })),
 ];
 
+/*
+ * Quaternius' Ultimate Gun Pack is no longer fetched. Every carried weapon now
+ * comes from the supplied low-poly pack above, which is what the project owner
+ * asked for and is also the better set for this game: its guns are modelled
+ * after real ones — an AK, an SVD, a Makarov — where the CC0 pack's are
+ * generic. `tools/gun-split.py` is the path from that pack's .blend to these
+ * files, and it is worth keeping because the split is not a straight export.
+ */
 export const MODEL_PACKS = [
-  {
-    id: 'guns', user: 'quaternius', slug: '50-lowpoly-guns',
-    name: 'Ultimate Gun Pack', dir: 'OBJ', size: 512,
-    use: 'the four carried weapons',
-    pick: {
-      pistol: 'Pistol_2',
-      smg: 'SubmachineGun_1',
-      rifle: 'AssaultRifle_1',
-      shotgun: 'Shotgun_1',
-    },
-  },
   {
     id: 'cars', user: 'quaternius', slug: 'lowpoly-cars',
     name: 'Realistic Car Pack', dir: 'OBJ', size: 512,

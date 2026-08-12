@@ -107,10 +107,6 @@ still reproduces everything from a clean clone.
 
 | In-game slot | Model | Pack | Kind |
 |---|---|---|---|
-| `pistol` | Pistol_2 | [Ultimate Gun Pack](https://quaternius.com) | guns |
-| `smg` | SubmachineGun_1 | [Ultimate Gun Pack](https://quaternius.com) | guns |
-| `rifle` | AssaultRifle_1 | [Ultimate Gun Pack](https://quaternius.com) | guns |
-| `shotgun` | Shotgun_1 | [Ultimate Gun Pack](https://quaternius.com) | guns |
 | `police` | Cop | [Realistic Car Pack](https://quaternius.com) | cars |
 | `sedan` | NormalCar1 | [Realistic Car Pack](https://quaternius.com) | cars |
 | `sedan2` | NormalCar2 | [Realistic Car Pack](https://quaternius.com) | cars |
@@ -289,6 +285,13 @@ from a clean clone.
 | `landmark:christ` | Hilltop statue | the summit landmark, in place of the plain cross |
 | `slums:kit` | Modular slum blocks | stacked hillside housing |
 | `police:interceptor` | Police interceptor sedan | the patrol cars at the foot of the hill |
+| `people:armored` | Armoured police officer | every police character — a finished figure, so it wears no cut clothing |
+| `guns:pistol` | Makarov PM | the sidearm |
+| `guns:smg` | Compact SMG | the submachine gun |
+| `guns:rifle` | AK-74 | the assault rifle |
+| `guns:shotgun` | Wood-stocked carbine | the shotgun slot — the pack has no pump gun, and this is the closest silhouette it has |
+| `guns:dmr` | SVD Dragunov | the marksman rifle |
+| `guns:launcher` | RPG-7 | the rocket launcher |
 
 Two of them are worth a second look before this is published anywhere
 commercial. `police:interceptor` is a real-world vehicle carrying a
