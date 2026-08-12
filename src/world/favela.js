@@ -1602,8 +1602,108 @@ function buildBackdrop(B, rng, scene) {
   mesh.frustumCulled = false;
   mesh.renderOrder = -900;          // behind everything, in front of the sky
   g.add(mesh);
+
+  buildSprawl(B, rng, g);
   scene.add(g);
 }
+
+/**
+ * The city the hill is part of.
+ *
+ * Bare ridges on every horizon put this hill alone in open country, which is
+ * the one thing Morro do Cruzeiro is not: a favela is surrounded by more
+ * favela, and below it by the formal city. From the summit — where the whole
+ * last third of a match is fought — that empty horizon was the strongest signal
+ * that the world stopped at the perimeter wall.
+ *
+ * One InstancedMesh of boxes, unlit and hazed by distance like the ridges are,
+ * so a few thousand rooftops cost a single draw call and no shadow work. They
+ * sit outside the play area and are never collided with; this is scenery in the
+ * strict sense.
+ */
+function buildSprawl(B, rng, group) {
+  const COUNT = 2600;
+  const geoBox = new THREE.BoxGeometry(1, 1, 1);
+  /*
+   * No `vertexColors` here, unlike the ridges. Per-instance colour arrives
+   * through `instanceColor`, which is a separate path — asking for vertex
+   * colours as well makes the shader look for a `color` attribute the box
+   * geometry does not have, and every building renders pure black.
+   */
+  const mat = new THREE.MeshBasicMaterial({ fog: false });
+  const inst = new THREE.InstancedMesh(geoBox, mat, COUNT);
+  inst.frustumCulled = false;
+  inst.renderOrder = -880;          // in front of the ridges, behind the map
+
+  /*
+   * A favela palette, then hazed toward the sky by distance. The haze is what
+   * makes depth read: without it a box at 300 m is as saturated as a wall at
+   * 10 m and the horizon looks like a sticker.
+   */
+  const PALETTE = [
+    0xb07a5c, 0x9a6b52, 0xb98a63, 0xc9a882, 0x8d6a5a,
+    0xa8543f, 0xd6c1a1, 0x7f8a7a, 0xb5b0a4, 0xc4785a,
+  ].map((h) => new THREE.Color().setHex(h, THREE.SRGBColorSpace));
+  const haze = new THREE.Color(0x9fb6c4);
+  const col = new THREE.Color();
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const pos = new THREE.Vector3();
+  const scl = new THREE.Vector3();
+
+  /*
+   * Ground for it to stand on. Beyond the perimeter the world is open sky, so
+   * without this the outlying blocks hang over nothing — most visible where the
+   * sprawl runs past the end of a ridge. A single hazed disc, well below the
+   * lowest terrace and wide enough to reach past the far band.
+   */
+  {
+    const land = new THREE.CircleGeometry(340, 40).rotateX(-Math.PI / 2);
+    const c = new THREE.Color().setHex(0x8a7a68, THREE.SRGBColorSpace).lerp(haze, 0.55);
+    const shelf = new THREE.Mesh(land, new THREE.MeshBasicMaterial({ color: c, fog: false }));
+    shelf.position.y = -3;
+    shelf.renderOrder = -890;       // over the ridges' feet, under the sprawl
+    shelf.frustumCulled = false;
+    group.add(shelf);
+  }
+
+  let n = 0;
+  while (n < COUNT) {
+    /*
+     * Clustered, not evenly scattered: real hillside housing arrives in dense
+     * pockets separated by scrub and rock. An even spread reads as wallpaper.
+     */
+    const a = rng() * Math.PI * 2;
+    const clusterD = rng.range(120, 300);
+    const cx = Math.cos(a) * clusterD;
+    const cz = Math.sin(a) * clusterD;
+    // higher up the further out, so the sprawl climbs the ridges behind us
+    const baseY = Math.max(0, (clusterD - 130) * rng.range(0.04, 0.20));
+    const pack = Math.min(COUNT - n, 20 + (rng() * 60) | 0);
+
+    for (let i = 0; i < pack; i++, n++) {
+      const rx = cx + rng.range(-34, 34);
+      const rz = cz + rng.range(-34, 34);
+      const d = Math.hypot(rx, rz);
+      const h = rng.range(3, 9);
+      const y = baseY + rng.range(-2, 6);
+      pos.set(rx, y + h / 2, rz);
+      scl.set(rng.range(3.5, 9), h, rng.range(3.5, 9));
+      q.setFromAxisAngle(_up, rng() * Math.PI * 2);
+      inst.setMatrixAt(n, m.compose(pos, q, scl));
+
+      col.copy(PALETTE[(rng() * PALETTE.length) | 0]);
+      // 0 at the near edge of the sprawl, 1 at the far — matched to the ridges
+      col.lerp(haze, clamp01((d - 110) / 230) * 0.82 + 0.10);
+      inst.setColorAt(n, col);
+    }
+  }
+  inst.instanceMatrix.needsUpdate = true;
+  if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  group.add(inst);
+}
+
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /* ── spawns ─────────────────────────────────────────────────────── */
 function finalizeSpawns(meta, collision) {

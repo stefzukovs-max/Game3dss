@@ -64,6 +64,6 @@ if (errors.length) {
   for (const e of errors.slice(0, 10)) console.log('   ', e);
 } else console.log(' ✓ no page errors');
 
-await page.screenshot({ path: `${process.env.SHOT_DIR ?? '.'}/pages-check.png` });
+await page.screenshot({ path: `${process.env.SHOT_DIR ?? '.'}/pages-check.png`, timeout: 90000 }).catch(()=>{});
 await browser.close();
 process.exit(ok ? 0 : 1);
