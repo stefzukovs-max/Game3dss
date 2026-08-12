@@ -135,9 +135,12 @@ export class Agent {
     this.model.setPosition(this.pos.x, this.pos.y, this.pos.z);
     this.model.faceYaw(this.yaw + Math.PI, dt, this.state === STATES.ENGAGE ? 13 : 7);
     const hs = Math.hypot(this.vel.x, this.vel.z);
+    // velocity along the facing, so backing off a target reverses the cycle
+    // rather than moonwalking; see the note in actor.js
+    const fwd = this.vel.x * -Math.sin(this.yaw) + this.vel.z * -Math.cos(this.yaw);
     this.model.update(dt, {
       speed: hs, aiming: this.state === STATES.ENGAGE && !!this.target,
-      crouching: this.crouching, pitch: this.pitch, dead: false,
+      crouching: this.crouching, pitch: this.pitch, dead: false, fwd,
     });
   }
 

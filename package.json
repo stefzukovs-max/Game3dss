@@ -17,6 +17,7 @@
     "kit": "node tools/kit-info.mjs",
     "check:pages": "node tools/pages-check.mjs",
     "check:fit": "node tools/fit-check.mjs",
+    "check:anim": "node tools/anim-check.mjs",
     "shots:chars": "node tools/character-shots.mjs",
     "assets": "node tools/fetch-assets.mjs",
     "props": "node tools/prop-info.mjs",

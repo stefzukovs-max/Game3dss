@@ -27,7 +27,7 @@ await p.goto('http://localhost:8080/', { waitUntil: 'load' });
 await p.waitForSelector('#scr-menu:not(.hidden)', { timeout: 150000 });
 await p.evaluate((c) => { window.__cloth = c; }, CLOTH);
 
-const shot = async (name, faction, { aiming, skin, turn = Math.PI }) => {
+const shot = async (name, faction, { aiming, skin, turn = 0 }) => {
   await p.evaluate(async ([fac, aiming, skin, turn]) => {
     const g = window.__game;
     g.selected.faction = fac;

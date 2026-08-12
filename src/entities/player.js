@@ -156,9 +156,15 @@ export class Player {
     this.model.setPosition(this.pos.x, this.pos.y, this.pos.z);
     this.model.root.rotation.y = this.yaw + Math.PI;
     const hs = Math.hypot(this.vel.x, this.vel.z);
+    /*
+     * Velocity along the way the character is facing, so the animation can tell
+     * walking forwards from backing away. At yaw 0 forward is -Z, which is what
+     * `rotation.y = yaw + PI` turns a +Z-facing model to.
+     */
+    const fwd = this.vel.x * -Math.sin(this.yaw) + this.vel.z * -Math.cos(this.yaw);
     this.model.update(dt, {
       speed: hs, aiming: this.aiming, crouching: this.crouching,
-      pitch: this.pitch, dead: false, lean: this._strafe,
+      pitch: this.pitch, dead: false, lean: this._strafe, fwd,
     });
   }
 

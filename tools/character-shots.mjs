@@ -8,7 +8,7 @@ p.on('pageerror', e => console.log('ERR', e.message));
 await p.goto('http://localhost:8080/', { waitUntil:'load' });
 await p.waitForSelector('#scr-menu:not(.hidden)', { timeout:150000 });
 
-const shot = async (name, faction, turn = Math.PI) => {
+const shot = async (name, faction, turn = 0) => {
   await p.evaluate(async ([fac, turn]) => {
     const g = window.__game;
     g.selected.faction = fac;
@@ -36,7 +36,8 @@ const shot = async (name, faction, turn = Math.PI) => {
       spot.y = g.world.collision.groundHeight(spot.x, spot.z, base.y + 3, 0.5);
       const a = new Agent(g, arch, fac, spot);
       a.yaw = Math.PI;
-      // the rigged actor faces -Z at rotation 0, so PI turns it to the camera
+      // the model faces +Z at rotation 0 and the camera sits on the +Z side,
+      // so 0 is front-on and PI is from behind
       a.model.root.rotation.y = turn;
       a.model.update(0.5, { speed: 0, aiming: i % 2 === 1, crouching: false, pitch: 0, dead: false });
       g.agents.push(a);
@@ -65,7 +66,7 @@ await shot('chars-1-gang', 'gang');
 await shot('chars-2-police', 'police');
 // and the same line-ups from behind: the reflective band, the pack and the
 // back of the vest are half of what tells the two sides apart in a firefight
-await shot('chars-3-gang-back', 'gang', 0);
-await shot('chars-4-police-back', 'police', 0);
+await shot('chars-3-gang-back', 'gang', Math.PI);
+await shot('chars-4-police-back', 'police', Math.PI);
 console.log('done');
 await b.close();

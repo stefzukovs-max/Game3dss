@@ -76,10 +76,10 @@ function gripFromAimPose(source, clips) {
   const inHand = new THREE.Quaternion().setFromRotationMatrix(rel).invert();
 
   /*
-   * The weapon models are built barrel-down-negative-Z, and the character faces
-   * +Z inside its own body (the pack faces the opposite way to the game, hence
-   * the half turn in the constructor), so a weapon aligned with the body needs
-   * the same half turn before it is handed to the bone.
+   * The weapon models are built barrel-down-negative-Z and the pack's character
+   * faces +Z, so a weapon aligned with the body needs a half turn before it is
+   * handed to the bone. This is measured in the pack's own untouched frame, so
+   * it is unaffected by how the actor is oriented in the world.
    */
   const forward = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
   mixer.stopAllAction();
@@ -134,8 +134,19 @@ export class SkinnedActor {
      * skeleton, so every character in the level animates as one body. This is
      * the single easiest way to get skinned instancing wrong.
      */
+    /*
+     * No half turn here, deliberately.
+     *
+     * The pack models face +Z, and so does the rig this replaces: both player
+     * and AI set `rotation.y = yaw + π`, which turns a +Z-facing model to the
+     * game's forward of −Z. Adding another π inside the actor cancelled that
+     * exactly, and every rigged character in the game ran backwards — facing
+     * the way it had come while its legs cycled forwards.
+     *
+     * It was invisible in the character harnesses because they set
+     * `root.rotation.y` directly and never went through a caller.
+     */
     const body = cloneSkinned(SOURCE.body);
-    body.rotation.y = Math.PI;          // the pack faces +Z; the game faces -Z
     this.root.add(body);
     this.body = body;
 
@@ -278,6 +289,21 @@ export class SkinnedActor {
       this._play(want);
 
       /*
+       * Which way the feet should cycle.
+       *
+       * The library ships forward loops only — no back-pedal and no strafe — so
+       * a character walking backwards while facing a target played a forward
+       * cycle and moonwalked. Running the same clip in reverse is not a real
+       * back-pedal animation, but it puts the feet on the right side of the
+       * body at the right time, which is the part the eye actually reads.
+       *
+       * `fwd` is velocity along the character's own nose; callers know their
+       * yaw, so they resolve it rather than the actor guessing from world
+       * velocity and a rotation it may not have applied yet.
+       */
+      this._back = (s.fwd ?? speed) < -0.35;
+
+      /*
        * Play locomotion at the speed the body is actually moving. A walk cycle
        * running at its authored rate under a character travelling at 5 m/s is
        * the classic ice-skating tell, and it is the thing that makes canned
@@ -286,7 +312,8 @@ export class SkinnedActor {
       const a = this._cur && this._actions.get(this._cur);
       if (a) {
         const ref = this._cur === LOCO.sprint ? 6.4 : this._cur === LOCO.jog ? 3.8 : 1.7;
-        a.timeScale = moving ? clamp(speed / ref, 0.55, 1.7) : 1;
+        const rate = moving ? clamp(speed / ref, 0.55, 1.7) : 1;
+        a.timeScale = this._back ? -rate : rate;
       }
     }
 

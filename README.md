@@ -101,7 +101,7 @@ Ten operators, five per faction, covering the same five pillars so both sides
 play fair — but the flavour of each pillar is opposite. The hill improvises;
 the battalion is issued.
 
-| | The Hillside Crew | Tactical Battalion |
+| | The Lookouts | 9th Battalion |
 |---|---|---|
 | **Recon** | **Kite** — the lookout. Fastest on foot, +40% jump, silent. Sends a kite up to outline every hostile through walls. | **Pvt. Camargo** — the eyes. +60% reserve ammo, vacuums pickups. Puts a drone up to mark the map. |
 | **Heavy** | **Boulder** — the door. 150 HP / 60 armour, −25% damage taken, no stagger. Drops a scrap barricade. | **Sgt. Stone** — the wall. 160 HP / 80 armour, −30% frontal damage. Plants a ballistic shield. |
@@ -276,6 +276,8 @@ npm run check:sim        # drives the game at a fixed 60 Hz timestep for N minut
 npm run check:mobile     # emulates a phone and drives the game through synthetic
                          # touch events: stick, look drag and every button
 npm run check:shooting   # weapon bench on open ground, isolated from allied fire
+npm run check:anim       # where characters actually face and travel, measured on
+                         # the rendered node — catches a model facing backwards
 npm run check:fit        # every screen at six real device sizes: no page overflow,
                          # and the button you must press is on screen and thumb-sized
 npm run check:outfits    # what each outfit preset actually cut, garment by garment
