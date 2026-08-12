@@ -32,6 +32,24 @@ no downloads at runtime — three.js is vendored and every texture, sound and
 npm start          # → http://localhost:8080
 ```
 
+## Play it
+
+**In a browser:** <https://stefzukovs-max.github.io/Game3dss/> — published by
+`.github/workflows/pages.yml` on every push to the development branch. The game
+is static, so the deploy is a copy rather than a build.
+
+It is a ~40 MB download on a cold cache, almost all of it textures and
+animation, and there is a loading screen while it lands. Once cached it starts
+immediately. Works on a phone: the touch controls appear on their own and the
+quality tier drops to match the device.
+
+**Locally,** with no asset fetch — the baked assets are committed:
+
+```bash
+git clone https://github.com/stefzukovs-max/Game3dss.git
+cd Game3dss && npm install && npm start
+```
+
 > Everything in this game is invented — the crews, the units, the operators and
 > the hill itself. Stylised, non-realistic depiction; no real people,
 > organisations or places.

@@ -1,0 +1,53 @@
+# Publishes the playable game to GitHub Pages.
+#
+# The game is static — no bundler, no build step, no server code — so this is a
+# copy, not a build. `configure-pages` turns Pages on by itself the first time
+# it runs, so nothing has to be clicked in the repository settings.
+#
+# Only the files the browser actually asks for are uploaded. The tooling
+# (Playwright harnesses, the asset pipeline) is build-time only and would add
+# weight to every visitor's site for no reason.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [claude/favela-shooter-game-fn7x6v]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# never let two deploys race; a half-uploaded 40 MB asset set is a broken game
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Stage the playable files
+        run: |
+          mkdir -p _site
+          cp -r index.html styles.css src vendor assets CREDITS.md README.md _site/
+          # tell Pages to serve the files verbatim rather than run Jekyll over them
+          touch _site/.nojekyll
+          du -sh _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
