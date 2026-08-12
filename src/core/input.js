@@ -29,7 +29,8 @@ export class Input {
     this.touchSensitivity = 1;
     this.invertY = false;
     this.isTouch = IS_TOUCH;
-    this.touch = { active: false, mx: 0, my: 0, fire: false, aim: false, lookX: 0, lookY: 0 };
+    this.touch = { active: false, mx: 0, my: 0, fire: false, fireL: false, aim: false,
+      lookX: 0, lookY: 0 };
     this._pressed = new Set();
     this._onLockChange = null;
 
@@ -124,7 +125,7 @@ export class Input {
    * is a good trigger — and the FIRE button still works for hipfire.
    */
   get firing() {
-    return this.buttons[0] || this.touch.fire
+    return this.buttons[0] || this.touch.fire || this.touch.fireL
       || (this.autoFire && this.isTouch && this.touch.aim);
   }
   get aiming() { return this.buttons[2] || this.touch.aim; }
@@ -252,7 +253,14 @@ export class Input {
       }, { passive: false });
     };
 
+    /*
+     * Two triggers, one flag each, OR-ed at the read. Sharing one flag looks
+     * simpler and breaks the moment both are down: releasing either would clear
+     * it, so firing with the left thumb and then tapping the right one would
+     * stop the gun.
+     */
     hold('btn-fire', (v) => (t.fire = v));
+    hold('btn-fire-l', (v) => (t.fireL = v));
     toggle('btn-aim', () => t.aim, (v) => (t.aim = v));
     toggle('btn-crouch', () => this.keys.has('ControlLeft'),
       (v) => (v ? this.keys.add('ControlLeft') : this.keys.delete('ControlLeft')));
@@ -266,6 +274,7 @@ export class Input {
   /** Clear any latched touch state (used when a menu opens). */
   releaseAll() {
     this.touch.fire = false;
+    this.touch.fireL = false;
     this.touch.aim = false;
     this.touch.mx = 0;
     this.touch.my = 0;

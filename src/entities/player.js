@@ -515,7 +515,27 @@ export class Player {
   updateCamera(camera, dt, collision) {
     const aim = this.aimBlend;
 
-    const pivot = _p.set(this.pos.x, this.pos.y + lerp(this.eyeHeight, this.eyeHeight + 0.06, aim), this.pos.z);
+    /*
+     * The camera pivot follows the player's head — damped vertically, exact
+     * horizontally.
+     *
+     * The split matters. Horizontal lag makes aiming feel like steering a boat,
+     * because the reticle sits on the camera and every strafe would swing it
+     * off the target. Vertical lag costs nothing and fixes the thing that made
+     * this hillside unpleasant to move around: the map is stairs, and every
+     * step popped the eye height by a quarter of a metre in one frame, so
+     * walking up the escadão strobed. Absorbing it over ~80 ms turns a stack of
+     * steps into a ramp without touching where the shots go.
+     *
+     * Crouching is exempt on purpose — dropping into cover should read as a
+     * fast, deliberate move, not a slow sink.
+     */
+    const eye = this.pos.y + lerp(this.eyeHeight, this.eyeHeight + 0.06, aim);
+    if (this.camEyeY == null || Math.abs(eye - this.camEyeY) > 1.6) this.camEyeY = eye;
+    else this.camEyeY = damp(this.camEyeY, eye, this.crouching !== this._camCrouch ? 26 : 13, dt);
+    this._camCrouch = this.crouching;
+
+    const pivot = _p.set(this.pos.x, this.camEyeY, this.pos.z);
 
     const pitch = clamp(this.pitch + this.recoilPitch, -1.35, 1.28);
     const yaw = this.yaw + this.recoilYaw;
@@ -557,9 +577,18 @@ export class Player {
     camera.rotateY(yaw);
     camera.rotateX(pitch);
 
+    /*
+     * Field of view carries three things at once: the zoom when you aim, the
+     * squeeze when Focus is up, and a widening while sprinting. The last one is
+     * the cheapest speed cue there is — nothing about the character changes, the
+     * world just starts rushing past the edges of the screen — and without it a
+     * sprint reads as the same run with a bigger number behind it.
+     */
     const focus = this.abilityActive > 0 && this.char.ability.id === 'focus';
-    const targetFov = lerp(this.game.settings.fov, this.game.settings.fov - 22, aim) - (focus ? 14 : 0);
-    camera.fov = damp(camera.fov, targetFov, 11, dt);
+    const base = this.game.settings.fov + (this.sprinting ? 9 : 0);
+    const targetFov = lerp(base, this.game.settings.fov - 22, aim) - (focus ? 14 : 0);
+    // into the sprint quickly, out of it quickly, but ease into the aim
+    camera.fov = damp(camera.fov, targetFov, aim > 0.02 ? 11 : 7, dt);
     camera.updateProjectionMatrix();
   }
 }

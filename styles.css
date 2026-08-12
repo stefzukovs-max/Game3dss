@@ -254,7 +254,16 @@ body.side-police .abil.ready{ box-shadow:0 0 16px rgba(78,163,255,.3), 0 4px 14p
   --pad-r: max(14px, env(safe-area-inset-right));
   --pad-b: max(12px, env(safe-area-inset-bottom));
   --pad-t: max(10px, env(safe-area-inset-top));
-  --btn: clamp(50px, 9vmin, 76px);
+  /*
+   * Thumb-sized, not icon-sized.
+   *
+   * A landscape phone is about 390 px tall, so the old `9vmin` floor put every
+   * control at its 50 px minimum and the whole cluster in the bottom corner —
+   * which is exactly the complaint. Scaling off `vh` instead ties the buttons
+   * to the dimension a thumb actually has to cover, and the floor is now what
+   * a fingertip needs rather than what fits.
+   */
+  --btn: clamp(56px, 15vh, 84px);
 }
 html,body{ overscroll-behavior:none; }
 
@@ -289,8 +298,13 @@ body.is-touch .touch-only{ display:revert !important; }
  * the corner where the thumb rests, and the middle of the right half is left
  * clear to drag. FIRE and AIM sit lowest and largest, on the arc a thumb
  * actually sweeps.
+ *
+ * The cluster is lifted off the bottom edge as well. Sitting flush in the
+ * corner it was both hard to hit and hard to see past — a thumb resting there
+ * covers the corner of the screen, and on a phone that corner is where the
+ * ammo counter lives.
  */
-#touch-right{ position:absolute; right:var(--pad-r); bottom:var(--pad-b);
+#touch-right{ position:absolute; right:var(--pad-r); bottom:calc(var(--pad-b) + 2.5vh);
   pointer-events:auto; display:grid; gap:clamp(7px,1.4vmin,12px);
   grid-template-columns:repeat(2, var(--btn));
   grid-template-areas:
@@ -329,12 +343,32 @@ body.lefty #stick-move{ left:auto; right:22%; }
  * `justify-self:end` plus a negative left margin keeps the overflow on the
  * inside where there is room for it.
  */
-#btn-fire{ grid-area:fire; width:calc(var(--btn) * 1.5); height:calc(var(--btn) * 1.5);
-  justify-self:end; margin:-25% 0 -6% calc(var(--btn) * -0.5);
+#btn-fire{ grid-area:fire; width:calc(var(--btn) * 1.62); height:calc(var(--btn) * 1.62);
+  justify-self:end; margin:-28% 0 -6% calc(var(--btn) * -0.62);
   background:rgba(190,40,40,.5); border-color:rgba(255,150,150,.62);
   font-size:clamp(12px,2.5vmin,17px); }
-#btn-aim{ width:calc(var(--btn) * 1.18); height:calc(var(--btn) * 1.18);
-  justify-self:start; margin:-9% 0 0 calc(var(--btn) * -0.18); }
+#btn-aim{ width:calc(var(--btn) * 1.24); height:calc(var(--btn) * 1.24);
+  justify-self:start; margin:-11% 0 0 calc(var(--btn) * -0.24); }
+
+/*
+ * ── the left-hand trigger ──
+ *
+ * Sits above the move stick, on the left edge, where the left thumb reaches
+ * without leaving the stick's arc. Deliberately unlabelled and semi-
+ * transparent: it is a second copy of a control that is already labelled on the
+ * right, and a second big red FIRE on screen reads as a bug.
+ *
+ * This is what makes shooting on a phone work. Firing with the right thumb
+ * means letting go of the look drag, so you shoot or you turn, never both.
+ * With a trigger under each thumb you can hold the aim and keep turning
+ * through a burst, which is how every phone shooter worth playing does it.
+ */
+#btn-fire-l{ position:absolute; left:var(--pad-l); bottom:calc(var(--pad-b) + 21vh);
+  width:calc(var(--btn) * 1.18); height:calc(var(--btn) * 1.18); pointer-events:auto;
+  background:rgba(190,40,40,.26); border-color:rgba(255,160,160,.4); }
+#btn-fire-l::after{ content:''; width:34%; aspect-ratio:1; border-radius:50%;
+  background:rgba(255,255,255,.42); }
+body.lefty #btn-fire-l{ left:auto; right:var(--pad-l); }
 /* the secondary row reads as secondary */
 #btn-swap,#btn-reload,#btn-nade,#btn-ability{ opacity:.88; }
 

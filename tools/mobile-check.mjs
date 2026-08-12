@@ -166,6 +166,38 @@ const magAfter = await page.evaluate(() => {
 await touchDrive([{ type: 'touchend', touches: [{ id: 5, x: fb.x + fb.width / 2, y: fb.y + fb.height / 2 }] }]);
 ok('FIRE button shoots', magAfter !== magBefore, `mag ${magBefore} → ${magAfter}`);
 
+/*
+ * The left trigger, tested doing the one job it exists for: shooting while the
+ * right thumb is mid-drag. Tapping it on its own would pass with the button
+ * wired to anything at all — this only passes if the look drag survives the
+ * shot, which is the whole reason there are two triggers.
+ */
+const lb = await page.locator('#btn-fire-l').boundingBox();
+const lp = { id: 6, x: lb.x + lb.width / 2, y: lb.y + lb.height / 2 };
+const drag = (x) => ({ id: 7, x, y: 195 });   // mid-height of the 844×390 landscape page
+const before2 = await page.evaluate(() => {
+  const g = window.__game;
+  g.player.weapon.mag = g.player.weapon.def.mag;
+  return { mag: g.player.weapon.mag, yaw: g.player.yaw };
+});
+await touchDrive([
+  { type: 'touchstart', touches: [lp] },
+  { type: 'touchstart', touches: [drag(633)] },
+  { type: 'touchmove', touches: [drag(723)] },
+]);
+const after2 = await page.evaluate(() => {
+  const g = window.__game;
+  for (let i = 0; i < 45; i++) g._tick(1 / 60);
+  return { mag: g.player.weapon.mag, yaw: g.player.yaw };
+});
+await touchDrive([
+  { type: 'touchend', touches: [lp] },
+  { type: 'touchend', touches: [drag(723)] },
+]);
+ok('left trigger shoots while the right thumb is looking',
+  after2.mag < before2.mag && Math.abs(after2.yaw - before2.yaw) > 0.02,
+  `mag ${before2.mag} → ${after2.mag}, Δyaw ${(after2.yaw - before2.yaw).toFixed(2)}`);
+
 await tapBtn('btn-aim');
 await page.waitForTimeout(200);
 ok('AIM toggles', await page.evaluate(() => window.__game.input.touch.aim));
