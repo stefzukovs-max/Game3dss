@@ -114,7 +114,19 @@ export class Input {
     return { x, y };
   }
 
-  get firing() { return this.buttons[0] || this.touch.fire; }
+  /**
+   * Firing.
+   *
+   * On touch, holding ADS fires on its own. This is the single thing that makes
+   * a shooter workable with two thumbs: FIRE and look are both the right thumb,
+   * so any layout that needs you to hold FIRE takes your aim away for as long
+   * as you are shooting. Aiming down sights is already a deliberate act, so it
+   * is a good trigger — and the FIRE button still works for hipfire.
+   */
+  get firing() {
+    return this.buttons[0] || this.touch.fire
+      || (this.autoFire && this.isTouch && this.touch.aim);
+  }
   get aiming() { return this.buttons[2] || this.touch.aim; }
 
   endFrame() { this._pressed.clear(); }
@@ -123,6 +135,8 @@ export class Input {
   _initTouch() {
     const t = this.touch;
     t.active = true;
+    // free the right thumb by default on touch; switchable in settings
+    if (this.autoFire === undefined) this.autoFire = true;
     const root = document.getElementById('touch');
     root?.classList.remove('hidden');
     document.body.classList.add('is-touch');
@@ -141,7 +155,14 @@ export class Input {
         if (isButton(to.target)) continue;                 // buttons handle themselves
 
         // left third of the screen steers; the stick floats to the thumb
-        if (stickId === null && to.clientX < innerWidth * 0.42) {
+        /*
+         * The left 44% steers. It is a share of the screen rather than a fixed
+         * pixel band so it holds on a 6-inch phone and on a tablet, and it is
+         * generous because the stick floats to wherever the thumb lands — there
+         * is nothing to hit, so a wider zone costs nothing and a narrower one
+         * makes the thumb hunt.
+         */
+        if (stickId === null && to.clientX < innerWidth * 0.44) {
           stickId = to.identifier;
           sx = to.clientX; sy = to.clientY;
           if (stick) {

@@ -63,6 +63,7 @@ class Game {
     this.input = new Input(this.canvas);
     this.input.sensitivity = this.settings.sens;
     this.input.invertY = this.settings.invert;
+    this.input.autoFire = this.settings.autofire !== false;
     this.hud = new HUD(this);
 
     this._bindMenus();
@@ -338,7 +339,7 @@ class Game {
     const d = {
       sens: 1, tsens: 1, fov: IS_TOUCH ? 82 : 78, vol: 70, invert: false,
       shadows: true, blood: true, dmgnum: true, res: 100,
-      quality: 'auto', assist: true, lefty: false, intro: true,
+      quality: 'auto', assist: true, lefty: false, intro: true, autofire: true,
     };
     try { return { ...d, ...JSON.parse(localStorage.getItem('hillcross.settings') || '{}') }; }
     catch { return d; }
@@ -360,6 +361,7 @@ class Game {
     $('set-blood').checked = s.blood;
     $('set-dmgnum').checked = s.dmgnum;
     $('set-assist').checked = s.assist;
+    if ($('set-autofire')) $('set-autofire').checked = s.autofire !== false;
     $('set-lefty').checked = s.lefty;
     for (const b of document.querySelectorAll('#seg-quality button')) {
       b.classList.toggle('on', b.dataset.v === s.quality);
@@ -370,6 +372,7 @@ class Game {
   _applySettings() {
     const s = this.settings;
     this.input.sensitivity = +s.sens;
+    this.input.autoFire = s.autofire !== false;
     this.input.touchSensitivity = +s.tsens;
     this.input.invertY = s.invert;
     audio.setVolume(s.vol / 100);
@@ -513,6 +516,7 @@ class Game {
     bind('set-tsens', 'tsens', { id: 'lbl-tsens', f: (v) => (+v).toFixed(2) }, parseFloat);
     bind('set-invert', 'invert');
     bind('set-assist', 'assist');
+    bind('set-autofire', 'autofire');
     bind('set-lefty', 'lefty');
 
     for (const b of document.querySelectorAll('#seg-quality button')) {

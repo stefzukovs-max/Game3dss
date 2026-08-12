@@ -363,11 +363,24 @@ export function scatterProps(scene, assets, world, opts = {}) {
    * "this is a real place" read than any amount of extra clutter: a street
    * with cars on it is inhabited.
    */
+  /*
+   * The marked patrol car is a supplied model rather than one from the kit, so
+   * it is preferred wherever the map asked for a police vehicle and the kit car
+   * stands in if it is absent. It is modelled in centimetres — the manifest
+   * carries the scale rather than this code guessing it, because the next
+   * supplied model will arrive in whatever unit its author happened to use.
+   */
+  const hero = assets.models.get('police:interceptor');
+  const heroScale = assets.manifest?.models?.find((m) => m.pack === 'police')?.scale ?? 1;
+
   const placeCar = (slot, x, y, z, yaw) => {
-    const src = assets.models.get(`cars:${slot}`);
+    const isPolice = slot === 'police';
+    const src = (isPolice && hero) || assets.models.get(`cars:${slot}`);
     if (!src) return false;
+    const sc = (isPolice && hero) ? heroScale : 1;
     _q.setFromAxisAngle(_up, yaw);
-    B.placeObject(`car:${slot}`, src, _m.compose(_v.set(x, y, z), _q, _s.set(1, 1, 1)));
+    B.placeObject(`car:${isPolice && hero ? 'interceptor' : slot}`, src,
+      _m.compose(_v.set(x, y, z), _q, _s.set(sc, sc, sc)));
     // a car is roughly 1.85 × 4.3 m; the rotated footprint is squared off for
     // the broadphase, and being generous keeps the AI from clipping through
     const c = Math.abs(Math.cos(yaw)), sn = Math.abs(Math.sin(yaw));

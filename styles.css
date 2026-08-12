@@ -254,7 +254,7 @@ body.side-police .abil.ready{ box-shadow:0 0 16px rgba(78,163,255,.3), 0 4px 14p
   --pad-r: max(14px, env(safe-area-inset-right));
   --pad-b: max(12px, env(safe-area-inset-bottom));
   --pad-t: max(10px, env(safe-area-inset-top));
-  --btn: clamp(46px, 8.4vmin, 72px);
+  --btn: clamp(50px, 9vmin, 76px);
 }
 html,body{ overscroll-behavior:none; }
 
@@ -277,18 +277,33 @@ body.is-touch .touch-only{ display:revert !important; }
 
 #touch-left-top{ position:absolute; left:var(--pad-l); top:var(--pad-t); pointer-events:auto; }
 
+/*
+ * ── the right-hand cluster ──
+ *
+ * Laid out for a thumb, not for a grid. The right half of the screen is the
+ * look area, and the previous 3×3 block of buttons sat in the middle of it —
+ * every look drag started on top of a button, and holding FIRE meant giving up
+ * aiming entirely for as long as you were shooting.
+ *
+ * Now the utility buttons run up the outside edge in two short columns, hugging
+ * the corner where the thumb rests, and the middle of the right half is left
+ * clear to drag. FIRE and AIM sit lowest and largest, on the arc a thumb
+ * actually sweeps.
+ */
 #touch-right{ position:absolute; right:var(--pad-r); bottom:var(--pad-b);
-  pointer-events:auto; display:grid; gap:clamp(6px,1.2vmin,11px);
-  grid-template-columns:repeat(3, var(--btn));
+  pointer-events:auto; display:grid; gap:clamp(7px,1.4vmin,12px);
+  grid-template-columns:repeat(2, var(--btn));
   grid-template-areas:
-    "skill nade  gun"
-    "reload crouch jump"
-    ".      aim   fire"; }
+    "gun    nade"
+    "reload skill"
+    "crouch jump"
+    "aim    fire"; }
 body.lefty #touch-right{ right:auto; left:var(--pad-r);
   grid-template-areas:
-    "gun   nade   skill"
-    "jump  crouch reload"
-    "fire  aim    ."; }
+    "nade  gun"
+    "skill reload"
+    "jump  crouch"
+    "fire  aim"; }
 body.lefty #stick-move{ left:auto; right:22%; }
 
 .tbtn{ display:grid; place-content:center; gap:1px; width:var(--btn); height:var(--btn);
@@ -307,9 +322,21 @@ body.lefty #stick-move{ left:auto; right:22%; }
 #btn-crouch{ grid-area:crouch; }
 #btn-jump{ grid-area:jump; }
 #btn-aim{ grid-area:aim; background:rgba(30,70,120,.42); }
-#btn-fire{ grid-area:fire; width:calc(var(--btn) * 1.34); height:calc(var(--btn) * 1.34);
-  margin:-17% 0 0 -17%; background:rgba(190,40,40,.46); border-color:rgba(255,140,140,.5);
-  font-size:clamp(12px,2.4vmin,16px); }
+/* the two that matter are the two that get the size */
+/*
+ * FIRE is half a button wider than its grid column, so it has to grow inwards.
+ * Left to expand naturally it grew to the right, off the edge of the screen —
+ * `justify-self:end` plus a negative left margin keeps the overflow on the
+ * inside where there is room for it.
+ */
+#btn-fire{ grid-area:fire; width:calc(var(--btn) * 1.5); height:calc(var(--btn) * 1.5);
+  justify-self:end; margin:-25% 0 -6% calc(var(--btn) * -0.5);
+  background:rgba(190,40,40,.5); border-color:rgba(255,150,150,.62);
+  font-size:clamp(12px,2.5vmin,17px); }
+#btn-aim{ width:calc(var(--btn) * 1.18); height:calc(var(--btn) * 1.18);
+  justify-self:start; margin:-9% 0 0 calc(var(--btn) * -0.18); }
+/* the secondary row reads as secondary */
+#btn-swap,#btn-reload,#btn-nade,#btn-ability{ opacity:.88; }
 
 /* ── rotate gate ── */
 #rotate-gate{ position:fixed; inset:0; z-index:40; display:grid; place-content:center;

@@ -12,21 +12,21 @@ await page.goto('http://localhost:8080/', { waitUntil: 'load' });
 await page.waitForSelector('#scr-menu:not(.hidden)', { timeout: 120000 });
 await page.waitForTimeout(1200);
 
-await page.screenshot({ path: `${OUT}/ui-1-menu-gang.png` });
+await page.screenshot({ path: `${OUT}/ui-1-menu-gang.png`, timeout: 90000 });
 
 await page.click('.op-list .op-card:nth-child(3)');           // Queen
 await page.waitForTimeout(300);
-await page.screenshot({ path: `${OUT}/ui-2-operator.png` });
+await page.screenshot({ path: `${OUT}/ui-2-operator.png`, timeout: 90000 });
 
 await page.click('.ftab[data-f="police"]');
 await page.waitForTimeout(400);
 await page.click('.op-list .op-card:nth-child(2)');           // Sgt. Stone
 await page.waitForTimeout(300);
-await page.screenshot({ path: `${OUT}/ui-3-police.png` });
+await page.screenshot({ path: `${OUT}/ui-3-police.png`, timeout: 90000 });
 
 await page.click('#btn-howto');
 await page.waitForTimeout(300);
-await page.screenshot({ path: `${OUT}/ui-4-settings.png` });
+await page.screenshot({ path: `${OUT}/ui-4-settings.png`, timeout: 90000 });
 await page.click('#btn-opts-back');
 await page.waitForTimeout(200);
 
@@ -51,7 +51,7 @@ await page.evaluate(() => {
   for (let i = 0; i < 120; i++) g._tick(1 / 60);
 });
 await page.waitForTimeout(900);
-await page.screenshot({ path: `${OUT}/ui-5-hud.png` });
+await page.screenshot({ path: `${OUT}/ui-5-hud.png`, timeout: 90000 });
 
 // ── beauty passes over the map ──
 const views = [
@@ -89,7 +89,7 @@ for (const [name, pos, look] of views) {
     if (g.skyDome) g.skyDome.position.copy(g.camera.position);
     (g.renderFrame ? g.renderFrame() : g.renderer.render(g.scene, g.camera));
   });
-  await page.screenshot({ path: `${OUT}/${name}.png` });
+  await page.screenshot({ path: `${OUT}/${name}.png`, timeout: 90000 });
 }
 
 console.log('shots written to', OUT);

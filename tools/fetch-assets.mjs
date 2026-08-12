@@ -30,7 +30,7 @@ import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, weld, textureCompress, quantize, mergeDocuments } from '@gltf-transform/functions';
 import { fetchItchPack } from './itch-fetch.mjs';
-import { MATERIALS, PROPS, HDRIS, MODEL_PACKS, LICENSE, SOURCES } from './asset-manifest.js';
+import { MATERIALS, PROPS, HDRIS, MODEL_PACKS, LOCAL_MODELS, LICENSE, SOURCES } from './asset-manifest.js';
 
 const exec = promisify(execFile);
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -628,6 +628,25 @@ handful of 2048² PBR sets, so one file per module would embed forty copies of
 the brickwork; merged first, dedup collapses them and the whole kit costs
 2.5 MB. \`npm run kit\` prints every module's grid size.
 
+### Supplied assets
+
+One model in \`assets/\` did not come from the CC0 libraries above: the marked
+patrol car, \`models/police/interceptor.glb\`, was supplied by the project owner.
+Its provenance and licence are theirs to state, not ours, so it is listed
+separately and the pipeline only records it — \`npm run assets\` cannot rebuild
+it from a clean clone.
+
+It is a real-world vehicle with a manufacturer's trademarked design and
+badging. That is worth a look before this is published anywhere commercial:
+model licences and trademark are separate questions, and a licence to use a
+mesh is not permission to use the marque.
+
+It arrived as a \`.blend\` and an \`.fbx\`. The FBX is the one that looks
+convenient and it is unusable — three's FBX importer mangles this file's
+pivots, and the car loads as a heap of detached panels. The \`.blend\` exports
+cleanly through Blender, which is the path \`tools/fbx-to-glb.mjs\` and
+\`tools/bake-glb.mjs\` document.
+
 **Still excluded** for licensing, unchanged: Mixamo (no clear redistribution
 grant, and an account is required) and Renderpeople / Human Alloy free samples
 (licence forbids redistribution).
@@ -671,6 +690,21 @@ if (want('models')) {
     catch (e) { console.error(`  ✗ ${pk.id}: ${e.message}`); }
   }
 } else if (prev) manifest.models = prev.models ?? [];
+
+/*
+ * Supplied models are recorded, never fetched. The baked GLB is committed, so
+ * all this does is confirm it is still there and put it in the manifest — with
+ * its provenance kept distinct from the CC0 libraries.
+ */
+for (const m of LOCAL_MODELS) {
+  if (await exists(path.join(OUT, m.file))) {
+    manifest.models.push({ pack: m.pack, slot: m.slot, source: m.source, file: m.file,
+      scale: m.scale ?? 1, note: m.note });
+    log(`  ✓ ${(m.pack + '/' + m.slot).padEnd(20)} supplied  ${mb((await fs.stat(path.join(OUT, m.file))).size)}`);
+  } else {
+    console.error(`  ✗ ${m.pack}/${m.slot}: ${m.file} is missing — rebuild it with tools/fbx-to-glb.mjs then tools/bake-glb.mjs`);
+  }
+}
 
 await fs.mkdir(OUT, { recursive: true });
 await fs.writeFile(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2));

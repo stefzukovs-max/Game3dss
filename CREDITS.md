@@ -173,6 +173,7 @@ still reproduces everything from a clean clone.
 | `bush2` | Bush_2 | [Realistic Car Pack](https://quaternius.com) | nature |
 | `tree1` | CommonTree_2 | [Realistic Car Pack](https://quaternius.com) | nature |
 | `tree2` | CommonTree_5 | [Realistic Car Pack](https://quaternius.com) | nature |
+| `interceptor` | undefined | [Realistic Car Pack](https://quaternius.com) | police |
 
 ## Environment lighting — Poly Haven
 
@@ -275,6 +276,25 @@ The kit is merged into one glTF at build time. Every module references the same
 handful of 2048² PBR sets, so one file per module would embed forty copies of
 the brickwork; merged first, dedup collapses them and the whole kit costs
 2.5 MB. `npm run kit` prints every module's grid size.
+
+### Supplied assets
+
+One model in `assets/` did not come from the CC0 libraries above: the marked
+patrol car, `models/police/interceptor.glb`, was supplied by the project owner.
+Its provenance and licence are theirs to state, not ours, so it is listed
+separately and the pipeline only records it — `npm run assets` cannot rebuild
+it from a clean clone.
+
+It is a real-world vehicle with a manufacturer's trademarked design and
+badging. That is worth a look before this is published anywhere commercial:
+model licences and trademark are separate questions, and a licence to use a
+mesh is not permission to use the marque.
+
+It arrived as a `.blend` and an `.fbx`. The FBX is the one that looks
+convenient and it is unusable — three's FBX importer mangles this file's
+pivots, and the car loads as a heap of detached panels. The `.blend` exports
+cleanly through Blender, which is the path `tools/fbx-to-glb.mjs` and
+`tools/bake-glb.mjs` document.
 
 **Still excluded** for licensing, unchanged: Mixamo (no clear redistribution
 grant, and an account is required) and Renderpeople / Human Alloy free samples

@@ -169,6 +169,24 @@ ok('FIRE button shoots', magAfter !== magBefore, `mag ${magBefore} → ${magAfte
 await tapBtn('btn-aim');
 await page.waitForTimeout(200);
 ok('AIM toggles', await page.evaluate(() => window.__game.input.touch.aim));
+
+/*
+ * Holding ADS has to shoot on its own. FIRE and look are both the right thumb,
+ * so any layout that needs FIRE held takes your aim away for as long as you are
+ * shooting — this is the setting that makes the game playable with two thumbs,
+ * and it is invisible in a screenshot.
+ */
+const auto = await page.evaluate(() => {
+  const g = window.__game;
+  const w = g.player.weapon;
+  w.mag = w.def.mag; w.reloading = false;
+  const before = w.mag;
+  for (let i = 0; i < 40; i++) g._tick(1 / 60);
+  return { before, after: g.player.weapon.mag, firing: g.input.firing };
+});
+ok('aiming alone fires', auto.after < auto.before,
+  `mag ${auto.before} → ${auto.after}, input.firing ${auto.firing}`);
+
 await tapBtn('btn-aim');
 
 await page.evaluate(() => { window.__game.player.vel.y = 0; window.__game.player.onGround = true; });
@@ -211,6 +229,25 @@ await page.screenshot({ path: `${OUT}/mob-2-hud.png` });
 await tapBtn('btn-pause');
 await page.waitForTimeout(300);
 ok('pause button pauses', await page.evaluate(() => window.__game.state === 'paused'));
+
+/*
+ * The controls have to be inside the screen, not merely present. FIRE is
+ * deliberately oversized and pulled toward the corner, which is exactly the
+ * kind of thing that ends up half off the edge of a notched phone.
+ */
+const onScreen = await page.evaluate(() => {
+  const out = {};
+  for (const id of ['btn-fire', 'btn-aim', 'btn-jump', 'btn-crouch', 'btn-reload', 'btn-swap', 'btn-nade', 'btn-ability']) {
+    const b = document.getElementById(id)?.getBoundingClientRect();
+    if (!b) { out[id] = 'missing'; continue; }
+    if (b.right > innerWidth + 1 || b.bottom > innerHeight + 1 || b.left < -1 || b.top < -1) {
+      out[id] = `${Math.round(b.left)},${Math.round(b.top)} ${Math.round(b.width)}x${Math.round(b.height)}`;
+    }
+  }
+  return out;
+});
+ok('every touch button is fully on screen', Object.keys(onScreen).length === 0, JSON.stringify(onScreen));
+
 await page.screenshot({ path: `${OUT}/mob-3-pause.png` });
 
 /* ── portrait gate ──

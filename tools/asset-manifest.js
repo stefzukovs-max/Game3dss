@@ -142,6 +142,31 @@ export const HDRIS = [
  * weapons and 15 attachments; the game uses four, chosen for silhouette —
  * they have to be distinguishable from each other at a glance in a fight.
  */
+/*
+ * Models that are not fetched.
+ *
+ * These arrive by hand — supplied by the project owner rather than pulled from
+ * a CC0 library — so the baked GLB is committed and the pipeline only records
+ * it. `npm run assets` cannot rebuild them from a clean clone, which is exactly
+ * why they are listed separately from everything else rather than quietly
+ * mixed in: the provenance and the licence are not ours to assert.
+ *
+ * `tools/fbx-to-glb.mjs` and `tools/bake-glb.mjs` are the two steps that made
+ * the file, so it can be remade if the source is supplied again.
+ */
+export const LOCAL_MODELS = [
+  {
+    pack: 'police', slot: 'interceptor',
+    file: 'models/police/interceptor.glb',
+    source: 'supplied',
+    name: 'Police interceptor sedan',
+    use: 'the patrol cars at the foot of the hill',
+    // exported from the .blend in metres, so it needs no rescaling
+    scale: 1,
+    note: 'supplied by the project owner; not from the CC0 libraries above',
+  },
+];
+
 export const MODEL_PACKS = [
   {
     id: 'guns', user: 'quaternius', slug: '50-lowpoly-guns',

@@ -1159,6 +1159,14 @@
       "source": "quaternius",
       "model": "CommonTree_5",
       "file": "models/nature/tree2.glb"
+    },
+    {
+      "pack": "police",
+      "slot": "interceptor",
+      "source": "supplied",
+      "file": "models/police/interceptor.glb",
+      "scale": 1,
+      "note": "supplied by the project owner; not from the CC0 libraries above"
     }
   ]
 }
