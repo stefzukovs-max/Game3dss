@@ -728,6 +728,34 @@
       "file": "models/people/body.glb"
     },
     {
+      "pack": "people",
+      "slot": "hair_buzz",
+      "source": "quaternius",
+      "model": "Hair_Buzzed.gltf",
+      "file": "models/people/hair_buzz.glb"
+    },
+    {
+      "pack": "people",
+      "slot": "hair_part",
+      "source": "quaternius",
+      "model": "Hair_SimpleParted.gltf",
+      "file": "models/people/hair_part.glb"
+    },
+    {
+      "pack": "people",
+      "slot": "hair_long",
+      "source": "quaternius",
+      "model": "Hair_Long.gltf",
+      "file": "models/people/hair_long.glb"
+    },
+    {
+      "pack": "people",
+      "slot": "beard",
+      "source": "quaternius",
+      "model": "Hair_Beard.gltf",
+      "file": "models/people/beard.glb"
+    },
+    {
       "pack": "anim",
       "slot": "clips",
       "source": "quaternius",

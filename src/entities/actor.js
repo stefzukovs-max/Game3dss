@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { damp, clamp, angleDelta } from '../core/utils.js';
-import { dress } from './outfit.js';
+import { dress, reshapeBody } from './outfit.js';
 
 /**
  * ══════════════════════════════════════════════════════════════════
@@ -33,6 +33,14 @@ let SOURCE = null;      // { body: Object3D, clips: Map<string, AnimationClip> }
 export function setActorSource(assets) {
   const body = assets?.models.get('people:body');
   if (!body || !assets.clips?.length) { SOURCE = null; return false; }
+
+  /*
+   * Reshape the shared body before anything is cloned or cut from it. The pack
+   * ships a comic-book physique; left alone it makes every character on the map
+   * a bodybuilder, and the clothing — which is cut from this surface — inherits
+   * it.
+   */
+  reshapeBody(body);
 
   const clips = new Map();
   for (const c of assets.clips) clips.set(c.name, c);

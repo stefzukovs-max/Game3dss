@@ -575,6 +575,14 @@ packs share all 65 bones, and every track of a clip binds to the base
 character's skeleton with no renaming. The animation library drives the body
 directly.
 
+**The physique needed changing first.** The pack's body is called "Superhero"
+and is built like one, and since the clothing is cut from that surface it
+inherits every bulge — dressed, it read as a bodybuilder in body paint.
+\`reshapeBody\` contracts the mesh around each bone, perpendicular to that
+bone's own run, and blends the result by skin weight the way skinning does.
+Every centre is a point *on* its bone, so the bone stays the axis of its limb
+and the skeleton does not have to move with the skin.
+
 **The gap was clothing.** The base pack ships bare bodies, and no CC0 outfit
 set anywhere shares this skeleton — the only modular outfit pack built for it
 is fantasy armour. So the clothing is cut out of the body itself, in
@@ -582,9 +590,19 @@ is fantasy armour. So the clothing is cut out of the body itself, in
 copied and pushed a centimetre or two along its own normals, so it inherits the
 pack's skin weights and deforms correctly with no rigging step. Bone weights
 give the soft boundaries — an armhole follows the shoulder — and cut planes give
-the hard ones. Hard kit that would not deform is modelled and hung off bones:
+the hard ones.
+
+A shell offset along the body's normals is a perfect cast of it, so a garment
+left there shows the abdominals through the shirt and the trousers read as
+leggings. Each one is relaxed against its own neighbours a few times to lift it
+off the muscle relief, and the clearance that smoothing eats is pushed back out
+afterwards.
+
+Anything that would not deform is modelled and hung off a bone instead:
 helmets, visors, night vision, caps, magazine pouches, shoulder radios,
-drop-leg holsters, knee pads, the gold chain.
+drop-leg holsters, knee pads, the gold chain — and footwear, because a shell
+around a foot is a shrink-wrapped foot, with toes and no sole. The pack's
+hairstyles go on the head bone the same way.
 
 \`npm run check:outfits\` reports what every preset cut, so a garment that
 comes back empty shows up as a number rather than as an absence in a

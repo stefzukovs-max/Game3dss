@@ -180,7 +180,19 @@ export const MODEL_PACKS = [
     id: 'people', user: 'quaternius', slug: 'universal-base-characters',
     name: 'Universal Base Characters', size: 512, format: 'gltf',
     use: 'the rigged body every character is built on',
-    files: { body: 'Superhero_Male_FullBody.gltf' },
+    /*
+     * The hairstyles ship as separate files rigged to the head bone. They are
+     * taken from the "Origin at 0" set and attached rigidly: hair does not
+     * deform on a shooter at this distance, and a rigid child of the head bone
+     * costs nothing next to a second skinned mesh per character.
+     */
+    files: {
+      body: 'Superhero_Male_FullBody.gltf',
+      hair_buzz: 'Hair_Buzzed.gltf',
+      hair_part: 'Hair_SimpleParted.gltf',
+      hair_long: 'Hair_Long.gltf',
+      beard: 'Hair_Beard.gltf',
+    },
   },
   {
     id: 'anim', user: 'quaternius', slug: 'universal-animation-library',

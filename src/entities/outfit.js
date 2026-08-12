@@ -46,6 +46,7 @@ const MAT_CACHE = new Map();     // kind -> Material
 const GEAR_GEO = new Map();      // gear part -> BufferGeometry
 let FABRIC = null;               // woven normal map
 let HIDE = null;                 // leather normal map
+let HAIR_SOURCE = null;          // hairstyles rigged to the head bone
 
 /** Hand the outfit system the scanned cloth maps, once the library is up. */
 export function setOutfitMaterials(assets) {
@@ -60,6 +61,12 @@ export function setOutfitMaterials(assets) {
   FABRIC = wrap(assets?.material('cloth')?.normal, 8);
   HIDE = wrap(assets?.material('leather')?.normal, 10);
   MAT_CACHE.clear();
+
+  const hair = (slot) => assets?.models.get(`people:${slot}`) ?? null;
+  const styles = ['hair_buzz', 'hair_part', 'hair_long'].map(hair).filter(Boolean);
+  HAIR_SOURCE = styles.length || hair('beard')
+    ? { styles, buzz: hair('hair_buzz'), beard: hair('beard') }
+    : null;
 }
 
 /**
@@ -115,6 +122,132 @@ function restMatrix(mesh) {
     .multiply(mesh.skeleton.boneInverses[0])
     .multiply(mesh.bindMatrix)
     .premultiply(mesh.matrixWorld);
+}
+
+/* ── proportions ──────────────────────────────────────────────────── */
+
+/**
+ * Per-bone reshaping, as a scale about a point on the bone's own axis.
+ *
+ * The pack's body is called "Superhero" and is built like one: deltoids the
+ * size of melons, a wasp waist and a 1.86 m arm span on a 1.82 m man. Dressed,
+ * that reads as a bodybuilder in body paint rather than as somebody who lives
+ * on this hill, and no amount of work on the clothing fixes it — the clothing
+ * is cut from this surface, so it inherits every bulge.
+ *
+ * Each bone contracts the mesh around itself, perpendicular to its own run: the
+ * arms lie along X in the bind pose so they take (1, k, k), the torso and legs
+ * stand along Y so they take (k, 1, k). Because every centre is a point *on*
+ * the bone, the bone stays the axis of its limb and the skeleton does not have
+ * to move with the skin — rotating a thinner arm still works exactly as before.
+ *
+ * The result is blended by skin weight, the same way skinning is, so the
+ * transitions come out smooth rather than stepping at every joint.
+ */
+const SHAPE = {
+  neck_01:    { c: [0, 1.520, -0.041], s: [0.90, 1, 0.90] },
+  clavicle_l: { c: [0.031, 1.495, 0.033], s: [1, 0.90, 0.92] },
+  clavicle_r: { c: [-0.031, 1.495, 0.033], s: [1, 0.90, 0.92] },
+  upperarm_l: { c: [0.212, 1.455, -0.065], s: [1, 0.76, 0.76] },
+  upperarm_r: { c: [-0.212, 1.455, -0.065], s: [1, 0.76, 0.76] },
+  lowerarm_l: { c: [0.463, 1.455, -0.073], s: [1, 0.84, 0.84] },
+  lowerarm_r: { c: [-0.463, 1.455, -0.073], s: [1, 0.84, 0.84] },
+  hand_l:     { c: [0.706, 1.455, -0.065], s: [1, 0.94, 0.94] },
+  hand_r:     { c: [-0.706, 1.455, -0.065], s: [1, 0.94, 0.94] },
+  spine_03:   { c: [0, 1.311, 0.007], s: [0.90, 1, 0.93] },
+  spine_02:   { c: [0, 1.178, 0.004], s: [0.96, 1, 0.98] },
+  spine_01:   { c: [0, 1.072, -0.007], s: [1.04, 1, 1.03] },
+  pelvis:     { c: [0, 0.949, -0.043], s: [1.02, 1, 1.00] },
+  thigh_l:    { c: [0.114, 0.971, -0.036], s: [0.91, 1, 0.91] },
+  thigh_r:    { c: [-0.114, 0.971, -0.036], s: [0.91, 1, 0.91] },
+  calf_l:     { c: [0.114, 0.542, -0.036], s: [0.89, 1, 0.89] },
+  calf_r:     { c: [-0.114, 0.542, -0.036], s: [0.89, 1, 0.89] },
+};
+
+/**
+ * Reshape the shared body once, in place.
+ *
+ * Runs on the source mesh before anything is cut from it, so the clothing
+ * inherits the new proportions for free.
+ *
+ * Normals are transformed rather than recomputed. `computeVertexNormals` would
+ * be the obvious call and it splits the normal at every UV seam, which puts a
+ * visible crease down the side of the head and along both arms — the authored
+ * normals are already smooth across those seams, and a non-uniform scale
+ * carries them correctly through its own inverse.
+ */
+export function reshapeBody(root) {
+  const src = bodyMesh(root);
+  if (!src || src.userData.reshaped) return false;
+
+  const skins = [];
+  root.traverse((o) => { if (o.isSkinnedMesh) skins.push(o); });
+  src.updateWorldMatrix(true, false);
+  const toRest = restMatrix(src);
+  const toAttr = toRest.clone().invert();
+  // direction-only forms of the same two transforms, for the normals
+  const dirToRest = new THREE.Matrix3().setFromMatrix4(toRest);
+  const dirToAttr = new THREE.Matrix3().setFromMatrix4(toAttr);
+
+  for (const mesh of skins) {
+    const names = mesh.skeleton.bones.map((b) => b.name);
+    const table = names.map((n) => SHAPE[n] ?? null);
+    if (!table.some(Boolean)) continue;
+
+    const pos = mesh.geometry.attributes.position;
+    const nor = mesh.geometry.attributes.normal;
+    const si = mesh.geometry.attributes.skinIndex;
+    const sw = mesh.geometry.attributes.skinWeight;
+    const n = pos.count;
+    const P = new Float32Array(n * 3);
+    const N = new Float32Array(n * 3);
+    const p = new THREE.Vector3();
+    const out = new THREE.Vector3();
+    const nv = new THREE.Vector3();
+    const acc = [0, 0, 0];
+
+    for (let i = 0; i < n; i++) {
+      p.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(toRest);
+      out.set(0, 0, 0);
+      acc[0] = acc[1] = acc[2] = 0;
+      let total = 0;
+
+      for (const k of ['X', 'Y', 'Z', 'W']) {
+        const w = sw[`get${k}`](i);
+        if (w <= 0) continue;
+        const e = table[si[`get${k}`](i)];
+        total += w;
+        if (!e) { out.addScaledVector(p, w); acc[0] += w; acc[1] += w; acc[2] += w; continue; }
+        out.x += w * (e.c[0] + e.s[0] * (p.x - e.c[0]));
+        out.y += w * (e.c[1] + e.s[1] * (p.y - e.c[1]));
+        out.z += w * (e.c[2] + e.s[2] * (p.z - e.c[2]));
+        acc[0] += w * e.s[0]; acc[1] += w * e.s[1]; acc[2] += w * e.s[2];
+      }
+      if (total <= 0) { out.copy(p); acc[0] = acc[1] = acc[2] = 1; total = 1; }
+      out.divideScalar(total).applyMatrix4(toAttr);
+      P[i * 3] = out.x; P[i * 3 + 1] = out.y; P[i * 3 + 2] = out.z;
+
+      /*
+       * A normal under a diagonal scale S transforms by S⁻¹ — but S is written
+       * in rest space and the stored normal is in the mesh's own space, which
+       * the armature turns a quarter turn out of it. So the normal makes the
+       * same round trip the position does.
+       */
+      nv.set(nor.getX(i), nor.getY(i), nor.getZ(i)).applyMatrix3(dirToRest);
+      nv.set(nv.x / (acc[0] / total || 1), nv.y / (acc[1] / total || 1),
+        nv.z / (acc[2] / total || 1)).applyMatrix3(dirToAttr).normalize();
+      N[i * 3] = nv.x; N[i * 3 + 1] = nv.y; N[i * 3 + 2] = nv.z;
+    }
+
+    mesh.geometry.setAttribute('position', new THREE.BufferAttribute(P, 3));
+    mesh.geometry.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+    mesh.geometry.computeBoundingBox();
+    mesh.geometry.computeBoundingSphere();
+  }
+
+  src.userData.reshaped = true;
+  KIT_CACHE.clear();
+  return true;
 }
 
 /* ── the cut list ─────────────────────────────────────────────────── */
@@ -191,32 +324,40 @@ function garments(o) {
   /* ── the crew ── */
   if (o.tank) {
     // no arms in the bone set, so the height cut shapes the straps directly
-    push({ name: 'tank', kind: 'cloth', color: o.shirt, thick: 0.013,
+    push({ name: 'tank', kind: 'cloth', color: o.shirt, thick: 0.017, drape: 2,
       bones: B.torso, cuts: [hem(0.88), collar(1.50), sleeve(0.17)] });
   } else if (!o.hasVest) {
-    push({ name: 'shirt', kind: 'cloth', color: o.shirt, thick: 0.016,
+    push({ name: 'shirt', kind: 'cloth', color: o.shirt, thick: 0.028, drape: 3,
       bones: [...B.torso, ...B.arms],
       cuts: [hem(0.86), collar(1.53), sleeve(0.36)] });
   } else {
     // under a plate carrier the sleeves run long — combat shirt, not a T-shirt
-    push({ name: 'combat shirt', kind: 'cloth', color: o.shirt, thick: 0.015,
+    push({ name: 'combat shirt', kind: 'cloth', color: o.shirt, thick: 0.026, drape: 3,
       bones: [...B.torso, ...B.arms],
       cuts: [hem(0.88), collar(1.55), sleeve(0.68)] });
   }
 
   if (o.shorts) {
-    push({ name: 'shorts', kind: 'cloth', color: o.pants, thick: 0.021,
+    push({ name: 'shorts', kind: 'cloth', color: o.pants, thick: 0.048, drape: 5,
       bones: B.legs, cuts: [y(0.60, 1.03)] });
   } else {
-    push({ name: 'trousers', kind: 'cloth', color: o.pants, thick: 0.020,
+    push({ name: 'trousers', kind: 'cloth', color: o.pants, thick: 0.046, drape: 6,
       bones: B.legs, cuts: [y(0.11, 1.03)] });
   }
 
-  /* footwear: a boot is the same cut as a shoe with a taller rim */
-  const boot = !!o.knees || o.shoes === 0x14161a;
-  push({ name: boot ? 'boots' : 'shoes', kind: 'gear', color: o.shoes ?? 0x22252b,
-    thick: boot ? 0.024 : 0.017, bones: B.feet,
-    cuts: [{ axis: 'y', max: boot ? 0.30 : 0.13, clamp: 'max' }] });
+  /*
+   * Footwear is modelled, not cut.
+   *
+   * A shell around the foot is a shrink-wrapped foot: it has toes, no sole and
+   * no toe box, and it comes out looking like a sock. Feet barely deform, so a
+   * boot can be a rigid object on the foot bone and have the one thing the
+   * shell cannot — a shape of its own. Only the shaft, which crosses the ankle,
+   * is still cut from the leg.
+   */
+  if (o.knees || o.shoes === 0x14161a) {
+    push({ name: 'boot shaft', kind: 'gear', color: o.shoes ?? 0x14161a, thick: 0.028, drape: 2,
+      bones: B.feet, cuts: [y(0.10, 0.30, 'max')] });
+  }
 
   /* ── the battalion ── */
   if (o.vest) {
@@ -226,7 +367,7 @@ function garments(o) {
      * over a shirt; unclamped, the chest weighting runs out at the base of the
      * neck on its own and leaves proper shoulder straps.
      */
-    push({ name: 'plate carrier', kind: 'gear', color: o.vest, thick: 0.045,
+    push({ name: 'plate carrier', kind: 'gear', color: o.vest, thick: 0.052, drape: 3,
       bones: B.chest, cuts: [hem(1.00), sleeve(0.20)] });
     if (o.sidePlates) {
       push({ name: 'side plates', kind: 'gear', color: o.vest, thick: 0.068,
@@ -251,13 +392,13 @@ function garments(o) {
       bones: [...B.hands, ...FINGERS], cuts: [{ axis: 'absx', min: 0.62, clamp: 'min' }] });
   }
   if (o.balaclava) {
-    push({ name: 'balaclava', kind: 'cloth', color: o.balaclava, thick: 0.009,
+    push({ name: 'balaclava', kind: 'cloth', color: o.balaclava, thick: 0.011, drape: 1,
       bones: B.head, cuts: [hem(1.56)] });
   } else if (o.head === 'bandana') {
     push({ name: 'bandana', kind: 'cloth', color: o.bandana, thick: 0.008,
       bones: B.head, cuts: [hem(1.74)] });
   } else if (o.head === 'hood') {
-    push({ name: 'hood', kind: 'cloth', color: o.hood, thick: 0.032,
+    push({ name: 'hood', kind: 'cloth', color: o.hood, thick: 0.042, drape: 4,
       bones: [...B.head, ...B.chest], cuts: [hem(1.44)] });
   }
   if (o.face && o.head !== 'hood') {
@@ -396,6 +537,8 @@ function cutGarment(src, spec, rest, toAttr) {
     C[j * 3] = col.r; C[j * 3 + 1] = col.g; C[j * 3 + 2] = col.b;
   }
 
+  if (spec.drape) relax(P, keep, remap, spec.drape, spec.thick / metresPerUnit(toAttr));
+
   const out = new THREE.BufferGeometry();
   out.setAttribute('position', new THREE.BufferAttribute(P, 3));
   out.setAttribute('normal', new THREE.BufferAttribute(N, 3));
@@ -405,6 +548,60 @@ function cutGarment(src, spec, rest, toAttr) {
   out.setAttribute('color', new THREE.BufferAttribute(C, 3));
   out.setIndex(keep.map((v) => remap[v]));
   return out;
+}
+
+/**
+ * Let a garment hang instead of tracing the body.
+ *
+ * A shell offset along the body's normals is a perfect cast of it, so the
+ * abdominals show through the shirt and the trousers read as leggings — which
+ * is most of why this looked like body paint. Averaging each vertex against its
+ * neighbours a few times relaxes the surface off the muscle relief and leaves
+ * the garment's own shape: the silhouette a shirt has because it hangs from the
+ * shoulders rather than because of what is under it.
+ *
+ * Laplacian smoothing shrinks whatever it touches, and a garment that shrinks
+ * ends up inside the body, so the lost thickness is pushed back out along the
+ * surface's own direction afterwards.
+ */
+function relax(P, keep, remap, iterations, thick) {
+  const m = P.length / 3;
+  const sum = new Float32Array(m * 3);
+  const deg = new Uint16Array(m);
+  const edge = (a, b) => {
+    sum[a * 3] += P[b * 3]; sum[a * 3 + 1] += P[b * 3 + 1]; sum[a * 3 + 2] += P[b * 3 + 2];
+    deg[a]++;
+  };
+
+  const before = P.slice();
+  for (let pass = 0; pass < iterations; pass++) {
+    sum.fill(0); deg.fill(0);
+    for (let k = 0; k < keep.length; k += 3) {
+      const a = remap[keep[k]], b = remap[keep[k + 1]], c = remap[keep[k + 2]];
+      edge(a, b); edge(a, c); edge(b, a); edge(b, c); edge(c, a); edge(c, b);
+    }
+    for (let i = 0; i < m; i++) {
+      if (!deg[i]) continue;
+      for (let j = 0; j < 3; j++) {
+        // half way to the neighbourhood average: enough to lose the relief in
+        // a few passes, gentle enough not to collapse a sleeve
+        P[i * 3 + j] += 0.5 * (sum[i * 3 + j] / deg[i] - P[i * 3 + j]);
+      }
+    }
+  }
+
+  // restore the clearance smoothing ate, along the direction it moved
+  for (let i = 0; i < m; i++) {
+    let dx = P[i * 3] - before[i * 3];
+    let dy = P[i * 3 + 1] - before[i * 3 + 1];
+    let dz = P[i * 3 + 2] - before[i * 3 + 2];
+    const d = Math.hypot(dx, dy, dz);
+    if (d < 1e-6) continue;
+    const push = Math.min(d, thick * 0.9);
+    P[i * 3] -= (dx / d) * push;
+    P[i * 3 + 1] -= (dy / d) * push;
+    P[i * 3 + 2] -= (dz / d) * push;
+  }
 }
 
 /**
@@ -491,6 +688,73 @@ function addGear(body, o, out) {
    * `tools/rig-info.mjs` prints them.
    */
 
+  /*
+   * Hair.
+   *
+   * A crowd of identically bald men is its own kind of comical, and the pack
+   * ships hairstyles rigged to the head bone. They go on rigidly: hair does not
+   * deform meaningfully at the distance this game is played at, and a rigid
+   * child of a bone costs a fraction of a second skinned mesh per character.
+   *
+   * Skipped under a balaclava or a hood, which would otherwise have hair
+   * growing through them.
+   */
+  if (HAIR_SOURCE && !o.balaclava && o.head !== 'hood') {
+    /*
+     * The battalion is on an operation and the crew is not, so they do not draw
+     * from the same set: police get service cuts, and anything under a helmet
+     * or a cap has to be a close crop or it grows through the crown.
+     */
+    const police = String(o.preset ?? '').startsWith('police');
+    const capped = o.head === 'helmet' || o.head === 'cap';
+    const styles = police ? HAIR_SOURCE.styles.slice(0, 2) : HAIR_SOURCE.styles;
+    if (styles.length) {
+      const pick = styles[Math.abs(o.hair ?? 0) % styles.length];
+      const style = capped ? (HAIR_SOURCE.buzz ?? pick) : pick;
+      if (style) {
+        /*
+         * These are the pack's "Origin at 0" hairstyles: their vertices are
+         * measured from the character's origin, not from the head. Parenting
+         * one straight to the head bone stacks 1.6 m on top of 1.7 m and puts
+         * the hair in the air above the character, so the mount is offset back
+         * down by exactly the head bone's rest height.
+         */
+        const g = mount(body, 'Head', V(0, -1.600, 0.017));
+        if (g) {
+          const h = style.clone(true);
+          h.traverse((m) => {
+            if (!m.isMesh) return;
+            m.castShadow = true;
+            m.frustumCulled = false;
+            m.material = m.material.clone();
+            m.material.color = new THREE.Color(o.hair ?? 0x1b1310);
+            m.material.roughness = 0.86;
+            m.material.metalness = 0;
+          });
+          g.add(h);
+          out.push(g);
+        }
+      }
+    }
+    if (HAIR_SOURCE.beard && !police && (o.hair ?? 0) % 3 === 0 && !o.face) {
+      const g = mount(body, 'Head', V(0, -1.600, 0.017));
+      if (g) {
+        const bd = HAIR_SOURCE.beard.clone(true);
+        bd.traverse((m) => {
+          if (!m.isMesh) return;
+          m.castShadow = true;
+          m.frustumCulled = false;
+          m.material = m.material.clone();
+          m.material.color = new THREE.Color(o.hair ?? 0x1b1310);
+          m.material.roughness = 0.9;
+          m.material.metalness = 0;
+        });
+        g.add(bd);
+        out.push(g);
+      }
+    }
+  }
+
   /* headgear */
   if (o.head === 'helmet') {
     add('Head', V(0, 0.100, 0.020), gearGeo('helmet', () => {
@@ -558,6 +822,33 @@ function addGear(body, o, out) {
         return k.scale(1, 1.15, 0.62).rotateX(Math.PI / 2);
       }), 0x16191e, 0.6, 0);
     }
+  }
+
+  /*
+   * Footwear.
+   *
+   * Built rather than cut, because a shoe's whole shape is the part a shrink
+   * wrap cannot give you: a flat sole standing proud of the ground, a blunt toe
+   * box, a heel. The foot bone barely moves relative to the leg, so a rigid
+   * object on it holds up fine.
+   */
+  /*
+   * Measured, not guessed. The foot runs from z −0.142 to +0.128 in rest space
+   * while its bone sits at z −0.088 — the ankle, 5 cm behind the middle of the
+   * foot and 21 cm behind the toe. A boot placed at the bone ends up behind the
+   * foot with the toes sticking out of the front of it.
+   */
+  const boot = !!o.knees || o.shoes === 0x14161a;
+  for (const [side, hand] of [['foot_l', 1], ['foot_r', -1]]) {
+    add(side, V(0.0175 * hand, -0.096, 0.081), gearGeo(boot ? 'boot' : 'shoe', () => {
+      const parts = [
+        box(0.118, 0.030, 0.292).translate(0, 0.015, 0),          // sole
+        box(0.108, 0.080, 0.250).translate(0, 0.068, -0.014),     // upper
+        box(0.096, 0.054, 0.086).translate(0, 0.046, 0.104),      // toe box
+      ];
+      if (boot) parts.push(box(0.104, 0.155, 0.112).translate(0, 0.180, -0.070));
+      return mergeGeometries(parts);
+    }), o.shoes ?? 0x22252b, boot ? 0.55 : 0.62, 0);
   }
 
   /* crew kit */

@@ -102,6 +102,35 @@ const out = await page.evaluate(async () => {
    * position alone buries it: the spine bones sit near the body's axis, not on
    * its surface, so every offset has to clear a different amount of anatomy.
    */
+  /*
+   * The foot, in rest space. Footwear is modelled rather than cut, so it has to
+   * be built to the foot's real extents — the foot bone sits at the ankle, a
+   * long way behind the toes, and a boot placed from the bone alone ends up
+   * behind the foot with the toes poking out of the front of it.
+   */
+  {
+    const p = bodyMesh.geometry.attributes.position;
+    const si = bodyMesh.geometry.attributes.skinIndex;
+    const sw = bodyMesh.geometry.attributes.skinWeight;
+    const names = bodyMesh.skeleton.bones.map((b) => b.name);
+    const want = new Set(['foot_l', 'ball_l', 'ball_leaf_l']);
+    const bb = new THREE.Box3();
+    const t = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      let m = 0;
+      for (const k of ['X', 'Y', 'Z', 'W']) {
+        if (want.has(names[si[`get${k}`](i)])) m += sw[`get${k}`](i);
+      }
+      if (m < 0.6) continue;
+      bb.expandByPoint(t.set(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(D));
+    }
+    log.push('--- left foot, rest space ---');
+    log.push(`  x ${bb.min.x.toFixed(3)} → ${bb.max.x.toFixed(3)}   ` +
+      `y ${bb.min.y.toFixed(3)} → ${bb.max.y.toFixed(3)}   ` +
+      `z ${bb.min.z.toFixed(3)} → ${bb.max.z.toFixed(3)}`);
+    log.push(`  foot_l bone at x 0.114 y 0.086 z -0.088 — offsets are relative to that`);
+  }
+
   log.push('--- body surface near the mounting bones ---');
   {
     const p = bodyMesh.geometry.attributes.position;
