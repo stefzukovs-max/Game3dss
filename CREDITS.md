@@ -173,7 +173,6 @@ still reproduces everything from a clean clone.
 | `bush2` | Bush_2 | [Realistic Car Pack](https://quaternius.com) | nature |
 | `tree1` | CommonTree_2 | [Realistic Car Pack](https://quaternius.com) | nature |
 | `tree2` | CommonTree_5 | [Realistic Car Pack](https://quaternius.com) | nature |
-| `interceptor` | undefined | [Realistic Car Pack](https://quaternius.com) | police |
 
 ## Environment lighting — Poly Haven
 
@@ -279,16 +278,24 @@ the brickwork; merged first, dedup collapses them and the whole kit costs
 
 ### Supplied assets
 
-One model in `assets/` did not come from the CC0 libraries above: the marked
-patrol car, `models/police/interceptor.glb`, was supplied by the project owner.
-Its provenance and licence are theirs to state, not ours, so it is listed
-separately and the pipeline only records it — `npm run assets` cannot rebuild
-it from a clean clone.
+These models did not come from the CC0 libraries above. They were supplied by
+the project owner, and their provenance and licence are theirs to state, not
+ours — the pipeline only records them, and `npm run assets` cannot rebuild them
+from a clean clone.
 
-It is a real-world vehicle with a manufacturer's trademarked design and
-badging. That is worth a look before this is published anywhere commercial:
-model licences and trademark are separate questions, and a licence to use a
-mesh is not permission to use the marque.
+| Slot | Model | Used for |
+|---|---|---|
+| `police:caveirao` | Armoured personnel truck | the battalion vehicle at the foot of the hill |
+| `landmark:christ` | Hilltop statue | the summit landmark, in place of the plain cross |
+| `slums:kit` | Modular slum blocks | stacked hillside housing |
+| `police:interceptor` | Police interceptor sedan | the patrol cars at the foot of the hill |
+
+Two of them are worth a second look before this is published anywhere
+commercial. `police:interceptor` is a real-world vehicle carrying a
+manufacturer's trademarked design and badging, and `landmark:christ` is a
+copyrighted sculpture whose rights are actively enforced. Model licences,
+trademark and the copyright in a depicted work are three separate questions,
+and a licence to use a mesh answers only the first of them.
 
 It arrived as a `.blend` and an `.fbx`. The FBX is the one that looks
 convenient and it is unusable — three's FBX importer mangles this file's

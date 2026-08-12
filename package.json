@@ -23,7 +23,9 @@
     "props": "node tools/prop-info.mjs",
     "shots:guns": "node tools/weapon-shots.mjs",
     "cutscene:preview": "node tools/build-cutscene-preview.mjs",
-    "view": "node tools/model-view.mjs"
+    "view": "node tools/model-view.mjs",
+    "budget": "node tools/scene-budget.mjs",
+    "kit:sheet": "node tools/kit-sheet.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.4.2",

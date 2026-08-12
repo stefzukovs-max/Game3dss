@@ -1162,10 +1162,42 @@
     },
     {
       "pack": "police",
+      "slot": "caveirao",
+      "source": "supplied",
+      "file": "models/police/caveirao.glb",
+      "scale": 1,
+      "name": "Armoured personnel truck",
+      "use": "the battalion vehicle at the foot of the hill",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "landmark",
+      "slot": "christ",
+      "source": "supplied",
+      "file": "models/landmark/christ.glb",
+      "scale": 0.3,
+      "name": "Hilltop statue",
+      "use": "the summit landmark, in place of the plain cross",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "slums",
+      "slot": "kit",
+      "source": "supplied",
+      "file": "models/slums/kit.glb",
+      "scale": 1,
+      "name": "Modular slum blocks",
+      "use": "stacked hillside housing",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "police",
       "slot": "interceptor",
       "source": "supplied",
       "file": "models/police/interceptor.glb",
       "scale": 1,
+      "name": "Police interceptor sedan",
+      "use": "the patrol cars at the foot of the hill",
       "note": "supplied by the project owner; not from the CC0 libraries above"
     }
   ]

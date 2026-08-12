@@ -156,6 +156,43 @@ export const HDRIS = [
  */
 export const LOCAL_MODELS = [
   {
+    pack: 'police', slot: 'caveirao',
+    file: 'models/police/caveirao.glb',
+    source: 'supplied', name: 'Armoured personnel truck',
+    use: 'the battalion vehicle at the foot of the hill',
+    scale: 1,
+    note: 'supplied by the project owner; not from the CC0 libraries above',
+  },
+  {
+    pack: 'landmark', slot: 'christ',
+    file: 'models/landmark/christ.glb',
+    source: 'supplied', name: 'Hilltop statue',
+    // 39.6 m tall as modelled, which is the real thing's height; the summit
+    // terrace needs something a player can stand next to
+    scale: 0.30,
+    use: 'the summit landmark, in place of the plain cross',
+    note: 'supplied by the project owner; not from the CC0 libraries above',
+  },
+  {
+    pack: 'slums', slot: 'kit',
+    file: 'models/slums/kit.glb',
+    source: 'supplied', name: 'Modular slum blocks',
+    use: 'stacked hillside housing',
+    scale: 1,
+    note: 'supplied by the project owner; not from the CC0 libraries above',
+  },
+  /*
+   * The supplied street vendor is deliberately absent.
+   *
+   * It was sent to be the crew's character model and it cannot be one: it has
+   * no armature, so not one of the game's animations will play on it, and it is
+   * modelled in a stylised cartoon proportion — a metre tall, oversized head,
+   * flat colours — against a roster of realistic 1.8 m figures. Standing it in
+   * the market as scenery was the fallback, and next to the police it would
+   * have read as a bug rather than as a bystander. Registering it anyway would
+   * put 0.45 MB in front of every player for something never drawn.
+   */
+  {
     pack: 'police', slot: 'interceptor',
     file: 'models/police/interceptor.glb',
     source: 'supplied',

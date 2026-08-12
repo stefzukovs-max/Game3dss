@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { makeRNG } from '../core/utils.js';
+import { MONUMENT_H } from './favela.js';
+import { dressSlums } from './slums.js';
 
 /**
  * Dresses the hillside with the CC0 photogrammetry props.
@@ -182,6 +184,36 @@ export function scatterProps(scene, assets, world, opts = {}) {
     taken.push({ x, z, r });
     return true;
   };
+  /** Claim ground unconditionally — for a footprint bigger than its test. */
+  const claim = (x, z, r) => { taken.push({ x, z, r }); };
+
+  /*
+   * Nothing solid goes in the mouth of a climb.
+   *
+   * This is not tidiness. The navigation graph puts a waypoint at the foot of
+   * every flight and, if that waypoint is inside something solid, relocates it
+   * to the nearest clear spot — so one six-metre electricity pole dropped at
+   * the bottom of the grand stair moved the waypoint sideways into the
+   * bandstand railing and closed the main route up the hill. It showed up as a
+   * single FAIL line in the map check and as nothing at all on screen.
+   *
+   * The map already recorded the rects it keeps clear for exactly this reason.
+   */
+  const climbRects = (meta.reserved ?? []).filter((r) => r.why === 'climb');
+  const inClimb = (x, z) => climbRects.some((r) =>
+    x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+
+  /*
+   * The slum kit goes down first, before any of the clutter.
+   *
+   * Order is not cosmetic here. Everything below claims ground through `free`,
+   * and a thousand gas bottles and tyres scattered across the hillside leave no
+   * two-and-a-half-metre square anywhere on it — run the other way round and
+   * nine shacks in ten lose the roll to a barrel. Buildings first, then the
+   * things people leave leaning against them, which is also the order the
+   * hillside was built in.
+   */
+  const slums = dressSlums(B, assets, world, { rng, density, free, claim, ground, surface });
 
   /* ── ground clutter ────────────────────────────────────────────────
    * Weighted so the common things stay common. A hillside has far more gas
@@ -230,7 +262,7 @@ export function scatterProps(scene, assets, world, opts = {}) {
 
     const x = h.x + dx, z = h.z + dz;
     const c = pickClutter();
-    if (!free(x, z, c.r)) continue;
+    if ((c.solid && inClimb(x, z)) || !free(x, z, c.r)) continue;
     const y = ground(x, z, h.y);
     if (y == null) continue;
 
@@ -291,7 +323,7 @@ export function scatterProps(scene, assets, world, opts = {}) {
     for (const lx of LANE_X) {
       for (let z = 58; z > -66; z -= rng.range(15, 24)) {
         const x = lx + rng.range(-2.5, 2.5);
-        if (!free(x, z, 1.4)) continue;
+        if (inClimb(x, z) || !free(x, z, 1.4)) continue;
         const y = surface(x, z, 60);
         if (y == null) continue;
         const yaw = rng() * Math.PI * 2;
@@ -370,16 +402,27 @@ export function scatterProps(scene, assets, world, opts = {}) {
    * carries the scale rather than this code guessing it, because the next
    * supplied model will arrive in whatever unit its author happened to use.
    */
-  const hero = assets.models.get('police:interceptor');
-  const heroScale = assets.manifest?.models?.find((m) => m.pack === 'police')?.scale ?? 1;
+  const supplied = (pack, slot) => {
+    const src = assets.models.get(`${pack}:${slot}`);
+    const rec = assets.manifest?.models?.find((m) => m.pack === pack && m.slot === slot);
+    return src ? { src, scale: rec?.scale ?? 1 } : null;
+  };
+
+  /*
+   * The battalion rolls in an armoured truck rather than saloons. The
+   * interceptor stays as the second choice and the kit car as the third, so the
+   * map still populates if a supplied model is missing.
+   */
+  const heroCar = supplied('police', 'caveirao') ?? supplied('police', 'interceptor');
 
   const placeCar = (slot, x, y, z, yaw) => {
     const isPolice = slot === 'police';
-    const src = (isPolice && hero) || assets.models.get(`cars:${slot}`);
+    const pick = isPolice ? heroCar : null;
+    const src = pick?.src ?? assets.models.get(`cars:${slot}`);
     if (!src) return false;
-    const sc = (isPolice && hero) ? heroScale : 1;
+    const sc = pick?.scale ?? 1;
     _q.setFromAxisAngle(_up, yaw);
-    B.placeObject(`car:${isPolice && hero ? 'interceptor' : slot}`, src,
+    B.placeObject(`car:${pick ? 'police-hero' : slot}`, src,
       _m.compose(_v.set(x, y, z), _q, _s.set(sc, sc, sc)));
     // a car is roughly 1.85 × 4.3 m; the rotated footprint is squared off for
     // the broadphase, and being generous keeps the AI from clipping through
@@ -554,6 +597,43 @@ export function scatterProps(scene, assets, world, opts = {}) {
     }
   }
 
+  /*
+   * The summit statue, standing where the boxed cross used to. The map has
+   * already left a hidden collision column for it, so this only has to put the
+   * geometry in the right place — and "the right place" is measured, not
+   * assumed, because a supplied model arrives in the author's units with the
+   * author's origin.
+   *
+   *   · scaled to the height the map reserved, from its own bounding box
+   *   · centred on the plinth by its box, not by its origin, which sits a metre
+   *     off to one side
+   *   · sat on the plinth by its base
+   *   · facing +z, down the hill and over the city, which is where the real one
+   *     looks and also the direction the police come from
+   *
+   * It ships with no materials at all — 39 metres of untextured mesh — so it
+   * gets soapstone here: pale, rough, barely metallic, and taking its light
+   * from the sky like everything else on the hill.
+   */
+  const statue = supplied('landmark', 'christ');
+  if (statue && meta.monument) {
+    const m0 = meta.monument;
+    statue.src.updateMatrixWorld(true);
+    _box.setFromObject(statue.src);
+    _box.getSize(_size);
+    const sc = MONUMENT_H / (_size.y || 1);
+    const stone = new THREE.MeshStandardMaterial({
+      color: 0xa9a79e, roughness: 0.95, metalness: 0, envMapIntensity: 0.5,
+    });
+    statue.src.traverse((o) => { if (o.isMesh) o.material = stone; });
+    _q.setFromAxisAngle(_up, 0);
+    B.placeObject('landmark:christ', statue.src, _m.compose(
+      _v.set(m0.x - (_box.min.x + _size.x / 2) * sc,
+        m0.y - _box.min.y * sc,
+        m0.z - (_box.min.z + _size.z / 2) * sc),
+      _q, _s.set(sc, sc, sc)));
+  }
+
   const built = B.build();
-  return { ...built, group: built.root };
+  return { ...built, group: built.root, slums };
 }

@@ -467,8 +467,21 @@ function writeCredits(manifest) {
     `| \`${m.slug}\` | [${m.id}](https://ambientcg.com/view?id=${m.id}) | ${m.size}px | ${m.use} |`);
   const props = manifest.props.map((p) =>
     `| [${p.authors?.name ?? p.id}](https://polyhaven.com/a/${p.id}) | ${(p.authors?.authors ?? []).join(', ') || '—'} | ${p.use} |`);
-  const models = (manifest.models ?? []).map((m) =>
-    `| \`${m.slot}\` | ${m.model} | [${m.pack === 'guns' ? 'Ultimate Gun Pack' : 'Realistic Car Pack'}](https://quaternius.com) | ${m.pack} |`);
+  /*
+   * Only the Quaternius packs go in this table, and the filter is the point:
+   * a supplied model has no `model` field and no pack behind it, so the old
+   * unconditional map credited every model the owner sent us to the Realistic
+   * Car Pack — a statue, a slum kit and a police van, all attributed to a
+   * library that never shipped them. Supplied models are listed in their own
+   * section further down, where their provenance can be stated honestly.
+   */
+  const models = (manifest.models ?? [])
+    .filter((m) => m.source !== 'supplied')
+    .map((m) => `| \`${m.slot}\` | ${m.model} | ` +
+      `[${m.pack === 'guns' ? 'Ultimate Gun Pack' : 'Realistic Car Pack'}](https://quaternius.com) | ${m.pack} |`);
+  const supplied = (manifest.models ?? [])
+    .filter((m) => m.source === 'supplied')
+    .map((m) => `| \`${m.pack}:${m.slot}\` | ${m.name ?? '—'} | ${m.use ?? '—'} |`);
   const hdris = manifest.hdris.map((h) =>
     `| [${h.name ?? h.id}](https://polyhaven.com/a/${h.id}) | ${(h.authors ?? []).join(', ') || '—'} | ${h.use} |`);
 
@@ -630,16 +643,19 @@ the brickwork; merged first, dedup collapses them and the whole kit costs
 
 ### Supplied assets
 
-One model in \`assets/\` did not come from the CC0 libraries above: the marked
-patrol car, \`models/police/interceptor.glb\`, was supplied by the project owner.
-Its provenance and licence are theirs to state, not ours, so it is listed
-separately and the pipeline only records it — \`npm run assets\` cannot rebuild
-it from a clean clone.
+These models did not come from the CC0 libraries above. They were supplied by
+the project owner, and their provenance and licence are theirs to state, not
+ours — the pipeline only records them, and \`npm run assets\` cannot rebuild them
+from a clean clone.
 
-It is a real-world vehicle with a manufacturer's trademarked design and
-badging. That is worth a look before this is published anywhere commercial:
-model licences and trademark are separate questions, and a licence to use a
-mesh is not permission to use the marque.
+${rows(supplied, ['Slot', 'Model', 'Used for'])}
+
+Two of them are worth a second look before this is published anywhere
+commercial. \`police:interceptor\` is a real-world vehicle carrying a
+manufacturer's trademarked design and badging, and \`landmark:christ\` is a
+copyrighted sculpture whose rights are actively enforced. Model licences,
+trademark and the copyright in a depicted work are three separate questions,
+and a licence to use a mesh answers only the first of them.
 
 It arrived as a \`.blend\` and an \`.fbx\`. The FBX is the one that looks
 convenient and it is unusable — three's FBX importer mangles this file's
@@ -699,7 +715,7 @@ if (want('models')) {
 for (const m of LOCAL_MODELS) {
   if (await exists(path.join(OUT, m.file))) {
     manifest.models.push({ pack: m.pack, slot: m.slot, source: m.source, file: m.file,
-      scale: m.scale ?? 1, note: m.note });
+      scale: m.scale ?? 1, name: m.name, use: m.use, note: m.note });
     log(`  ✓ ${(m.pack + '/' + m.slot).padEnd(20)} supplied  ${mb((await fs.stat(path.join(OUT, m.file))).size)}`);
   } else {
     console.error(`  ✗ ${m.pack}/${m.slot}: ${m.file} is missing — rebuild it with tools/fbx-to-glb.mjs then tools/bake-glb.mjs`);

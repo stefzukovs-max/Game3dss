@@ -61,6 +61,16 @@ const FLOOR_H = 2.75;
 const STREET_DEPTH = 8.0;
 
 /**
+ * How tall the summit monument stands, in metres.
+ *
+ * One number, used twice and owned here: the map sizes the monument's hidden
+ * collision column to it, and the prop pass scales the supplied statue to it
+ * rather than trusting a scale factor in the manifest. A re-bake that changes
+ * the model's units then moves nothing.
+ */
+export const MONUMENT_H = 11.9;
+
+/**
  * Climbs between terraces. `kind`:
  *   'stair' steep steps · 'grand' the wide painted staircase · 'ramp' vehicle slope
  * Hand-placed so the three lanes never line up into one straight sprint.
@@ -142,14 +152,25 @@ class WorldBuilder {
     return true;
   }
 
+  /** Is a supplied model in the pack? Stand-ins step aside when it is. */
+  hasModel(key) { return !!this.models?.get(key); }
+
+  /**
+   * @param {object} [opts]
+   * @param {boolean} [opts.hidden] collide but do not draw. For a box a
+   *   supplied model is standing in front of: the model brings the silhouette,
+   *   the box keeps the mass, and drawing both would put geometry inside it.
+   */
   box(matKey, cx, cy, cz, w, h, d, opts = {}) {
-    const { solid = true, texScale = 0.5, rotY = 0, tag = 'world' } = opts;
+    const { solid = true, texScale = 0.5, rotY = 0, tag = 'world', hidden = false } = opts;
     const b = this.batches.get(matKey);
     if (!b) throw new Error('unknown material ' + matKey);
-    const geo = texturedBox(w, h, d, texScale);
-    _m.compose(_v.set(cx, cy, cz), _q.setFromAxisAngle(_up, rotY), _s.set(1, 1, 1));
-    b.batcher.add(geo, _m);
-    geo.dispose();
+    if (!hidden) {
+      const geo = texturedBox(w, h, d, texScale);
+      _m.compose(_v.set(cx, cy, cz), _q.setFromAxisAngle(_up, rotY), _s.set(1, 1, 1));
+      b.batcher.add(geo, _m);
+      geo.dispose();
+    }
 
     if (solid) {
       if (rotY === 0) this.collision.addBox(cx, cy, cz, w, h, d, tag);
@@ -231,6 +252,7 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
   const B = new WorldBuilder(collision);
   // when real models are available the box-built stand-ins step aside
   B.useModels = !!(opts.assets?.ready && opts.assets.models.size);
+  B.models = opts.assets?.ready ? opts.assets.models : null;
 
   /*
    * PBR materials. `detail` adds a Sobel-derived normal map and a luminance
@@ -390,6 +412,14 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
   // the builder carries the record so the deeply nested geometry helpers can
   // note what they made without every one of them taking `meta` as an argument
   B.meta = meta;
+  /*
+   * The rects the map kept clear — lanes, streets, climbs, landmark plots. The
+   * prop pass needs them: anything it drops into the world is solid, and the
+   * one thing that must never happen is a shack landing in the mouth of a
+   * climb. Sharing the list is how a later pass avoids the routes without
+   * re-deriving where they are.
+   */
+  meta.reserved = B.reserved;
 
   onProgress(0.08, 'Carving the hillside…');
   buildTerrain(B, rng);
@@ -781,11 +811,29 @@ function buildSummit(B, rng, meta) {
     const s = 16 - i * 3;
     B.box('concrete', cx, t.y + 0.3 + i * 0.6, cz, s, 0.6 + i * 0.6, s, { texScale: 0.5, tag: 'ground' });
   }
-  // the cross itself
-  const by = t.y + 2.4;
-  B.box('cross', cx, by + 4.2, cz, 1.1, 8.4, 1.1, { texScale: 0.6, tag: 'monument' });
-  B.box('cross', cx, by + 6.2, cz, 5.0, 1.1, 1.1, { texScale: 0.6, tag: 'monument' });
+  /*
+   * The monument.
+   *
+   * A boxed cross when the map builds on its own geometry, and the supplied
+   * Redeemer when the pack is there. Both cases go through `B.box` so the mass
+   * is in the collision world either way; the statue's boxes are hidden, and
+   * the prop pass stands the model in the same place — see `meta.monument`.
+   *
+   * The statue's solid is a single column rather than the cross's two boxes.
+   * Its arms are ten metres up, above anything that walks or shoots, and an
+   * invisible crossbar hanging up there would stop bullets over empty air.
+   */
+  const top = t.y + 3.3;           // the plinth's top step
+  if (B.hasModel('landmark:christ')) {
+    B.box('cross', cx, top + MONUMENT_H / 2, cz, 2.4, MONUMENT_H, 2.0,
+      { hidden: true, tag: 'monument' });
+  } else {
+    const by = t.y + 2.4;
+    B.box('cross', cx, by + 4.2, cz, 1.1, 8.4, 1.1, { texScale: 0.6, tag: 'monument' });
+    B.box('cross', cx, by + 6.2, cz, 5.0, 1.1, 1.1, { texScale: 0.6, tag: 'monument' });
+  }
   meta.landmarks.push({ name: 'The Cross', x: cx, z: cz });
+  meta.monument = { x: cx, y: top, z: cz };
 
   // ── THE BIG ROOF: the crew's rooftop HQ, west summit ──
   const hx = -34, hz = -58;
