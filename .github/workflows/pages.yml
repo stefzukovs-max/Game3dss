@@ -1,8 +1,16 @@
 # Publishes the playable game to GitHub Pages.
 #
 # The game is static — no bundler, no build step, no server code — so this is a
-# copy, not a build. `configure-pages` turns Pages on by itself the first time
-# it runs, so nothing has to be clicked in the repository settings.
+# copy, not a build.
+#
+# ── one-time setup ──
+# Repository Settings → Pages → Source: **GitHub Actions**.
+#
+# That switch cannot be flipped from here. `configure-pages` is asked to enable
+# Pages itself, but creating a Pages site needs repository-admin rights and the
+# workflow's GITHUB_TOKEN does not carry them however its permissions are
+# declared — it fails with "Resource not accessible by integration". Once the
+# source is set, `enablement` is a no-op and every push deploys on its own.
 #
 # Only the files the browser actually asks for are uploaded. The tooling
 # (Playwright harnesses, the asset pipeline) is build-time only and would add
