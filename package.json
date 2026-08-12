@@ -14,6 +14,7 @@
     "check:mobile": "node tools/mobile-check.mjs",
     "check:outfits": "node tools/outfit-check.mjs",
     "rig": "node tools/rig-info.mjs",
+    "kit": "node tools/kit-info.mjs",
     "shots:chars": "node tools/character-shots.mjs",
     "assets": "node tools/fetch-assets.mjs",
     "props": "node tools/prop-info.mjs",

@@ -735,6 +735,334 @@
       "file": "models/anim/clips.glb"
     },
     {
+      "pack": "city",
+      "slot": "door_wood",
+      "source": "quaternius",
+      "model": "Door_1",
+      "file": "models/city/kit.glb",
+      "part": "door_wood"
+    },
+    {
+      "pack": "city",
+      "slot": "door_panel",
+      "source": "quaternius",
+      "model": "Door_2",
+      "file": "models/city/kit.glb",
+      "part": "door_panel"
+    },
+    {
+      "pack": "city",
+      "slot": "door_metal",
+      "source": "quaternius",
+      "model": "Door_3",
+      "file": "models/city/kit.glb",
+      "part": "door_metal"
+    },
+    {
+      "pack": "city",
+      "slot": "doorframe_metal",
+      "source": "quaternius",
+      "model": "DoorFrame_Metal_Single",
+      "file": "models/city/kit.glb",
+      "part": "doorframe_metal"
+    },
+    {
+      "pack": "city",
+      "slot": "doorframe_wood",
+      "source": "quaternius",
+      "model": "DoorFrame_Wooden",
+      "file": "models/city/kit.glb",
+      "part": "doorframe_wood"
+    },
+    {
+      "pack": "city",
+      "slot": "window_brick",
+      "source": "quaternius",
+      "model": "Brick_Window_Square_Single",
+      "file": "models/city/kit.glb",
+      "part": "window_brick"
+    },
+    {
+      "pack": "city",
+      "slot": "window_brick_trim",
+      "source": "quaternius",
+      "model": "Brick_Window_Trim_Single",
+      "file": "models/city/kit.glb",
+      "part": "window_brick_trim"
+    },
+    {
+      "pack": "city",
+      "slot": "window_inset",
+      "source": "quaternius",
+      "model": "Brick_Inset_Window",
+      "file": "models/city/kit.glb",
+      "part": "window_inset"
+    },
+    {
+      "pack": "city",
+      "slot": "window_metal",
+      "source": "quaternius",
+      "model": "Metal_Window",
+      "file": "models/city/kit.glb",
+      "part": "window_metal"
+    },
+    {
+      "pack": "city",
+      "slot": "window_metal_half",
+      "source": "quaternius",
+      "model": "Metal_Window_Half",
+      "file": "models/city/kit.glb",
+      "part": "window_metal_half"
+    },
+    {
+      "pack": "city",
+      "slot": "window_full",
+      "source": "quaternius",
+      "model": "Metal_FullWindow",
+      "file": "models/city/kit.glb",
+      "part": "window_full"
+    },
+    {
+      "pack": "city",
+      "slot": "shop_wall",
+      "source": "quaternius",
+      "model": "Metal_FirstFloor_Wall",
+      "file": "models/city/kit.glb",
+      "part": "shop_wall"
+    },
+    {
+      "pack": "city",
+      "slot": "shop_wall_alt",
+      "source": "quaternius",
+      "model": "Metal_FirstFloor_Wall_1",
+      "file": "models/city/kit.glb",
+      "part": "shop_wall_alt"
+    },
+    {
+      "pack": "city",
+      "slot": "shop_window",
+      "source": "quaternius",
+      "model": "Metal_FirstFloor_Window",
+      "file": "models/city/kit.glb",
+      "part": "shop_window"
+    },
+    {
+      "pack": "city",
+      "slot": "brick_plain",
+      "source": "quaternius",
+      "model": "Brick_Plain_1",
+      "file": "models/city/kit.glb",
+      "part": "brick_plain"
+    },
+    {
+      "pack": "city",
+      "slot": "brick_worn",
+      "source": "quaternius",
+      "model": "Brick_Plain_3",
+      "file": "models/city/kit.glb",
+      "part": "brick_worn"
+    },
+    {
+      "pack": "city",
+      "slot": "brick_panel",
+      "source": "quaternius",
+      "model": "Brick_Plain_4",
+      "file": "models/city/kit.glb",
+      "part": "brick_panel"
+    },
+    {
+      "pack": "city",
+      "slot": "brick_double",
+      "source": "quaternius",
+      "model": "Brick_RedWhite_DoubleWindow",
+      "file": "models/city/kit.glb",
+      "part": "brick_double"
+    },
+    {
+      "pack": "city",
+      "slot": "brick_column",
+      "source": "quaternius",
+      "model": "Brick_Column_Small",
+      "file": "models/city/kit.glb",
+      "part": "brick_column"
+    },
+    {
+      "pack": "city",
+      "slot": "brick_base",
+      "source": "quaternius",
+      "model": "Brick_BottomTrim",
+      "file": "models/city/kit.glb",
+      "part": "brick_base"
+    },
+    {
+      "pack": "city",
+      "slot": "brick_cap",
+      "source": "quaternius",
+      "model": "Brick_TopTrim",
+      "file": "models/city/kit.glb",
+      "part": "brick_cap"
+    },
+    {
+      "pack": "city",
+      "slot": "cornice_metal",
+      "source": "quaternius",
+      "model": "Cornice_Metal_Center",
+      "file": "models/city/kit.glb",
+      "part": "cornice_metal"
+    },
+    {
+      "pack": "city",
+      "slot": "rail_run",
+      "source": "quaternius",
+      "model": "Stairs_Rails_Metal_Straight_1",
+      "file": "models/city/kit.glb",
+      "part": "rail_run"
+    },
+    {
+      "pack": "city",
+      "slot": "rail_run_long",
+      "source": "quaternius",
+      "model": "Stairs_Rails_Metal_Straight_2",
+      "file": "models/city/kit.glb",
+      "part": "rail_run_long"
+    },
+    {
+      "pack": "city",
+      "slot": "rail_flight",
+      "source": "quaternius",
+      "model": "Stairs_Rails_Metal",
+      "file": "models/city/kit.glb",
+      "part": "rail_flight"
+    },
+    {
+      "pack": "city",
+      "slot": "stoop",
+      "source": "quaternius",
+      "model": "Stairs_Entrance_Concrete",
+      "file": "models/city/kit.glb",
+      "part": "stoop"
+    },
+    {
+      "pack": "city",
+      "slot": "entrance",
+      "source": "quaternius",
+      "model": "Entrance_Concrete_2x1",
+      "file": "models/city/kit.glb",
+      "part": "entrance"
+    },
+    {
+      "pack": "city",
+      "slot": "wall_guard",
+      "source": "quaternius",
+      "model": "Trim_Wall_Guard",
+      "file": "models/city/kit.glb",
+      "part": "wall_guard"
+    },
+    {
+      "pack": "city",
+      "slot": "ac_unit",
+      "source": "quaternius",
+      "model": "Prop_ACUnit",
+      "file": "models/city/kit.glb",
+      "part": "ac_unit"
+    },
+    {
+      "pack": "city",
+      "slot": "bollard",
+      "source": "quaternius",
+      "model": "Prop_Bollard",
+      "file": "models/city/kit.glb",
+      "part": "bollard"
+    },
+    {
+      "pack": "city",
+      "slot": "drain",
+      "source": "quaternius",
+      "model": "Prop_Drain",
+      "file": "models/city/kit.glb",
+      "part": "drain"
+    },
+    {
+      "pack": "city",
+      "slot": "manhole",
+      "source": "quaternius",
+      "model": "Prop_ManholeCover",
+      "file": "models/city/kit.glb",
+      "part": "manhole"
+    },
+    {
+      "pack": "city",
+      "slot": "planter",
+      "source": "quaternius",
+      "model": "Prop_Planter_Single",
+      "file": "models/city/kit.glb",
+      "part": "planter"
+    },
+    {
+      "pack": "city",
+      "slot": "road",
+      "source": "quaternius",
+      "model": "Street_2Lane",
+      "file": "models/city/kit.glb",
+      "part": "road"
+    },
+    {
+      "pack": "city",
+      "slot": "road_bare",
+      "source": "quaternius",
+      "model": "Street_2Lane_noSidewalk",
+      "file": "models/city/kit.glb",
+      "part": "road_bare"
+    },
+    {
+      "pack": "city",
+      "slot": "road_tee",
+      "source": "quaternius",
+      "model": "Street_TIntersection",
+      "file": "models/city/kit.glb",
+      "part": "road_tee"
+    },
+    {
+      "pack": "city",
+      "slot": "kerb",
+      "source": "quaternius",
+      "model": "Sidewalk_Straight_3m",
+      "file": "models/city/kit.glb",
+      "part": "kerb"
+    },
+    {
+      "pack": "city",
+      "slot": "kerb_corner",
+      "source": "quaternius",
+      "model": "Sidewalk_Corner_Flat_3m",
+      "file": "models/city/kit.glb",
+      "part": "kerb_corner"
+    },
+    {
+      "pack": "city",
+      "slot": "kerb_planter",
+      "source": "quaternius",
+      "model": "Sidewalk_Planter",
+      "file": "models/city/kit.glb",
+      "part": "kerb_planter"
+    },
+    {
+      "pack": "city",
+      "slot": "crosswalk",
+      "source": "quaternius",
+      "model": "Decal_Crosswalk",
+      "file": "models/city/kit.glb",
+      "part": "crosswalk"
+    },
+    {
+      "pack": "city",
+      "slot": "centreline",
+      "source": "quaternius",
+      "model": "Decal_DoubleYellow_Straight",
+      "file": "models/city/kit.glb",
+      "part": "centreline"
+    },
+    {
       "pack": "nature",
       "slot": "palm1",
       "source": "quaternius",

@@ -378,7 +378,18 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
   ['awning0', 'awning1', 'awning2'].forEach((k, i) =>
     B.material(k, col([0xd94f4f, 0x3f8f5f, 0x3f6f9f][i], { side: THREE.DoubleSide })));
 
-  const meta = { spawns: { gang: [], police: [] }, cover: [], pickups: [], houses: [], landmarks: [], vehicles: [], foliage: [] };
+  /*
+   * `doors`, `stairs` and `frontage` are records of what the map built, for the
+   * prop pass to furnish. The geometry that punches an opening is the only code
+   * that knows where the opening ended up, and re-deriving door positions from
+   * the finished collision boxes would be guesswork.
+   */
+  const meta = { spawns: { gang: [], police: [] }, cover: [], pickups: [], houses: [], landmarks: [],
+    vehicles: [], foliage: [], doors: [], stairs: [], frontage: [] };
+
+  // the builder carries the record so the deeply nested geometry helpers can
+  // note what they made without every one of them taking `meta` as an argument
+  B.meta = meta;
 
   onProgress(0.08, 'Carving the hillside…');
   buildTerrain(B, rng);
@@ -913,6 +924,9 @@ function punchDoor(B, rng, px, py, pz, face, nx, nz) {
   bx('trim', (dw / 2 + t / 2), cy, t, dh + t, 0.14, 0.02);
   bx('trim', 0, cy + dh / 2 + t / 2, dw + t * 2, t, 0.14, 0.02);
   bx('concreteDark', 0, py + 0.04, dw + 0.3, 0.08, 0.34, 0.10);      // step
+
+  // hand the opening to the prop pass, which hangs a modelled door in it
+  B.meta?.doors.push({ x: px + nx * 0.02, y: py, z: pz + nz * 0.02, nx, nz, w: dw, h: dh });
 }
 
 /**
@@ -1209,6 +1223,7 @@ function buildStair(B, rng, x, yLow, yHigh, zTop, grand) {
       { texScale: 0.7, tag: 'stair' });
   }
   const run = steps * tread;
+  B.meta?.stairs.push({ x, yLow, zTop, steps, riser, tread, width, grand });
 
   if (grand) {
     // central divider - the thing that makes the grand stair survivable

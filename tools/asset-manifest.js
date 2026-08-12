@@ -188,6 +188,82 @@ export const MODEL_PACKS = [
     use: '43 animation clips on the same skeleton',
     files: { clips: 'UAL1_Standard.glb' },
   },
+  /*
+   * The city kit. Textured PBR modular architecture — brick facades, real
+   * doors and windows, metal shopfronts, stair railings, street furniture and
+   * road tiles with lane markings.
+   *
+   * Curated hard, and against the setting rather than against the pack. Exposed
+   * red brick, roll-up shopfronts and improvised stair rails are exactly what a
+   * hillside like this is built from, so those come. The slate roofs, stone
+   * cornices and ornamental trim are a north-Atlantic downtown and would look
+   * imported, so they stay out — as do the pack's three pre-built buildings,
+   * which are 3 MB each and assembled for a different city.
+   *
+   * `merge` is the important flag. Every module references the same handful of
+   * 2048² texture sets, so writing one GLB per module embeds thirty copies of
+   * the brickwork; merged into a single document first, dedup collapses them to
+   * one and the whole kit costs less than two of the buildings would.
+   */
+  {
+    id: 'city', user: 'quaternius', slug: 'downtown-city-megakit',
+    name: 'Downtown City MegaKit', size: 1024, format: 'gltf', merge: 'kit',
+    use: 'facade detail, shopfronts, stair rails, street furniture and the road',
+    pick: {
+      /* openings — these replace the punched holes in the procedural houses */
+      door_wood: 'Door_1',
+      door_panel: 'Door_2',
+      door_metal: 'Door_3',
+      doorframe_metal: 'DoorFrame_Metal_Single',
+      doorframe_wood: 'DoorFrame_Wooden',
+      window_brick: 'Brick_Window_Square_Single',
+      window_brick_trim: 'Brick_Window_Trim_Single',
+      window_inset: 'Brick_Inset_Window',
+      window_metal: 'Metal_Window',
+      window_metal_half: 'Metal_Window_Half',
+      window_full: 'Metal_FullWindow',
+
+      /* street-level shopfronts along the lower road */
+      shop_wall: 'Metal_FirstFloor_Wall',
+      shop_wall_alt: 'Metal_FirstFloor_Wall_1',
+      shop_window: 'Metal_FirstFloor_Window',
+
+      /* brick facade modules for the blocks at the foot of the hill */
+      brick_plain: 'Brick_Plain_1',
+      brick_worn: 'Brick_Plain_3',
+      brick_panel: 'Brick_Plain_4',
+      brick_double: 'Brick_RedWhite_DoubleWindow',
+      brick_column: 'Brick_Column_Small',
+      brick_base: 'Brick_BottomTrim',
+      brick_cap: 'Brick_TopTrim',
+      cornice_metal: 'Cornice_Metal_Center',
+
+      /* the stairs the whole map is built around finally get handrails */
+      rail_run: 'Stairs_Rails_Metal_Straight_1',
+      rail_run_long: 'Stairs_Rails_Metal_Straight_2',
+      rail_flight: 'Stairs_Rails_Metal',
+      stoop: 'Stairs_Entrance_Concrete',
+      entrance: 'Entrance_Concrete_2x1',
+      wall_guard: 'Trim_Wall_Guard',
+
+      /* street furniture */
+      ac_unit: 'Prop_ACUnit',
+      bollard: 'Prop_Bollard',
+      drain: 'Prop_Drain',
+      manhole: 'Prop_ManholeCover',
+      planter: 'Prop_Planter_Single',
+
+      /* the road at the foot of the hill */
+      road: 'Street_2Lane',
+      road_bare: 'Street_2Lane_noSidewalk',
+      road_tee: 'Street_TIntersection',
+      kerb: 'Sidewalk_Straight_3m',
+      kerb_corner: 'Sidewalk_Corner_Flat_3m',
+      kerb_planter: 'Sidewalk_Planter',
+      crosswalk: 'Decal_Crosswalk',
+      centreline: 'Decal_DoubleYellow_Straight',
+    },
+  },
   {
     id: 'nature', user: 'quaternius', slug: '150-lowpoly-nature-models',
     name: 'Ultimate Nature Pack', dir: 'OBJ', size: 512,

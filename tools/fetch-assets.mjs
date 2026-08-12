@@ -28,7 +28,7 @@ import { pipeline } from 'node:stream/promises';
 import sharp from 'sharp';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, weld, textureCompress, quantize } from '@gltf-transform/functions';
+import { dedup, prune, weld, textureCompress, quantize, mergeDocuments } from '@gltf-transform/functions';
 import { fetchItchPack } from './itch-fetch.mjs';
 import { MATERIALS, PROPS, HDRIS, MODEL_PACKS, LICENSE, SOURCES } from './asset-manifest.js';
 
@@ -261,13 +261,15 @@ async function buildHdri(h) {
 async function buildModelPack(pack) {
   const outDir = path.join(OUT, 'models', pack.id);
   const wanted = Object.entries(pack.pick ?? pack.files ?? {});
-  const have = await Promise.all(wanted.map(([slot]) =>
-    exists(path.join(outDir, `${slot}.glb`))));
+  // a merged kit is one file on disk, whatever the slot count
+  const outputs = pack.merge ? [`${pack.merge}.glb`] : wanted.map(([slot]) => `${slot}.glb`);
+  const have = await Promise.all(outputs.map((f) => exists(path.join(outDir, f))));
   if (!FORCE && have.every(Boolean)) {
     log(`  · ${pack.id} (cached)`);
     return wanted.map(([slot, src]) => ({
       pack: pack.id, slot, source: 'quaternius', model: src,
-      file: `models/${pack.id}/${slot}.glb`,
+      file: `models/${pack.id}/${pack.merge ?? slot}.glb`,
+      ...(pack.merge ? { part: slot } : {}),
     }));
   }
 
@@ -312,6 +314,8 @@ async function buildModelPack(pack) {
 
   await fs.mkdir(outDir, { recursive: true });
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
+  if (pack.merge) return mergeModelPack(pack, glbDir, outDir, io, wanted);
+
   const entries = [];
   for (const [slot, src] of wanted) {
     const from = pack.format === 'gltf'
@@ -332,6 +336,72 @@ async function buildModelPack(pack) {
     log(`  ✓ ${(pack.id + '/' + slot).padEnd(20)} ${src.padEnd(18)} ${mb((await fs.stat(to)).size)}`);
     entries.push({ pack: pack.id, slot, source: 'quaternius', model: src, file: `models/${pack.id}/${slot}.glb` });
   }
+  return entries;
+}
+
+/**
+ * Fold a whole modular kit into one GLB, each module a named node.
+ *
+ * Modular kits share their textures across every piece — this one dresses forty
+ * modules from nine 2048² PBR sets — so the per-module path would write forty
+ * files that each embed their own copy of the brickwork. Merging first means
+ * `dedup` sees the duplicates as duplicates and collapses them, and the runtime
+ * gets one request and one set of GPU uploads instead of forty.
+ */
+async function mergeModelPack(pack, glbDir, outDir, io, wanted) {
+  const { Document } = await import('@gltf-transform/core');
+  const doc = new Document();
+  const scene = doc.createScene(pack.id);
+  const entries = [];
+
+  for (const [slot, src] of wanted) {
+    // kit modules are named without an extension in the manifest, the way the
+    // OBJ packs' picks are, so the two read the same
+    let from = null;
+    for (const name of [src, `${src}.gltf`, `${src}.glb`]) {
+      from = await findFile(glbDir, name);
+      if (from) break;
+    }
+    if (!from) { console.error(`  ✗ ${pack.id}/${slot}: ${src} not in pack`); continue; }
+
+    const sub = await io.read(from);
+    const before = new Set(doc.getRoot().listScenes());
+    mergeDocuments(doc, sub);
+
+    /*
+     * `merge` brings the other document's scenes across intact. Re-parent each
+     * new scene's roots under one named node so the runtime can ask for a
+     * module by slot, then drop the now-empty scene.
+     */
+    const group = doc.createNode(slot);
+    for (const s of doc.getRoot().listScenes()) {
+      if (before.has(s)) continue;
+      for (const child of s.listChildren()) { s.removeChild(child); group.addChild(child); }
+      s.dispose();
+    }
+    scene.addChild(group);
+    entries.push({ pack: pack.id, slot, source: 'quaternius', model: src,
+      file: `models/${pack.id}/${pack.merge}.glb`, part: slot });
+  }
+
+  doc.getRoot().setDefaultScene(scene);
+  /*
+   * Each merged document arrives with its own buffer, and a GLB may only have
+   * one. Point every accessor at the first and drop the rest.
+   */
+  const [buffer] = doc.getRoot().listBuffers();
+  for (const a of doc.getRoot().listAccessors()) a.setBuffer(buffer);
+  for (const b of doc.getRoot().listBuffers()) if (b !== buffer) b.dispose();
+
+  await doc.transform(
+    dedup(), prune({ keepAttributes: false }), weld(),
+    textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [pack.size, pack.size], quality: 86 }),
+    quantize({ pattern: /^(POSITION|TEXCOORD|NORMAL|TANGENT)/ }),
+  );
+
+  const to = path.join(outDir, `${pack.merge}.glb`);
+  await fs.writeFile(to, await io.writeBinary(doc));
+  log(`  ✓ ${(pack.id + '/' + pack.merge).padEnd(20)} ${entries.length} modules  ${mb((await fs.stat(to)).size)}`);
   return entries;
 }
 
@@ -484,25 +554,15 @@ rights, so: excluded.
 photorealistic, free to download — and the licence explicitly forbids
 redistribution. Unambiguous, so: excluded.
 
-**Quaternius character packs.** CC0, rigged and animated, and they would have
-been fine to ship. They are stylised low-poly characters, though, and the brief
-here was to move *away* from a blocky look, so adopting them would have worked
-against the goal even though the licence is clean.
-
 ### The characters
 
-The characters are still the procedural rig in \`src/entities/character.js\`,
-and that is the last thing in this project that still looks hand-made rather
-than modelled. The replacement has been found and verified, but not yet wired
-in.
-
-**What was found.** Quaternius publishes two CC0 packs through itch.io that
-together solve it:
+The characters are real rigged humans driven by skeletal animation. Two CC0
+packs from Quaternius make it work, and neither is any use on its own:
 
 | Pack | What it gives |
 |---|---|
-| Universal Base Characters | An anatomically proportioned rigged human — 14k triangles, real hands, separate hair and eye meshes, six hairstyles |
-| Universal Animation Library | 43 named clips on the same skeleton |
+| [Universal Base Characters](https://quaternius.itch.io/universal-base-characters) | An anatomically proportioned rigged human — 12.5k triangles, real hands, separate hair and eye meshes |
+| [Universal Animation Library](https://quaternius.itch.io/universal-animation-library) | 43 named clips on the same skeleton |
 
 The clips are the ones a third-person shooter actually needs: \`Idle_Loop\`,
 \`Walk_Loop\`, \`Jog_Fwd_Loop\`, \`Sprint_Loop\`, \`Crouch_Idle_Loop\`,
@@ -511,16 +571,44 @@ The clips are the ones a third-person shooter actually needs: \`Idle_Loop\`,
 \`Death01\`, \`Jump_Start\` / \`_Loop\` / \`_Land\`, \`Roll\`.
 
 **The risk was retargeting**, and it was measured rather than assumed: the two
-packs share all 65 bones, and all 195 tracks of a clip bind to the base
+packs share all 65 bones, and every track of a clip binds to the base
 character's skeleton with no renaming. The animation library drives the body
 directly.
 
-**What is left is engine work, not asset hunting**: load the skinned glTF,
-drive an AnimationMixer from the locomotion state the rig already computes
-(speed, aiming, crouching, hit, dead), parent the weapon to the right-hand
-bone, and hang the police and crew kit — which already exists as geometry — off
-bones instead of the procedural pivots. That changes how every character is
-posed, so it is deliberately not half-done here.
+**The gap was clothing.** The base pack ships bare bodies, and no CC0 outfit
+set anywhere shares this skeleton — the only modular outfit pack built for it
+is fantasy armour. So the clothing is cut out of the body itself, in
+\`src/entities/outfit.js\`: a garment is the region of the body it covers,
+copied and pushed a centimetre or two along its own normals, so it inherits the
+pack's skin weights and deforms correctly with no rigging step. Bone weights
+give the soft boundaries — an armhole follows the shoulder — and cut planes give
+the hard ones. Hard kit that would not deform is modelled and hung off bones:
+helmets, visors, night vision, caps, magazine pouches, shoulder radios,
+drop-leg holsters, knee pads, the gold chain.
+
+\`npm run check:outfits\` reports what every preset cut, so a garment that
+comes back empty shows up as a number rather than as an absence in a
+screenshot, and \`npm run rig\` prints the measurements the cuts are written
+against.
+
+### The map
+
+The hillside is procedural, on scanned materials. What the
+[Downtown City MegaKit](https://quaternius.itch.io/downtown-city-megakit)
+adds is the fittings: modelled doors hung in the openings the houses punch,
+metal handrails down the staircases, and bollards, drains, manholes and
+planters along the lower street.
+
+It is curated against the setting rather than against the pack. Exposed brick
+and roll-up shopfronts are what a hillside like this is built from; the slate
+roofs, stone cornices and ornamental trim are a north-Atlantic downtown and
+would look imported, so they are left in the archive along with the pack's
+three pre-built buildings.
+
+The kit is merged into one glTF at build time. Every module references the same
+handful of 2048² PBR sets, so one file per module would embed forty copies of
+the brickwork; merged first, dedup collapses them and the whole kit costs
+2.5 MB. \`npm run kit\` prints every module's grid size.
 
 **Still excluded** for licensing, unchanged: Mixamo (no clear redistribution
 grant, and an account is required) and Renderpeople / Human Alloy free samples

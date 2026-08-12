@@ -118,6 +118,47 @@ still reproduces everything from a clean clone.
 | `taxi` | Taxi | [Realistic Car Pack](https://quaternius.com) | cars |
 | `body` | Superhero_Male_FullBody.gltf | [Realistic Car Pack](https://quaternius.com) | people |
 | `clips` | UAL1_Standard.glb | [Realistic Car Pack](https://quaternius.com) | anim |
+| `door_wood` | Door_1 | [Realistic Car Pack](https://quaternius.com) | city |
+| `door_panel` | Door_2 | [Realistic Car Pack](https://quaternius.com) | city |
+| `door_metal` | Door_3 | [Realistic Car Pack](https://quaternius.com) | city |
+| `doorframe_metal` | DoorFrame_Metal_Single | [Realistic Car Pack](https://quaternius.com) | city |
+| `doorframe_wood` | DoorFrame_Wooden | [Realistic Car Pack](https://quaternius.com) | city |
+| `window_brick` | Brick_Window_Square_Single | [Realistic Car Pack](https://quaternius.com) | city |
+| `window_brick_trim` | Brick_Window_Trim_Single | [Realistic Car Pack](https://quaternius.com) | city |
+| `window_inset` | Brick_Inset_Window | [Realistic Car Pack](https://quaternius.com) | city |
+| `window_metal` | Metal_Window | [Realistic Car Pack](https://quaternius.com) | city |
+| `window_metal_half` | Metal_Window_Half | [Realistic Car Pack](https://quaternius.com) | city |
+| `window_full` | Metal_FullWindow | [Realistic Car Pack](https://quaternius.com) | city |
+| `shop_wall` | Metal_FirstFloor_Wall | [Realistic Car Pack](https://quaternius.com) | city |
+| `shop_wall_alt` | Metal_FirstFloor_Wall_1 | [Realistic Car Pack](https://quaternius.com) | city |
+| `shop_window` | Metal_FirstFloor_Window | [Realistic Car Pack](https://quaternius.com) | city |
+| `brick_plain` | Brick_Plain_1 | [Realistic Car Pack](https://quaternius.com) | city |
+| `brick_worn` | Brick_Plain_3 | [Realistic Car Pack](https://quaternius.com) | city |
+| `brick_panel` | Brick_Plain_4 | [Realistic Car Pack](https://quaternius.com) | city |
+| `brick_double` | Brick_RedWhite_DoubleWindow | [Realistic Car Pack](https://quaternius.com) | city |
+| `brick_column` | Brick_Column_Small | [Realistic Car Pack](https://quaternius.com) | city |
+| `brick_base` | Brick_BottomTrim | [Realistic Car Pack](https://quaternius.com) | city |
+| `brick_cap` | Brick_TopTrim | [Realistic Car Pack](https://quaternius.com) | city |
+| `cornice_metal` | Cornice_Metal_Center | [Realistic Car Pack](https://quaternius.com) | city |
+| `rail_run` | Stairs_Rails_Metal_Straight_1 | [Realistic Car Pack](https://quaternius.com) | city |
+| `rail_run_long` | Stairs_Rails_Metal_Straight_2 | [Realistic Car Pack](https://quaternius.com) | city |
+| `rail_flight` | Stairs_Rails_Metal | [Realistic Car Pack](https://quaternius.com) | city |
+| `stoop` | Stairs_Entrance_Concrete | [Realistic Car Pack](https://quaternius.com) | city |
+| `entrance` | Entrance_Concrete_2x1 | [Realistic Car Pack](https://quaternius.com) | city |
+| `wall_guard` | Trim_Wall_Guard | [Realistic Car Pack](https://quaternius.com) | city |
+| `ac_unit` | Prop_ACUnit | [Realistic Car Pack](https://quaternius.com) | city |
+| `bollard` | Prop_Bollard | [Realistic Car Pack](https://quaternius.com) | city |
+| `drain` | Prop_Drain | [Realistic Car Pack](https://quaternius.com) | city |
+| `manhole` | Prop_ManholeCover | [Realistic Car Pack](https://quaternius.com) | city |
+| `planter` | Prop_Planter_Single | [Realistic Car Pack](https://quaternius.com) | city |
+| `road` | Street_2Lane | [Realistic Car Pack](https://quaternius.com) | city |
+| `road_bare` | Street_2Lane_noSidewalk | [Realistic Car Pack](https://quaternius.com) | city |
+| `road_tee` | Street_TIntersection | [Realistic Car Pack](https://quaternius.com) | city |
+| `kerb` | Sidewalk_Straight_3m | [Realistic Car Pack](https://quaternius.com) | city |
+| `kerb_corner` | Sidewalk_Corner_Flat_3m | [Realistic Car Pack](https://quaternius.com) | city |
+| `kerb_planter` | Sidewalk_Planter | [Realistic Car Pack](https://quaternius.com) | city |
+| `crosswalk` | Decal_Crosswalk | [Realistic Car Pack](https://quaternius.com) | city |
+| `centreline` | Decal_DoubleYellow_Straight | [Realistic Car Pack](https://quaternius.com) | city |
 | `palm1` | PalmTree_1 | [Realistic Car Pack](https://quaternius.com) | nature |
 | `palm2` | PalmTree_2 | [Realistic Car Pack](https://quaternius.com) | nature |
 | `palm3` | PalmTree_3 | [Realistic Car Pack](https://quaternius.com) | nature |
@@ -159,7 +200,7 @@ redistribution. Unambiguous, so: excluded.
 
 ### The characters
 
-The characters are real rigged humans, driven by skeletal animation. Two CC0
+The characters are real rigged humans driven by skeletal animation. Two CC0
 packs from Quaternius make it work, and neither is any use on its own:
 
 | Pack | What it gives |
@@ -178,20 +219,40 @@ packs share all 65 bones, and every track of a clip binds to the base
 character's skeleton with no renaming. The animation library drives the body
 directly.
 
-**The gap was clothing.** The base pack ships six bare bodies and no clothes,
-and there is no CC0 outfit set anywhere that shares this skeleton — the only
-modular outfit pack built for it is fantasy armour. So the clothing is cut out
-of the body itself, in `src/entities/outfit.js`: a garment is the region of the
-body it covers, copied and pushed a centimetre or two along its own normals,
-which means it inherits the pack's skin weights and deforms correctly with no
-rigging step. Bone weights give the soft boundaries (an armhole follows the
-shoulder), cut planes give the hard ones (hems, collars, sleeve ends). Hard kit
-that would not deform — helmets, pouches, radios, holsters, knee pads, the gold
-chain — is modelled and hung off bones instead.
+**The gap was clothing.** The base pack ships bare bodies, and no CC0 outfit
+set anywhere shares this skeleton — the only modular outfit pack built for it
+is fantasy armour. So the clothing is cut out of the body itself, in
+`src/entities/outfit.js`: a garment is the region of the body it covers,
+copied and pushed a centimetre or two along its own normals, so it inherits the
+pack's skin weights and deforms correctly with no rigging step. Bone weights
+give the soft boundaries — an armhole follows the shoulder — and cut planes give
+the hard ones. Hard kit that would not deform is modelled and hung off bones:
+helmets, visors, night vision, caps, magazine pouches, shoulder radios,
+drop-leg holsters, knee pads, the gold chain.
 
 `npm run check:outfits` reports what every preset cut, so a garment that
-silently comes back empty is visible as a number rather than as an absence in a
-screenshot.
+comes back empty shows up as a number rather than as an absence in a
+screenshot, and `npm run rig` prints the measurements the cuts are written
+against.
+
+### The map
+
+The hillside is procedural, on scanned materials. What the
+[Downtown City MegaKit](https://quaternius.itch.io/downtown-city-megakit)
+adds is the fittings: modelled doors hung in the openings the houses punch,
+metal handrails down the staircases, and bollards, drains, manholes and
+planters along the lower street.
+
+It is curated against the setting rather than against the pack. Exposed brick
+and roll-up shopfronts are what a hillside like this is built from; the slate
+roofs, stone cornices and ornamental trim are a north-Atlantic downtown and
+would look imported, so they are left in the archive along with the pack's
+three pre-built buildings.
+
+The kit is merged into one glTF at build time. Every module references the same
+handful of 2048² PBR sets, so one file per module would embed forty copies of
+the brickwork; merged first, dedup collapses them and the whole kit costs
+2.5 MB. `npm run kit` prints every module's grid size.
 
 **Still excluded** for licensing, unchanged: Mixamo (no clear redistribution
 grant, and an account is required) and Renderpeople / Human Alloy free samples

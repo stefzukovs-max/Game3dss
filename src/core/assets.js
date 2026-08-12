@@ -91,16 +91,29 @@ export class AssetLibrary {
     // gun is not a playable state, so these load on every tier.
     if (this.manifest.models?.length) {
       const gltf = new GLTFLoader();
+      /*
+       * A merged kit is one file holding many modules, so every one of its
+       * manifest entries names the same file and differs only by `part`.
+       * Loading per entry would fetch and upload the whole kit forty times
+       * over, so files are loaded once and the parts looked up inside.
+       */
+      const loaded = new Map();
       for (const m of this.manifest.models) {
         try {
-          const g = await gltf.loadAsync(BASE + m.file);
-          g.scene.traverse((o) => {
-            if (!o.isMesh) return;
-            o.castShadow = true;
-            o.receiveShadow = true;
-            if (o.material) o.material.envMapIntensity = 1.0;
-          });
-          this.models.set(`${m.pack}:${m.slot}`, g.scene);
+          let g = loaded.get(m.file);
+          if (!g) {
+            g = await gltf.loadAsync(BASE + m.file);
+            g.scene.traverse((o) => {
+              if (!o.isMesh) return;
+              o.castShadow = true;
+              o.receiveShadow = true;
+              if (o.material) o.material.envMapIntensity = 1.0;
+            });
+            loaded.set(m.file, g);
+          }
+          const node = m.part ? g.scene.getObjectByName(m.part) : g.scene;
+          if (node) this.models.set(`${m.pack}:${m.slot}`, node);
+          else console.warn(`[assets] ${m.pack}/${m.slot}: no part "${m.part}" in the kit`);
           // the animation pack is carried for its clips, not its mesh
           if (m.pack === 'anim' && g.animations?.length) this.clips = g.animations;
         } catch (e) {

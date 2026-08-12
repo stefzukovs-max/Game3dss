@@ -455,6 +455,92 @@ export function scatterProps(scene, assets, world, opts = {}) {
       rng() * Math.PI * 2, rng.range(0.85, 1.25));
   }
 
+  /* ── the city kit ───────────────────────────────────────────────────
+   * Modular architecture on a 2 × 3 m grid, used where the map has already
+   * built the structure and only the fittings are missing. The map knows where
+   * it punched every doorway and laid every flight of steps, and recorded
+   * them; this hangs the real thing in them.
+   *
+   * Everything here is decorative. The doorways and staircases are already
+   * solid, or already deliberately walkable, and adding collision to a handrail
+   * is how a route the AI depends on quietly stops working — the map check
+   * exists because that has happened before.
+   */
+  const kit = (slot) => assets.model('city', slot);
+
+  /* real doors in the openings the houses punched */
+  const LEAVES = ['door_wood', 'door_panel', 'door_metal'];
+  const leaves = LEAVES.map(kit).filter(Boolean);
+  if (leaves.length) {
+    for (const d of meta.doors ?? []) {
+      const pick = (Math.abs(d.x * 31 + d.z * 17) | 0) % leaves.length;
+      // the module is a 1.00 × 2.20 m leaf; the opening is 0.95 × 2.05
+      _q.setFromAxisAngle(_up, Math.atan2(d.nx, d.nz));
+      B.placeObject(`city:${LEAVES[pick]}`, leaves[pick],
+        _m.compose(_v.set(d.x, d.y, d.z), _q, _s.set(d.w / 1.0, d.h / 2.2, 1)));
+    }
+  }
+
+  /*
+   * Handrails down the staircases — the map is built around its stairs and
+   * they were the last thing on it with no ironwork at all.
+   *
+   * The module is a fixed-pitch flight: 1.98 m of rise over 2.31 m of run,
+   * about 41°. These stairs climb 0.29 over a 0.46 tread, about 32°, so the
+   * module is scaled to the run and to the rise separately. That lands the
+   * handrail on exactly the right slope, at the cost of standing the posts
+   * about three-quarters height — which is the price of a fixed-pitch kit and
+   * is invisible next to a rail that floats or cuts through the treads.
+   *
+   * `rail_run` is the obvious-looking choice and the wrong one: it is the bar
+   * alone, with no posts under it, so it hangs in the air.
+   */
+  const rail = kit('rail_flight');
+  if (rail) {
+    const RUN = 2.31, RISE = 1.98;
+    for (const s of meta.stairs ?? []) {
+      const perSeg = Math.max(2, Math.round(RUN / s.tread));
+      // the grand stair is wide enough for a pair either side of its divider
+      const lanes = s.grand ? [-s.width / 4, s.width / 4] : [0];
+      for (let i = 0; i + perSeg <= s.steps; i += perSeg) {
+        const run = s.tread * perSeg;
+        const rise = s.riser * perSeg;
+        const z = s.zTop + s.tread * (s.steps - i) - run;
+        const y = s.yLow + s.riser * i;
+        for (const lane of lanes) {
+          _q.setFromAxisAngle(_up, 0);
+          B.placeObject('city:rail', rail,
+            _m.compose(_v.set(s.x + lane, y, z), _q, _s.set(1, rise / RISE, run / RUN)));
+        }
+      }
+    }
+  }
+
+  /* street furniture along the paved lower ground */
+  const FURNITURE = [
+    { slot: 'bollard', w: 7, r: 0.4 },
+    { slot: 'drain', w: 5, r: 0.5 },
+    { slot: 'manhole', w: 4, r: 0.6 },
+    { slot: 'planter', w: 3, r: 1.2 },
+    { slot: 'kerb_planter', w: 3, r: 1.1 },
+  ];
+  const furniture = FURNITURE.filter((f) => assets.model('city', f.slot));
+  if (furniture.length) {
+    const total = furniture.reduce((a, f) => a + f.w, 0);
+    for (let i = 0; i < Math.round(46 * density); i++) {
+      const x = rng.range(-64, 64);
+      const z = rng.range(24, 74);            // the flat ground at the foot
+      let roll = rng() * total;
+      const pickF = furniture.find((f) => (roll -= f.w) <= 0) ?? furniture[0];
+      if (!free(x, z, pickF.r)) continue;
+      const y = surface(x, z, 8);
+      if (y == null || y > ROAD_Y + 1.5) continue;
+      _q.setFromAxisAngle(_up, rng.chance(0.5) ? 0 : Math.PI / 2);
+      B.placeObject(`city:${pickF.slot}`, assets.model('city', pickF.slot),
+        _m.compose(_v.set(x, y, z), _q, _s.set(1, 1, 1)));
+    }
+  }
+
   const built = B.build();
   return { ...built, group: built.root };
 }
