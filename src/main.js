@@ -152,17 +152,56 @@ class Game {
     this.post?.setSize(innerWidth, innerHeight);
   }
 
+  /**
+   * Rotate a hint while the assets land.
+   *
+   * These are the things a new player otherwise finds out by dying: that the
+   * hill is climbable, that the tower is the objective, that ADS is worth the
+   * mobility. Stopped as soon as the menu appears.
+   */
+  _startTips() {
+    const el = $('loadtip');
+    if (!el) return;
+    const TIPS = [
+      'The Escad\u00e3o is the fast way up and the obvious way up. Both sides know it.',
+      'Hold right mouse to aim. It costs you speed and pays in accuracy.',
+      'Rooftops connect. Ladders and external stairs are not decoration.',
+      'The water tower carries the transmitter. Whoever holds it hears the other side coming.',
+      'Crouching tightens your aim and drops your silhouette below a parapet.',
+      'Reload behind cover, not in it \u2014 a wall you can shoot through is not cover.',
+      'Every operator plays differently. Kite is fast and fragile; Boulder is neither.',
+      'On a phone, drag the right side of the screen to look and the left stick to move.',
+    ];
+    let i = Math.floor(Math.random() * TIPS.length);
+    const next = () => { el.textContent = TIPS[i++ % TIPS.length]; };
+    next();
+    this._tipTimer = setInterval(next, 4200);
+  }
+
+  _stopTips() { clearInterval(this._tipTimer); this._tipTimer = null; }
+
   async _load() {
-    const step = (p, msg) => new Promise((r) => {
+    /*
+     * A cold load is forty megabytes, most of it textures and animation, so
+     * this screen is on for a while on a first visit. It gets a percentage
+     * because a bar alone cannot tell you whether it is nearly done or barely
+     * started, and a rotating tip because the wait is long enough to teach
+     * something in.
+     */
+    const show = (p, m) => {
       $('loadfill').style.width = (p * 100) + '%';
-      $('loadmsg').textContent = msg;
+      $('loadmsg').textContent = m;
+      const pct = $('loadpct');
+      if (pct) pct.textContent = Math.round(p * 100) + '%';
+    };
+    this._startTips();
+
+    const step = (p, msg) => new Promise((r) => {
+      show(p, msg);
       requestAnimationFrame(() => setTimeout(r, 0));
     });
 
-    const bar = (p, m) => {
-      $('loadfill').style.width = (p * 100) + '%';
-      $('loadmsg').textContent = m;
-    };
+    const bar = show;
 
     /*
      * Assets first, because the world is built out of them. If assets/ is

@@ -20,13 +20,12 @@ Everything here is invented — the hill, the crews, the unit, the city.
 
 
 A browser-based **third-person shooter** set on a Brazilian favela hillside.
-Two factions fight over the same hill: the **Hillside Crew** hold it, the
-**Tactical Battalion** try to take it. Pick a side, pick an operator, survive the
-waves.
+Two factions fight over the same hill: **The Lookouts** hold it, the **9th
+Battalion** come up it. Pick a side, pick an operator, survive the waves.
 
-Runs in any modern browser, **desktop or phone**. No build step, no bundler,
-no downloads at runtime — three.js is vendored and every texture, sound and
-3D model is generated procedurally at load time.
+Runs in any modern browser, **desktop or phone**. No build step and no bundler —
+three.js is vendored, and the map, characters and props are baked CC0 assets
+served straight from `assets/`. Sound is still synthesised at runtime.
 
 ```bash
 npm start          # → http://localhost:8080
@@ -152,12 +151,13 @@ The map's surfaces and its set dressing are real photogrammetry, fetched from
 two CC0 libraries and baked into `assets/` by a build step:
 
 ```bash
-npm run assets           # ~29 MB into assets/, and regenerates CREDITS.md
+npm run assets           # ~40 MB into assets/, and regenerates CREDITS.md
 ```
 
 25 scanned PBR material sets from [ambientCG](https://ambientcg.com), 26 scanned
-props from [Poly Haven](https://polyhaven.com), nine hand-modelled weapons and
-vehicles from [Quaternius](https://quaternius.com), and one Poly Haven HDRI that
+props from [Poly Haven](https://polyhaven.com), weapons, vehicles, a rigged
+character with a 43-clip animation library and a modular city kit from
+[Quaternius](https://quaternius.com), and one Poly Haven HDRI that
 serves as sky, image-based lighting and the source of the sun's direction — the
 brightest region of the HDR is measured at load and the directional light is
 placed there, so the shadows agree with the sky instead of being aimed by hand.
@@ -276,6 +276,12 @@ npm run check:sim        # drives the game at a fixed 60 Hz timestep for N minut
 npm run check:mobile     # emulates a phone and drives the game through synthetic
                          # touch events: stick, look drag and every button
 npm run check:shooting   # weapon bench on open ground, isolated from allied fire
+npm run check:fit        # every screen at six real device sizes: no page overflow,
+                         # and the button you must press is on screen and thumb-sized
+npm run check:outfits    # what each outfit preset actually cut, garment by garment
+npm run check:pages      # boots the game from a subdirectory the way GitHub Pages
+                         # serves it, and fails on any 404 or page error
+npm run rig / kit        # measurements the character cuts and kit placement use
 npm run shots            # captures menu / HUD / map screenshots
 npm run shots:chars      # close-up portraits of both factions' character rigs
 npm run shots:guns       # turntable portraits of the four weapon models

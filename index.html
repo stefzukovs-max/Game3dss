@@ -28,6 +28,10 @@
 -->
 <svg id="glyphs" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
   <defs>
+    <symbol id="wordmark" viewBox="0 0 734 146">
+      <g class="mark-fill"><path transform="translate(0 26)" d="M0 0h26v116h-26Z M0 0h92v26h-92Z M0 46h76v23h-76Z M0 90h92v26h-92Z"/><path transform="translate(107 26)" d="M0 0h92v26h-92Z M0 26h26v44h-26Z M0 46h92v23h-92Z M66 46h26v44h-26Z M0 90h92v26h-92Z"/><path transform="translate(214 26)" d="M0 0h92v26h-92Z M0 0h26v116h-26Z M0 90h92v26h-92Z"/><path transform="translate(321 26)" d="M0 0h92v26h-92Z M0 0h26v116h-26Z M66 0h26v116h-26Z M0 52h92v23h-92Z"/><path transform="translate(428 26)" d="M0 0h78v26h-78Z M0 0h26v116h-26Z M66 10h26v96h-26Z M0 90h78v26h-78Z"/><path transform="translate(535 26)" d="M0 0h92v26h-92Z M0 0h26v116h-26Z M66 0h26v116h-26Z M0 52h92v23h-92Z"/><path transform="translate(642 26)" d="M0 0h92v26h-92Z M0 0h26v116h-26Z M66 0h26v116h-26Z M0 90h92v26h-92Z"/></g>
+      <g class="mark-til" aria-hidden="true"><path d="M440.0 18 q11 -14 22 -4 t22 -4" /></g>
+    </symbol>
     <g id="g-run"><path d="M14 4.5a2 2 0 1 0 0 .01M12.5 21l2-6-3.5-3 1-5 4 3 3 1"/><path d="M9.5 12.5 6 14l-1.5 5"/></g>
     <g id="g-kite"><path d="M12 2 4 10l8 8 8-8Z"/><path d="M12 18v4M12 22l-3-1M12 22l3-1"/></g>
     <g id="g-shield"><path d="M12 2 4 5.5v6c0 5 3.5 8.5 8 10.5 4.5-2 8-5.5 8-10.5v-6Z"/></g>
@@ -177,22 +181,50 @@
 <div id="rotate-gate" class="hidden">
   <div class="rot-icon">⟳</div>
   <h3>ROTATE YOUR DEVICE</h3>
-  <p>Cross Hill plays in landscape.</p>
+  <p>Escadão plays in landscape.</p>
 </div>
 
 <!-- ═══════════════════════ OVERLAY / MENUS ═══════════════════════ -->
 <div id="overlay">
 
   <!-- ── loading ── -->
-  <section id="scr-load" class="screen">
-    <h1 class="logo">HILL<span>OF THE</span>CROSS</h1>
-    <div class="loadbar"><i id="loadfill"></i></div>
-    <p id="loadmsg">Building the hillside…</p>
+  <section id="scr-load" class="screen load">
+    <!--
+      The loading screen carries the same drawn wordmark the menu does. It used
+      to show a different, older name in a system font — the first thing anyone
+      saw was off-brand and rendered differently on every machine.
+    -->
+    <div class="mark load-mark">
+      <svg class="mark-word" viewBox="0 0 734 146" aria-label="ESCADAO">
+        <use href="#wordmark" />
+      </svg>
+      <span class="mark-rule"></span>
+      <p class="mark-sub">NINE HUNDRED STEPS TO THE CROSS</p>
+    </div>
+
+    <div class="load-block">
+      <div class="loadbar"><i id="loadfill"></i></div>
+      <div class="load-row">
+        <p id="loadmsg">Building the hillside…</p>
+        <span id="loadpct">0%</span>
+      </div>
+    </div>
+
+    <p class="load-tip"><b>TIP</b> <span id="loadtip"></span></p>
   </section>
 
   <!-- ── main menu / operator select ── -->
-  <section id="scr-menu" class="screen wide hidden">
-    <div class="menu-head">
+  <!-- ── main menu / operator select ── -->
+  <!--
+    Three rows: a brand bar, a body that scrolls, and an action bar that does
+    not. The action bar is the point — on a landscape phone this screen is
+    taller than the viewport no matter how it is trimmed, and when the whole
+    screen scrolled together GO UP ended up six hundred pixels below the fold
+    with nothing on screen to suggest it existed.
+  -->
+  <section id="scr-menu" class="screen wide split hidden">
+
+    <div class="menu-head s-head">
       <!--
         The wordmark is drawn, not typed. A webfont cannot be loaded here (no
         network at runtime, strict CSP) and a system font stack would render as
@@ -201,24 +233,9 @@
         everywhere, at any size, for about a kilobyte.
       -->
       <div class="mark">
-        <svg class="mark-word" viewBox="0 0 734 146" aria-label="ESCADAO">
-          <g class="mark-fill"><path transform="translate(0 26)" d="M0 0h26v116h-26Z M0 0h92v26h-92Z M0 46h76v23h-76Z M0 90h92v26h-92Z"/><path transform="translate(107 26)" d="M0 0h92v26h-92Z M0 26h26v44h-26Z M0 46h92v23h-92Z M66 46h26v44h-26Z M0 90h92v26h-92Z"/><path transform="translate(214 26)" d="M0 0h92v26h-92Z M0 0h26v116h-26Z M0 90h92v26h-92Z"/><path transform="translate(321 26)" d="M0 0h92v26h-92Z M0 0h26v116h-26Z M66 0h26v116h-26Z M0 52h92v23h-92Z"/><path transform="translate(428 26)" d="M0 0h78v26h-78Z M0 0h26v116h-26Z M66 10h26v96h-26Z M0 90h78v26h-78Z"/><path transform="translate(535 26)" d="M0 0h92v26h-92Z M0 0h26v116h-26Z M66 0h26v116h-26Z M0 52h92v23h-92Z"/><path transform="translate(642 26)" d="M0 0h92v26h-92Z M0 0h26v116h-26Z M66 0h26v116h-26Z M0 90h92v26h-92Z"/></g>
-          <g class="mark-til" aria-hidden="true"><path d="M440.0 18 q11 -14 22 -4 t22 -4" /></g>
-        </svg>
+        <svg class="mark-word" viewBox="0 0 734 146" aria-label="ESCADAO"><use href="#wordmark" /></svg>
         <span class="mark-rule"></span>
         <p class="mark-sub">NINE HUNDRED STEPS TO THE CROSS</p>
-      </div>
-
-      <div class="brief">
-        <span class="brief-stamp">TONIGHT</span>
-        <p><b>Morro do Cruzeiro.</b> Four thousand people up a granite slope. One road
-          reaches the bottom — above it there is nothing but the Escadão and the lanes
-          that branch off it.</p>
-        <p>The transmitter on the water tower carries the Saturday <i>baile</i>, and it
-          carries the lookouts: when a patrol turns off the coast road the music cuts and
-          a voice says which gate.</p>
-        <p>The eviction notices are served Monday. The Battalion is coming up tonight to
-          take the tower first. <b>The hill has until dawn.</b></p>
       </div>
 
       <div class="faction-tabs">
@@ -231,14 +248,31 @@
       </div>
     </div>
 
-    <p class="faction-blurb" id="faction-blurb"></p>
+    <div class="menu-body s-body">
+      <div class="brief">
+        <span class="brief-stamp">TONIGHT</span>
+        <p><b>Morro do Cruzeiro.</b> Four thousand people up a granite slope. One road
+          reaches the bottom — above it there is nothing but the Escad&#227;o and the lanes
+          that branch off it.</p>
+        <p>The transmitter on the water tower carries the Saturday <i>baile</i>, and it
+          carries the lookouts: when a patrol turns off the coast road the music cuts and
+          a voice says which gate.</p>
+        <p>The eviction notices are served Monday. The Battalion is coming up tonight to
+          take the tower first. <b>The hill has until dawn.</b></p>
+      </div>
 
-    <div class="op-layout">
-      <div class="op-list" id="op-list"></div>
-      <div class="op-detail" id="op-detail"></div>
+      <p class="faction-blurb" id="faction-blurb"></p>
+
+      <div class="op-layout">
+        <div class="op-list" id="op-list"></div>
+        <div class="op-detail" id="op-detail"></div>
+      </div>
+
+      <p class="disclaimer">Fiction. Every character, crew, unit and location in this game is
+        invented. Stylised, non-realistic depiction &#8212; no real people, organisations or places.</p>
     </div>
 
-    <div class="menu-foot">
+    <div class="menu-foot s-foot">
       <div class="opt-row">
         <label>DIFFICULTY</label>
         <div class="seg" id="seg-diff">
@@ -248,16 +282,17 @@
           <button data-v="3">Inferno</button>
         </div>
       </div>
-      <button id="btn-play" class="big"><span>GO UP</span></button>
-      <button id="btn-howto" class="link">Controls &amp; settings</button>
+      <div class="foot-go">
+        <button id="btn-play" class="big"><span>GO UP</span></button>
+        <button id="btn-howto" class="link">Controls &amp; settings</button>
+      </div>
     </div>
-    <p class="disclaimer">Fiction. Every character, crew, unit and location in this game is invented.
-      Stylised, non-realistic depiction — no real people, organisations or places.</p>
   </section>
 
   <!-- ── controls / settings ── -->
-  <section id="scr-opts" class="screen hidden">
-    <h2>CONTROLS</h2>
+  <section id="scr-opts" class="screen split hidden">
+    <h2 class="s-head">CONTROLS</h2>
+    <div class="s-body">
     <div class="keys">
       <div><b>W A S D</b> move</div><div><b>Mouse</b> look</div>
       <div><b>LMB</b> fire</div><div><b>RMB</b> aim down sights</div>
@@ -304,7 +339,8 @@
         <label class="chk"><input id="set-lefty" type="checkbox" /> Left-handed layout</label>
       </div>
     </div>
-    <button id="btn-opts-back" class="big">BACK</button>
+    </div>
+    <div class="s-foot"><button id="btn-opts-back" class="big">BACK</button></div>
   </section>
 
   <!-- ── pause ── -->

@@ -5,7 +5,7 @@ import { buildTextureLibrary, FAVELA_COLORS, deriveNormalMap, deriveRoughnessMap
 
 /**
  * ══════════════════════════════════════════════════════════════════
- *  MAP — "CROSS HILL"
+ *  MAP — MORRO DO CRUZEIRO
  * ══════════════════════════════════════════════════════════════════
  *
  *  A hillside in five terraces. Police push UP from the plaza (+Z, low);

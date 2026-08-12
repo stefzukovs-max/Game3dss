@@ -408,26 +408,137 @@ body.lefty #stick-move{ left:auto; right:22%; }
   .stats div{ padding:7px 4px; } .stats b{ font-size:19px; } .stats span{ font-size:8px; }
 }
 
-/* very short viewports: the operator list stacks under the detail panel */
-@media (max-height: 430px){
-  .op-layout{ grid-template-columns:minmax(126px,30%) 1fr; }
-  .od-bio{ display:none; }
+/* ══════════════════ SHORT VIEWPORTS ══════════════════
+ * A phone held sideways is the tight case: ~840 px across and, once Safari's
+ * toolbars are counted, barely 320 px down. There is width to spare and no
+ * height at all, so these steps spend the width — the brand bar and the action
+ * bar go side by side — and buy back every vertical pixel they can.
+ *
+ * `--mark` drives the whole brand bar, so turning it down here shrinks the
+ * wordmark, its rule and its subtitle together and in proportion.
+ * ═══════════════════════════════════════════════════ */
+:root{ --mark:74px; }
+
+@media (max-height: 720px){
+  :root{ --mark:56px; }
+  .brief p{ font-size:12.5px; line-height:1.5; }
+  .brief{ margin:10px 0; padding:12px 14px; }
+}
+
+@media (max-height: 600px){
+  :root{ --mark:44px; }
+  .mark-sub{ display:none; }
+  .screen.split{ padding:10px 14px 10px; gap:6px; }
+  .faction-blurb{ font-size:12px; margin:6px 0; }
   .disclaimer{ display:none; }
+}
+
+/* below this the story panel simply cannot earn its space; it is flavour, and
+   it is on the cutscene and in the README */
+@media (max-height: 500px){
+  :root{ --mark:34px; }
+  .mark-rule{ display:none; }
+  .brief{ display:none; }
+  .faction-blurb{ display:none; }
+  .op-layout{ grid-template-columns:minmax(126px,32%) 1fr; gap:10px; }
+  .od-bio{ display:none; }
+  .menu-foot .opt-row label{ display:none; }
+  .screen.split{ padding:8px 12px 8px; gap:4px; }
+  .screen.split > .s-foot{ padding-top:7px; }
+}
+
+@media (max-height: 380px){
+  :root{ --mark:26px; }
+  .ftab span{ display:none; }
+  .od-stats{ display:none; }
 }
 
 .seg-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .seg-row label{ font-size:11px; letter-spacing:.22em; color:var(--dim); }
 
 /* ══════════════════════════ MENUS ══════════════════════════ */
-#overlay{ position:fixed; inset:0; z-index:20; display:grid; place-items:center; overflow:auto;
+#overlay{ position:fixed; inset:0; z-index:20; display:grid; place-items:center; overflow:hidden;
   background:
     radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,140,40,.10), transparent 70%),
     radial-gradient(ellipse at 50% 40%, #17120e 0%, #06070a 74%); }
 #overlay.transparent{ background:rgba(4,6,10,.76); backdrop-filter:blur(4px); }
 #overlay.gone{ display:none; }
-.screen{ width:min(880px,94vw); max-height:96vh; overflow-y:auto; text-align:center; padding:24px 20px; }
+/*
+ * ── screens fit the viewport, always ──
+ *
+ * `dvh`, not `vh`. On a phone `vh` is the height the viewport would have with
+ * the browser toolbars hidden, so a `100vh` screen is taller than the space you
+ * can actually see and the bottom of it sits under the address bar. `dvh`
+ * tracks the space that is really there.
+ *
+ * A `.split` screen is three rows — brand, body, actions — and only the middle
+ * one scrolls. That is what keeps the primary button on screen: when the whole
+ * screen scrolled as one, GO UP sat 600 px below the fold on a landscape phone
+ * and there was nothing visible to suggest scrolling would reach it.
+ */
+.screen{ width:min(880px,94vw); max-height:calc(100vh - 16px); max-height:calc(100dvh - 16px);
+  overflow-y:auto; text-align:center; padding:24px 20px; }
 .screen.wide{ width:min(1180px,96vw); }
 .screen.bare{ background:none; }
+
+.screen.split{ display:grid; grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden;
+  padding:14px 18px 12px; gap:8px; }
+/* `minmax(0,1fr)` above and `min-height:0` here are the same fix twice over: a
+   grid row defaults to its content's min-content height and refuses to shrink,
+   so without both the body simply pushes the action bar off the bottom. */
+.screen.split > .s-body{ min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  padding:2px 4px 4px; -webkit-overflow-scrolling:touch; }
+.screen.split > .s-foot{ padding-top:10px; border-top:1px solid var(--line); }
+
+/*
+ * ── the menu body ──
+ *
+ * Wide screens get two columns: the story on the left, the roster on the
+ * right. Stacked, the story pushed the roster down and left a column of dead
+ * space beside it — this is the same content using the width the screen
+ * actually has.
+ *
+ * Below 900 px, and on any screen short enough that the story is hidden
+ * outright, it collapses back to one column. `1fr` is restated in both cases
+ * rather than left to cascade, because a two-column grid with its first column
+ * display:none leaves an empty gutter down the left of the roster.
+ */
+.menu-body{ display:grid; gap:14px 22px; align-content:start; }
+
+@media (min-width: 900px){
+  .menu-body{ grid-template-columns:minmax(250px,330px) minmax(0,1fr); }
+  .menu-body > .brief{ grid-column:1; grid-row:1 / span 2; margin:0; align-self:start; }
+  .menu-body > .faction-blurb{ grid-column:2; grid-row:1; margin:0; text-align:left; }
+  .menu-body > .op-layout{ grid-column:2; grid-row:2; }
+  .menu-body > .disclaimer{ grid-column:1 / -1; }
+}
+@media (max-height: 500px){
+  .menu-body{ grid-template-columns:minmax(0,1fr) !important; }
+  .menu-body > .op-layout{ grid-column:1 !important; grid-row:auto !important; }
+}
+
+/*
+ * The action bar stays one row — it is the last place with height to give.
+ *
+ * Scoped to `.screen` on purpose. A media query adds no specificity, so an
+ * unqualified `.menu-foot` here would be overridden by the plain `.menu-foot`
+ * rule further down the file purely on source order, and the bar would keep
+ * wrapping onto two lines while the query looked correct.
+ */
+@media (min-width: 620px){
+  .screen .menu-foot{ flex-wrap:nowrap; }
+  .screen .menu-foot .seg{ flex-wrap:nowrap; }
+}
+/* on a short screen the button itself is worth trimming */
+@media (max-height: 500px){
+  .screen .menu-foot .big{ padding:11px 26px; font-size:15px; }
+  .screen .menu-foot .seg button{ padding:6px 11px; font-size:12.5px; }
+}
+
+/* the scrollbar, so it reads as part of the flyer rather than as chrome */
+.s-body::-webkit-scrollbar{ width:6px; }
+.s-body::-webkit-scrollbar-thumb{ background:rgba(239,233,220,.18); border-radius:3px; }
+.s-body::-webkit-scrollbar-track{ background:transparent; }
 .sub{ color:var(--dim); letter-spacing:.14em; font-size:15px; margin-bottom:16px; }
 
 .logo{ font-size:clamp(40px,8vw,86px); font-weight:800; letter-spacing:.02em; line-height:.9;
@@ -444,8 +555,14 @@ h2.dead{ color:var(--bad); }
 h3{ font-size:22px; letter-spacing:.1em; }
 
 /* ── faction tabs ── */
-.menu-head{ display:flex; align-items:center; justify-content:space-between; gap:20px;
-  flex-wrap:wrap; margin-bottom:10px; }
+/*
+ * The brand bar. Two things side by side on anything wide enough, stacked when
+ * it is not — and everything in it scales off `--mark`, one number the height
+ * media queries below turn down as the viewport gets shorter, so the whole bar
+ * shrinks together instead of each piece needing its own breakpoint.
+ */
+.menu-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:18px;
+  flex-wrap:wrap; text-align:left; }
 .faction-tabs{ display:flex; gap:10px; }
 .ftab{ padding:9px 20px; background:rgba(255,255,255,.045); border:2px solid var(--line);
   color:var(--dim); font:inherit; cursor:pointer; border-radius:4px; text-align:left;
@@ -515,7 +632,16 @@ body.side-police .op-card.on{ background:rgba(78,163,255,.12); }
 .od-skill .kbd{ margin-left:auto; font-size:11px; letter-spacing:.12em; color:var(--accent);
   border:1px solid var(--accent); padding:2px 7px; height:fit-content; border-radius:3px; }
 
-.menu-foot{ margin-top:18px; }
+/*
+ * The action bar. Side by side so it stays one row tall — on a landscape phone
+ * every row of vertical space here is one fewer row of operator list.
+ */
+.menu-foot{ display:flex; align-items:center; justify-content:space-between;
+  gap:16px; flex-wrap:wrap; }
+.menu-foot .opt-row{ display:flex; align-items:center; gap:10px; margin:0; }
+.foot-go{ display:flex; align-items:center; gap:14px; margin-left:auto; }
+.foot-go .big{ margin:0; }
+.foot-go .link{ margin:0; white-space:nowrap; }
 .opt-row{ display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:14px; }
 .opt-row label{ font-size:11px; letter-spacing:.28em; color:var(--dim); }
 .seg{ display:flex; border:1px solid var(--line); border-radius:3px; overflow:hidden; }
@@ -581,12 +707,43 @@ label.chk input{ width:17px; height:17px; accent-color:var(--accent); }
 .card.rare .cr{ background:rgba(255,180,40,.22); color:#ffd27a; }
 .card.rare{ border-color:rgba(255,180,40,.45); box-shadow:0 0 22px rgba(255,180,40,.12); }
 
-/* ── loading / lock ── */
-.loadbar{ width:min(440px,80vw); height:6px; margin:28px auto 12px; background:rgba(255,255,255,.12);
-  overflow:hidden; }
-#loadfill{ display:block; height:100%; width:0; background:linear-gradient(90deg,var(--gang),var(--gang-2));
-  transition:width .25s; }
-#loadmsg{ font-size:14px; letter-spacing:.18em; color:var(--dim); }
+/* ── loading ──────────────────────────────────────────────────────────
+ * The first thing anyone sees, so it carries the wordmark rather than a name
+ * set in whatever the platform's default font happens to be. A cold load is
+ * forty megabytes: the percentage is there because a bar alone cannot say
+ * whether it is nearly finished, and the tip is there because the wait is long
+ * enough to be worth teaching in.
+ * ──────────────────────────────────────────────────────────────────── */
+.screen.load{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:22px; text-align:center; }
+.load-mark{ display:flex; flex-direction:column; align-items:center; }
+.screen.load .mark-word{ height:clamp(38px,9vmin,96px); }
+.screen.load .mark-rule,
+.screen.load .mark-sub{ align-self:center; }
+
+.load-block{ width:min(460px,84vw); }
+.loadbar{ width:100%; height:5px; background:rgba(239,233,220,.13); overflow:hidden; }
+/* deliberately not rotated: at 100% the tilt leaves a sliver of track showing
+   past the end of the fill, which reads as a load that never finished */
+#loadfill{ display:block; height:100%; width:0; background:var(--accent);
+  transition:width .3s ease-out; }
+.load-row{ display:flex; align-items:baseline; justify-content:space-between; gap:14px;
+  margin-top:9px; }
+#loadmsg{ font-size:12px; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; }
+#loadpct{ font-size:12px; letter-spacing:.12em; font-weight:800; color:var(--accent);
+  font-variant-numeric:tabular-nums; }
+
+.load-tip{ max-width:44ch; font-size:12.5px; line-height:1.6; color:rgba(239,233,220,.5); }
+.load-tip b{
+  display:inline-block; margin-right:8px; padding:2px 7px;
+  font-size:9.5px; font-weight:800; letter-spacing:.22em;
+  color:var(--ink); background:rgba(239,233,220,.55); transform:rotate(-2deg);
+}
+@media (max-height: 480px){
+  .screen.load{ gap:12px; }
+  .screen.load .mark-sub,
+  .load-tip{ display:none; }
+}
 .lockcard{ background:rgba(6,8,12,.7); padding:28px 44px; border:1px solid var(--line);
   border-radius:6px; }
 .lockcard p{ color:var(--dim); font-size:14px; margin-top:6px; }
@@ -599,7 +756,7 @@ label.chk input{ width:17px; height:17px; accent-color:var(--accent); }
    ═══════════════════════════════════════════════════════════ */
 .mark{ position:relative; padding:2px 0 6px; }
 .mark-word{
-  display:block; width:min(52vw,560px); height:auto;
+  display:block; width:auto; height:var(--mark,74px);
   transform:rotate(-1.1deg);
   filter:drop-shadow(3px 3px 0 var(--accent-2));
 }
@@ -608,13 +765,14 @@ label.chk input{ width:17px; height:17px; accent-color:var(--accent); }
 .mark-fill{ fill:var(--paper); }
 .mark-til{ fill:none; stroke:var(--accent); stroke-width:11; stroke-linecap:round; }
 .mark-rule{
-  display:block; height:5px; margin:8px 0 7px; width:min(46vw,470px);
+  display:block; height:calc(var(--mark,74px) * .062); margin:6px 0 5px;
+  width:calc(var(--mark,74px) * 5.6); max-width:100%;
   background:var(--accent);
   transform:rotate(-1.1deg);
   clip-path:polygon(0 0,100% 12%,99.4% 100%,.6% 84%);   /* torn, not ruled */
 }
 .mark-sub{
-  font-size:clamp(10px,1.05vw,13px); letter-spacing:.42em; font-weight:600;
+  font-size:clamp(9px,calc(var(--mark,74px) * .155),13px); letter-spacing:.42em; font-weight:600;
   color:var(--dim); text-transform:uppercase; transform:rotate(-1.1deg);
 }
 
