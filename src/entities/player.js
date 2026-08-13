@@ -421,6 +421,9 @@ export class Player {
     const hits = game.combat.fire(this, origin, dir, w, game.livingTargets(this), { spread, muzzle });
 
     w.addBloom();
+    // the shooter's own recoil, so firing reads from outside as well as from
+    // behind the camera; the procedural rig has no such method, hence the guard
+    this.model.kick?.(def.recoil);
 
     // recoil
     const kick = def.recoil / this.control * (this.aiming ? 0.62 : 1) * (this.crouching ? 0.8 : 1);

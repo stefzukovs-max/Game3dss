@@ -59,6 +59,34 @@ export function setActorSource(assets) {
     if (m) bodies[kind] = m;
   }
 
+  /*
+   * ── an upper-body-only copy of the aim pose ──
+   *
+   * The single worst thing about how this game animated: aiming was a whole-
+   * body clip, so it could only play while standing still. Take one step while
+   * aimed — which is most of a firefight — and the aim pose was replaced
+   * outright by a jog, the arms dropped to a run cycle, and the gun pointed
+   * wherever the hand bone happened to swing. The character never once looked
+   * like they were aiming at the thing the player was shooting.
+   *
+   * The fix is a layer, and three.js gives it for free once you see it: the
+   * mixer blends per *property*, so an action whose tracks only touch the spine
+   * and arms leaves the legs entirely to whatever else is playing. Filtering
+   * the aim clip's tracks down to the upper body turns it into an overlay that
+   * runs on top of a walk, a jog or a sprint.
+   *
+   * No masks, no second mixer, no additive setup — just a clip that declines to
+   * mention the legs.
+   */
+  const UPPER = /^(spine_|clavicle_|upperarm_|lowerarm_|hand_|index_|middle_|ring_|pinky_|thumb_|neck_|Head)/;
+  const aimClip = clips.get(LOCO.aim) ?? clips.get(LOCO.aimIdle);
+  if (aimClip) {
+    const upper = aimClip.clone();
+    upper.name = AIM_UPPER;
+    upper.tracks = upper.tracks.filter((t) => UPPER.test(t.name.split('.')[0]));
+    if (upper.tracks.length) clips.set(AIM_UPPER, upper);
+  }
+
   SOURCE = { body, bodies, clips, grip: gripFromAimPose(body, clips) };
   return true;
 }
@@ -131,6 +159,9 @@ const LOCO = {
  * fails silently — `getObjectByName` returns undefined, the weapon quietly
  * parents to the root and the aim pitch quietly does nothing.
  */
+/** The upper-body slice of the aim pose, derived at load. See setActorSource. */
+const AIM_UPPER = 'Aim_Upper';
+
 const HAND_BONE = 'hand_r';
 const SPINE = ['spine_03', 'spine_02'];
 
@@ -142,6 +173,7 @@ export class SkinnedActor {
     this.deadBlend = 0;
     this._cur = null;
     this._hitUntil = 0;
+    this._kick = 0;
 
     /*
      * SkeletonUtils.clone, not Object3D.clone. A plain clone copies the meshes
@@ -312,6 +344,14 @@ export class SkinnedActor {
       this._play(want);
 
       /*
+       * The aim overlay rides on top of the locomotion, so a character can walk
+       * and aim at the same time. It is skipped when the full-body aim clip is
+       * already the base — layering a pose over itself does nothing but cost a
+       * blend — and while sprinting, because nobody sprints down their sights.
+       */
+      this._aimLayer(s.aiming && moving && want !== LOCO.sprint, dt);
+
+      /*
        * Which way the feet should cycle.
        *
        * The library ships forward loops only — no back-pedal and no strafe — so
@@ -351,6 +391,52 @@ export class SkinnedActor {
     if (spine && s.aiming) {
       spine.rotation.x += clamp(s.pitch ?? 0, -0.9, 0.9) * 0.55;
     }
+
+    /*
+     * Recoil, on the character rather than only on the camera.
+     *
+     * Firing used to be invisible from the outside: the camera kicked, the
+     * shooter did not move at all. Watch an ally empty a magazine and they were
+     * a statue with a noise. This rolls the chest back on each shot and lets it
+     * settle, which is most of what reads as a gun going off, and it costs one
+     * bone rotation.
+     *
+     * Applied after `mixer.update` for the same reason the aim pitch is: the
+     * mixer overwrites bone rotations outright, so anything added before it is
+     * simply gone.
+     */
+    if (this._kick > 0.0001) {
+      if (spine) spine.rotation.x -= this._kick;
+      this._kick = damp(this._kick, 0, 16, dt);
+    }
+  }
+
+  /**
+   * A shot was fired. `amount` is the weapon's recoil figure; the scale here
+   * turns it into a believable few degrees of chest roll.
+   */
+  kick(amount = 1) {
+    this._kick = Math.min(0.16, (this._kick ?? 0) + amount * 0.022);
+  }
+
+  /**
+   * Fade the upper-body aim pose in and out over the locomotion clip.
+   *
+   * Weight rather than play/stop: snapping a pose on at full strength mid-stride
+   * pops the arms, and the whole point of the layer is that raising the weapon
+   * reads as a movement.
+   */
+  _aimLayer(on, dt) {
+    if (!SOURCE.clips.has(AIM_UPPER)) return;
+    let a = this._actions.get(AIM_UPPER);
+    if (!a) {
+      a = this.mixer.clipAction(SOURCE.clips.get(AIM_UPPER));
+      a.play();
+      this._actions.set(AIM_UPPER, a);
+      this._aimW = 0;
+    }
+    this._aimW = damp(this._aimW ?? 0, on ? 1 : 0, on ? 14 : 9, dt);
+    a.setEffectiveWeight(this._aimW);
   }
 
   faceYaw(yaw, dt, rate = 12) {

@@ -204,20 +204,34 @@ ok('AIM toggles', await page.evaluate(() => window.__game.input.touch.aim));
 
 /*
  * Holding ADS has to shoot on its own. FIRE and look are both the right thumb,
- * so any layout that needs FIRE held takes your aim away for as long as you are
- * shooting — this is the setting that makes the game playable with two thumbs,
- * and it is invisible in a screenshot.
+ * so any layout that needs FIRE held takes your aim away — and the fix for
+ * that is now two triggers rather than a trigger tied to ADS.
+ *
+ * `autofire` is therefore OFF by default and this asserts both halves: aiming
+ * alone must NOT fire, and turning the setting on must restore the old
+ * behaviour. The default matters because AIM is a toggle — with it on, tapping
+ * AIM started the gun and did not stop it until you un-aimed, so you could
+ * never line up a shot.
  */
 const auto = await page.evaluate(() => {
   const g = window.__game;
-  const w = g.player.weapon;
-  w.mag = w.def.mag; w.reloading = false;
-  const before = w.mag;
-  for (let i = 0; i < 40; i++) g._tick(1 / 60);
-  return { before, after: g.player.weapon.mag, firing: g.input.firing };
+  const shootFor = (frames) => {
+    const w = g.player.weapon;
+    w.mag = w.def.mag; w.reloading = false;
+    const before = w.mag;
+    for (let i = 0; i < frames; i++) g._tick(1 / 60);
+    return before - g.player.weapon.mag;
+  };
+  const offShots = shootFor(40);
+  g.input.autoFire = true;
+  const onShots = shootFor(40);
+  g.input.autoFire = false;
+  return { offShots, onShots };
 });
-ok('aiming alone fires', auto.after < auto.before,
-  `mag ${auto.before} → ${auto.after}, input.firing ${auto.firing}`);
+ok('aiming alone does not fire by default', auto.offShots === 0,
+  `${auto.offShots} rounds while only aiming`);
+ok('the autofire setting still works when switched on', auto.onShots > 0,
+  `${auto.onShots} rounds with autofire on`);
 
 await tapBtn('btn-aim');
 

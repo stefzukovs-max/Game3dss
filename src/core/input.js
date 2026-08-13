@@ -118,11 +118,19 @@ export class Input {
   /**
    * Firing.
    *
-   * On touch, holding ADS fires on its own. This is the single thing that makes
-   * a shooter workable with two thumbs: FIRE and look are both the right thumb,
-   * so any layout that needs you to hold FIRE takes your aim away for as long
-   * as you are shooting. Aiming down sights is already a deliberate act, so it
-   * is a good trigger — and the FIRE button still works for hipfire.
+   * `autoFire` makes aiming pull the trigger on touch. It was added when FIRE
+   * and look were both the right thumb, so holding FIRE meant giving up aiming
+   * — a real problem with a real fix at the time.
+   *
+   * It is off by default now, and turning it off is a bug fix rather than a
+   * preference change. With a trigger under each thumb the crutch is
+   * unnecessary, and it was actively hostile: AIM is a toggle, so tapping it
+   * started the gun firing and did not stop until you un-aimed. You could not
+   * line up a shot. You could not hold an angle. Recoil climbed the whole time
+   * you were trying to settle the reticle, which is exactly what "the aim
+   * doesn't work" feels like from the other side of the screen.
+   *
+   * The setting stays for anyone who liked it.
    */
   get firing() {
     return this.buttons[0] || this.touch.fire || this.touch.fireL
@@ -136,8 +144,8 @@ export class Input {
   _initTouch() {
     const t = this.touch;
     t.active = true;
-    // free the right thumb by default on touch; switchable in settings
-    if (this.autoFire === undefined) this.autoFire = true;
+    // see `firing`: off by default now that both thumbs have a trigger
+    if (this.autoFire === undefined) this.autoFire = false;
     const root = document.getElementById('touch');
     root?.classList.remove('hidden');
     document.body.classList.add('is-touch');

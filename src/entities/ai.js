@@ -525,6 +525,7 @@ export class Agent {
     const muzzle = this.model.muzzleNode
       ? this.model.muzzleNode.getWorldPosition(_g) : eye;
 
+    this.model.kick?.(w.def.recoil);
     const hits = game.combat.fire(this, eye, dir, w, game.enemiesOf(this),
       { spread, muzzle });
 

@@ -144,6 +144,41 @@ const out = await page.evaluate(async () => {
       .sub(new THREE.Vector3().setFromMatrixPosition(hips.matrixWorld));
     return [+d.x.toFixed(3), +d.y.toFixed(3), +d.z.toFixed(3)];
   };
+  /*
+   * ── does aiming survive movement? ──
+   *
+   * The aim pose used to be a whole-body clip, so it only played standing
+   * still: one step while aimed and the arms dropped into a run cycle with the
+   * gun swinging at the shooter's side. Since most of a firefight happens while
+   * moving, that was the animation nobody ever saw working.
+   *
+   * Measured on the weapon hand, relative to the pelvis, in the character's own
+   * frame while jogging: aiming should carry it forward and up. Comparing
+   * against the same jog un-aimed isolates the layer from the run cycle itself.
+   */
+  const handWhileMoving = (aiming) => {
+    p.yaw = 0; p.pitch = 0;
+    g.input.buttons[2] = aiming;
+    g.input.keys.add('KeyW');
+    for (let i = 0; i < 40; i++) g._tick(1 / 60);
+    const hand = p.model.body?.getObjectByName('hand_r');
+    const hips = p.model.body?.getObjectByName('pelvis');
+    g.input.keys.delete('KeyW');
+    g.input.buttons[2] = false;
+    if (!hand || !hips) return null;
+    hand.updateWorldMatrix(true, false); hips.updateWorldMatrix(true, false);
+    const d = new THREE.Vector3().setFromMatrixPosition(hand.matrixWorld)
+      .sub(new THREE.Vector3().setFromMatrixPosition(hips.matrixWorld));
+    // the model faces +Z before the caller's half turn, so -Z is "in front"
+    return { fwd: +(-d.z).toFixed(3), up: +d.y.toFixed(3) };
+  };
+  const jogHip = handWhileMoving(false);
+  const jogAim = handWhileMoving(true);
+  if (jogHip && jogAim) {
+    res.aimLayerFwd = +(jogAim.fwd - jogHip.fwd).toFixed(3);
+    res.aimLayerUp = +(jogAim.up - jogHip.up).toFixed(3);
+  }
+
   const up = headOffset(0.9);
   const down = headOffset(-0.9);
   g.input.buttons[2] = false;
@@ -169,6 +204,7 @@ console.log(`\n── ${out.agentCount} agents ──`);
 const off = out.agents.filter((a) => a.towardYaw < 0.7);
 say(off.length === 0, 'all agents face along their own yaw',
   off.length ? `${off.length} do not: ${JSON.stringify(off.slice(0, 3))}` : '');
+let res_;
 const spun = out.agents.filter((a) => a.spinPerFrame > 0.5);
 say(spun.length === 0, 'no agent is spinning',
   spun.length ? `${spun.length} turning >0.5 rad/frame` : '');
@@ -179,6 +215,13 @@ if (out.pitchSwingZ != null) {
     `head moves ${out.pitchSwingZ} m along the nose`);
   say(out.pitchSwingX < out.pitchSwingZ * 0.6, 'and does not tip it sideways',
     `sideways ${out.pitchSwingX} m vs forward ${out.pitchSwingZ} m`);
+}
+
+if (res_ = out.aimLayerFwd, res_ != null) {
+  console.log('\n── aiming while moving ──');
+  say(Math.abs(out.aimLayerFwd) > 0.06 || Math.abs(out.aimLayerUp) > 0.06,
+    'the weapon hand comes up when aiming on the move',
+    `hand moves ${out.aimLayerFwd} m forward, ${out.aimLayerUp} m up vs the same jog un-aimed`);
 }
 
 console.log(bad ? `\n${bad} failure(s)` : '\nanimation looks sane');
