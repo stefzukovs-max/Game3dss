@@ -13,6 +13,7 @@ import { drawCards } from './systems/upgrades.js';
 import { Player } from './entities/player.js';
 import { ROSTER, FACTIONS, rosterFor, byId } from './entities/roster.js';
 import { HUD } from './ui/hud.js';
+import { PerfHUD } from './ui/perfhud.js';
 import { setCharacterDetail, applyCharacterMaterials } from './entities/character.js';
 import { setActorSource } from './entities/actor.js';
 import { setOutfitMaterials } from './entities/outfit.js';
@@ -65,6 +66,7 @@ class Game {
     this.input.invertY = this.settings.invert;
     this.input.autoFire = this.settings.autofire !== false;
     this.hud = new HUD(this);
+    this.perf = new PerfHUD(this);
 
     this._bindMenus();
     this._buildOperatorUI();
@@ -1059,6 +1061,8 @@ class Game {
     }
 
     if (this.world) this.renderFrame(dt);
+    // after the render: `renderer.info` counts the frame that just went out
+    this.perf.sample(raw);
     this.input.endFrame();
   }
 

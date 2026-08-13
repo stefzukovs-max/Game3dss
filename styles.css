@@ -246,6 +246,18 @@ body.side-police .abil.ready{ box-shadow:0 0 16px rgba(78,163,255,.3), 0 4px 14p
 #fps{ position:absolute; left:50%; bottom:6px; transform:translateX(-50%);
   font-size:11px; color:rgba(255,255,255,.28); letter-spacing:.14em; }
 
+/*
+ * ── the perf overlay (F3, or four fingers) ──
+ * Top-left, above everything including the pause screen: it is a diagnostic,
+ * and the moment you most want to read it is the moment the game is struggling
+ * enough that something else is covering the screen.
+ */
+#perfhud{ position:fixed; left:8px; top:8px; z-index:9999; pointer-events:none;
+  white-space:pre; font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color:#9dff9d; background:rgba(0,0,0,.72); padding:7px 10px; border-radius:3px;
+  text-shadow:0 1px 2px #000; font-variant-numeric:tabular-nums; }
+#perfhud[hidden]{ display:none; }
+
 /* ══════════════════════════ TOUCH CONTROLS ══════════════════════════ */
 /* Sized in vmin so the same layout works on a 5" phone and a 13" tablet.
    Everything sits inside the safe area so notches and home bars don't eat it. */
