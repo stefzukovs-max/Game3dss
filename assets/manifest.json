@@ -6,292 +6,6 @@
   },
   "materials": [
     {
-      "slug": "brick_red",
-      "source": "ambientcg",
-      "id": "Bricks097",
-      "size": 1024,
-      "tile": 1,
-      "use": "primary exposed-brick walls",
-      "maps": {
-        "color": "materials/brick_red/color.webp",
-        "normal": "materials/brick_red/normal.webp",
-        "arm": "materials/brick_red/arm.webp"
-      }
-    },
-    {
-      "slug": "brick_orange",
-      "source": "ambientcg",
-      "id": "Bricks051",
-      "size": 1024,
-      "tile": 1,
-      "use": "newer brick walls",
-      "maps": {
-        "color": "materials/brick_orange/color.webp",
-        "normal": "materials/brick_orange/normal.webp",
-        "arm": "materials/brick_orange/arm.webp"
-      }
-    },
-    {
-      "slug": "plaster_orange",
-      "source": "ambientcg",
-      "id": "PaintedPlaster013",
-      "size": 1024,
-      "tile": 2,
-      "use": "orange render peeling to brick",
-      "maps": {
-        "color": "materials/plaster_orange/color.webp",
-        "normal": "materials/plaster_orange/normal.webp",
-        "arm": "materials/plaster_orange/arm.webp"
-      }
-    },
-    {
-      "slug": "plaster_yellow",
-      "source": "ambientcg",
-      "id": "PaintedPlaster007",
-      "size": 1024,
-      "tile": 2,
-      "use": "yellow render peeling to brick",
-      "maps": {
-        "color": "materials/plaster_yellow/color.webp",
-        "normal": "materials/plaster_yellow/normal.webp",
-        "arm": "materials/plaster_yellow/arm.webp"
-      }
-    },
-    {
-      "slug": "plaster_worn",
-      "source": "ambientcg",
-      "id": "PaintedPlaster008",
-      "size": 1024,
-      "tile": 2,
-      "use": "blue-grey render peeling to brick",
-      "maps": {
-        "color": "materials/plaster_worn/color.webp",
-        "normal": "materials/plaster_worn/normal.webp",
-        "arm": "materials/plaster_worn/arm.webp"
-      }
-    },
-    {
-      "slug": "plaster_blue",
-      "source": "ambientcg",
-      "id": "PaintedPlaster002",
-      "size": 512,
-      "tile": 2,
-      "use": "painted blue walls",
-      "maps": {
-        "color": "materials/plaster_blue/color.webp",
-        "normal": "materials/plaster_blue/normal.webp",
-        "arm": "materials/plaster_blue/arm.webp"
-      }
-    },
-    {
-      "slug": "plaster_green",
-      "source": "ambientcg",
-      "id": "PaintedPlaster003",
-      "size": 512,
-      "tile": 2,
-      "use": "painted green walls",
-      "maps": {
-        "color": "materials/plaster_green/color.webp",
-        "normal": "materials/plaster_green/normal.webp",
-        "arm": "materials/plaster_green/arm.webp"
-      }
-    },
-    {
-      "slug": "plaster_white",
-      "source": "ambientcg",
-      "id": "PaintedPlaster016",
-      "size": 512,
-      "tile": 2,
-      "use": "weathered white walls",
-      "maps": {
-        "color": "materials/plaster_white/color.webp",
-        "normal": "materials/plaster_white/normal.webp",
-        "arm": "materials/plaster_white/arm.webp"
-      }
-    },
-    {
-      "slug": "plaster_plain",
-      "source": "ambientcg",
-      "id": "Plaster006",
-      "size": 1024,
-      "tile": 2.5,
-      "use": "neutral render, tinted per house colour",
-      "maps": {
-        "color": "materials/plaster_plain/color.webp",
-        "normal": "materials/plaster_plain/normal.webp",
-        "arm": "materials/plaster_plain/arm.webp"
-      }
-    },
-    {
-      "slug": "concrete_wall",
-      "source": "ambientcg",
-      "id": "Concrete034",
-      "size": 1024,
-      "tile": 2,
-      "use": "raw concrete walls and stair flanks",
-      "maps": {
-        "color": "materials/concrete_wall/color.webp",
-        "normal": "materials/concrete_wall/normal.webp",
-        "arm": "materials/concrete_wall/arm.webp"
-      }
-    },
-    {
-      "slug": "concrete_slab",
-      "source": "ambientcg",
-      "id": "Concrete031",
-      "size": 1024,
-      "tile": 2,
-      "use": "terrace slabs and rooftops",
-      "maps": {
-        "color": "materials/concrete_slab/color.webp",
-        "normal": "materials/concrete_slab/normal.webp",
-        "arm": "materials/concrete_slab/arm.webp"
-      }
-    },
-    {
-      "slug": "corrugated",
-      "source": "ambientcg",
-      "id": "CorrugatedSteel005",
-      "size": 1024,
-      "tile": 1.2,
-      "use": "bare galvanised roof sheeting",
-      "maps": {
-        "color": "materials/corrugated/color.webp",
-        "normal": "materials/corrugated/normal.webp",
-        "arm": "materials/corrugated/arm.webp"
-      }
-    },
-    {
-      "slug": "corrugated_red",
-      "source": "ambientcg",
-      "id": "CorrugatedSteel002",
-      "size": 512,
-      "tile": 1.2,
-      "use": "red-painted roof sheeting",
-      "maps": {
-        "color": "materials/corrugated_red/color.webp",
-        "normal": "materials/corrugated_red/normal.webp",
-        "arm": "materials/corrugated_red/arm.webp"
-      }
-    },
-    {
-      "slug": "corrugated_green",
-      "source": "ambientcg",
-      "id": "CorrugatedSteel006A",
-      "size": 512,
-      "tile": 1.2,
-      "use": "green-painted roof sheeting",
-      "maps": {
-        "color": "materials/corrugated_green/color.webp",
-        "normal": "materials/corrugated_green/normal.webp",
-        "arm": "materials/corrugated_green/arm.webp"
-      }
-    },
-    {
-      "slug": "asphalt",
-      "source": "ambientcg",
-      "id": "Asphalt033",
-      "size": 1024,
-      "tile": 2,
-      "use": "the road at the foot of the hill",
-      "maps": {
-        "color": "materials/asphalt/color.webp",
-        "normal": "materials/asphalt/normal.webp",
-        "arm": "materials/asphalt/arm.webp"
-      }
-    },
-    {
-      "slug": "paving_brick",
-      "source": "ambientcg",
-      "id": "PavingStones092",
-      "size": 1024,
-      "tile": 1,
-      "use": "plaza and market paving",
-      "maps": {
-        "color": "materials/paving_brick/color.webp",
-        "normal": "materials/paving_brick/normal.webp",
-        "arm": "materials/paving_brick/arm.webp"
-      }
-    },
-    {
-      "slug": "paving_stone",
-      "source": "ambientcg",
-      "id": "PavingStones128",
-      "size": 512,
-      "tile": 2,
-      "use": "stair treads and landings",
-      "maps": {
-        "color": "materials/paving_stone/color.webp",
-        "normal": "materials/paving_stone/normal.webp",
-        "arm": "materials/paving_stone/arm.webp"
-      }
-    },
-    {
-      "slug": "dirt",
-      "source": "ambientcg",
-      "id": "Ground079S",
-      "size": 1024,
-      "tile": 2,
-      "use": "dirt alleys and unpaved ground",
-      "maps": {
-        "color": "materials/dirt/color.webp",
-        "normal": "materials/dirt/normal.webp",
-        "arm": "materials/dirt/arm.webp"
-      }
-    },
-    {
-      "slug": "rock",
-      "source": "ambientcg",
-      "id": "Rock030",
-      "size": 512,
-      "tile": 2,
-      "use": "exposed hillside rock",
-      "maps": {
-        "color": "materials/rock/color.webp",
-        "normal": "materials/rock/normal.webp",
-        "arm": "materials/rock/arm.webp"
-      }
-    },
-    {
-      "slug": "planks",
-      "source": "ambientcg",
-      "id": "Planks023A",
-      "size": 512,
-      "tile": 2,
-      "use": "timber shack walls, doors, market stalls",
-      "maps": {
-        "color": "materials/planks/color.webp",
-        "normal": "materials/planks/normal.webp",
-        "arm": "materials/planks/arm.webp"
-      }
-    },
-    {
-      "slug": "rust",
-      "source": "ambientcg",
-      "id": "Metal021",
-      "size": 512,
-      "tile": 2,
-      "use": "rusted metal, water tanks, railings",
-      "maps": {
-        "color": "materials/rust/color.webp",
-        "normal": "materials/rust/normal.webp",
-        "arm": "materials/rust/arm.webp"
-      }
-    },
-    {
-      "slug": "azulejo",
-      "source": "ambientcg",
-      "id": "Tiles101",
-      "size": 512,
-      "tile": 0.6,
-      "use": "tiled shopfronts",
-      "maps": {
-        "color": "materials/azulejo/color.webp",
-        "normal": "materials/azulejo/normal.webp",
-        "arm": "materials/azulejo/arm.webp"
-      }
-    },
-    {
       "slug": "cloth",
       "source": "ambientcg",
       "id": "Fabric030",
@@ -1157,6 +871,116 @@
       "source": "quaternius",
       "model": "CommonTree_5",
       "file": "models/nature/tree2.glb"
+    },
+    {
+      "pack": "police",
+      "slot": "caveirao",
+      "source": "supplied",
+      "file": "models/police/caveirao.glb",
+      "scale": 1,
+      "name": "Armoured personnel truck",
+      "use": "the battalion vehicle at the foot of the hill",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "landmark",
+      "slot": "christ",
+      "source": "supplied",
+      "file": "models/landmark/christ.glb",
+      "scale": 0.3,
+      "name": "Hilltop statue",
+      "use": "the summit landmark, in place of the plain cross",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "slums",
+      "slot": "kit",
+      "source": "supplied",
+      "file": "models/slums/kit.glb",
+      "scale": 1,
+      "name": "Modular slum blocks",
+      "use": "stacked hillside housing",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "people",
+      "slot": "crew",
+      "source": "supplied",
+      "file": "models/people/crew.glb",
+      "scale": 1,
+      "name": "Street vendor in a Flamengo shirt",
+      "use": "every crew character — a finished figure, so it wears no cut clothing",
+      "note": "supplied by the project owner; unrigged, re-bound onto the game rig with tools/rebind-character.py"
+    },
+    {
+      "pack": "people",
+      "slot": "armored",
+      "source": "supplied",
+      "file": "models/people/armored.glb",
+      "scale": 1,
+      "name": "Armoured police officer",
+      "use": "every police character — a finished figure, so it wears no cut clothing",
+      "note": "supplied by the project owner; re-bound onto the game rig with tools/rebind-character.py"
+    },
+    {
+      "pack": "guns",
+      "slot": "pistol",
+      "source": "supplied",
+      "file": "models/guns/pistol.glb",
+      "scale": 1,
+      "name": "Makarov PM",
+      "use": "the sidearm",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "smg",
+      "source": "supplied",
+      "file": "models/guns/smg.glb",
+      "scale": 1,
+      "name": "Compact SMG",
+      "use": "the submachine gun",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "rifle",
+      "source": "supplied",
+      "file": "models/guns/rifle.glb",
+      "scale": 1,
+      "name": "AK-74",
+      "use": "the assault rifle",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "shotgun",
+      "source": "supplied",
+      "file": "models/guns/shotgun.glb",
+      "scale": 1,
+      "name": "Wood-stocked carbine",
+      "use": "the shotgun slot — the pack has no pump gun, and this is the closest silhouette it has",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "dmr",
+      "source": "supplied",
+      "file": "models/guns/dmr.glb",
+      "scale": 1,
+      "name": "SVD Dragunov",
+      "use": "the marksman rifle",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
+    },
+    {
+      "pack": "guns",
+      "slot": "launcher",
+      "source": "supplied",
+      "file": "models/guns/launcher.glb",
+      "scale": 1,
+      "name": "RPG-7",
+      "use": "the rocket launcher",
+      "note": "supplied by the project owner; not from the CC0 libraries above"
     },
     {
       "pack": "police",

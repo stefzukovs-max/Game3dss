@@ -27,28 +27,6 @@ G and B channels of a single image.
 
 | In-game name | ambientCG asset | Baked size | Used for |
 |---|---|---|---|
-| `brick_red` | [Bricks097](https://ambientcg.com/view?id=Bricks097) | 1024px | primary exposed-brick walls |
-| `brick_orange` | [Bricks051](https://ambientcg.com/view?id=Bricks051) | 1024px | newer brick walls |
-| `plaster_orange` | [PaintedPlaster013](https://ambientcg.com/view?id=PaintedPlaster013) | 1024px | orange render peeling to brick |
-| `plaster_yellow` | [PaintedPlaster007](https://ambientcg.com/view?id=PaintedPlaster007) | 1024px | yellow render peeling to brick |
-| `plaster_worn` | [PaintedPlaster008](https://ambientcg.com/view?id=PaintedPlaster008) | 1024px | blue-grey render peeling to brick |
-| `plaster_blue` | [PaintedPlaster002](https://ambientcg.com/view?id=PaintedPlaster002) | 512px | painted blue walls |
-| `plaster_green` | [PaintedPlaster003](https://ambientcg.com/view?id=PaintedPlaster003) | 512px | painted green walls |
-| `plaster_white` | [PaintedPlaster016](https://ambientcg.com/view?id=PaintedPlaster016) | 512px | weathered white walls |
-| `plaster_plain` | [Plaster006](https://ambientcg.com/view?id=Plaster006) | 1024px | neutral render, tinted per house colour |
-| `concrete_wall` | [Concrete034](https://ambientcg.com/view?id=Concrete034) | 1024px | raw concrete walls and stair flanks |
-| `concrete_slab` | [Concrete031](https://ambientcg.com/view?id=Concrete031) | 1024px | terrace slabs and rooftops |
-| `corrugated` | [CorrugatedSteel005](https://ambientcg.com/view?id=CorrugatedSteel005) | 1024px | bare galvanised roof sheeting |
-| `corrugated_red` | [CorrugatedSteel002](https://ambientcg.com/view?id=CorrugatedSteel002) | 512px | red-painted roof sheeting |
-| `corrugated_green` | [CorrugatedSteel006A](https://ambientcg.com/view?id=CorrugatedSteel006A) | 512px | green-painted roof sheeting |
-| `asphalt` | [Asphalt033](https://ambientcg.com/view?id=Asphalt033) | 1024px | the road at the foot of the hill |
-| `paving_brick` | [PavingStones092](https://ambientcg.com/view?id=PavingStones092) | 1024px | plaza and market paving |
-| `paving_stone` | [PavingStones128](https://ambientcg.com/view?id=PavingStones128) | 512px | stair treads and landings |
-| `dirt` | [Ground079S](https://ambientcg.com/view?id=Ground079S) | 1024px | dirt alleys and unpaved ground |
-| `rock` | [Rock030](https://ambientcg.com/view?id=Rock030) | 512px | exposed hillside rock |
-| `planks` | [Planks023A](https://ambientcg.com/view?id=Planks023A) | 512px | timber shack walls, doors, market stalls |
-| `rust` | [Metal021](https://ambientcg.com/view?id=Metal021) | 512px | rusted metal, water tanks, railings |
-| `azulejo` | [Tiles101](https://ambientcg.com/view?id=Tiles101) | 512px | tiled shopfronts |
 | `cloth` | [Fabric030](https://ambientcg.com/view?id=Fabric030) | 512px | shirt and trouser weave |
 | `denim` | [Fabric077](https://ambientcg.com/view?id=Fabric077) | 512px | jeans twill |
 | `leather` | [Leather028](https://ambientcg.com/view?id=Leather028) | 512px | vests, boots, holsters, gear straps |
@@ -281,6 +259,17 @@ from a clean clone.
 
 | Slot | Model | Used for |
 |---|---|---|
+| `police:caveirao` | Armoured personnel truck | the battalion vehicle at the foot of the hill |
+| `landmark:christ` | Hilltop statue | the summit landmark, in place of the plain cross |
+| `slums:kit` | Modular slum blocks | stacked hillside housing |
+| `people:crew` | Street vendor in a Flamengo shirt | every crew character — a finished figure, so it wears no cut clothing |
+| `people:armored` | Armoured police officer | every police character — a finished figure, so it wears no cut clothing |
+| `guns:pistol` | Makarov PM | the sidearm |
+| `guns:smg` | Compact SMG | the submachine gun |
+| `guns:rifle` | AK-74 | the assault rifle |
+| `guns:shotgun` | Wood-stocked carbine | the shotgun slot — the pack has no pump gun, and this is the closest silhouette it has |
+| `guns:dmr` | SVD Dragunov | the marksman rifle |
+| `guns:launcher` | RPG-7 | the rocket launcher |
 | `police:caveirao` | Armoured personnel truck | the battalion vehicle at the foot of the hill |
 | `landmark:christ` | Hilltop statue | the summit landmark, in place of the plain cross |
 | `slums:kit` | Modular slum blocks | stacked hillside housing |

@@ -263,12 +263,22 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
   B.models = opts.assets?.ready ? opts.assets.models : null;
 
   /*
-   * PBR materials. `detail` adds a Sobel-derived normal map and a luminance
-   * roughness map off the same canvas the albedo came from - real relief with
-   * nothing extra to ship. Dropped on the low tier, where the extra texture
-   * fetches per fragment cost more than they're worth on a phone.
+   * ── stylised, not photoscanned — see ART.md ──
+   *
+   * The walls used to be ambientCG photogrammetry: measured normals, ARM maps,
+   * 1024² albedo of real brick. They looked excellent on their own and they
+   * were the reason the game had four art directions in one frame, because
+   * nothing else in it could be photographed. The direction is stylised now, so
+   * the architecture comes off the canvas painter in textures.js — which was
+   * always here, as the fallback for a missing pack — and the scans are gone
+   * from the manifest entirely, taking 11 MB of download with them.
+   *
+   * `detail` is off for the same reason. It derived a Sobel normal and a
+   * luminance roughness map from each albedo, which is a clever way to get
+   * relief for free and is exactly the relief this direction does not want. It
+   * also cost two extra texture fetches per fragment on a phone.
    */
-  const detail = opts.detail !== false;
+  const detail = false;
   const assets = opts.assets?.ready ? opts.assets : null;
 
   const pbr = (map, o = {}) => () => {
@@ -308,10 +318,18 @@ export function buildFavela(scene, seed = 20240607, onProgress = () => {}, opts 
    * world-scaled at 0.5/m, so `repeat = 2 / tile` puts every surface at its
    * true size no matter what geometry it lands on.
    */
+  /*
+   * Kept as a function of the same shape rather than deleted, so every
+   * `B.material(...)` line below still reads as "this surface, with this
+   * fallback" and the scanned path is one edit away if the direction is ever
+   * revisited. It resolves to the painted texture now; `assets.standard` is no
+   * longer reachable because the manifest ships no materials.
+   */
   const scan = (slug, fallback, o = {}) => () => {
-    if (!assets) return fallback();
-    const entry = assets.manifest.materials.find((m) => m.slug === slug);
-    const m = assets.standard(slug, { repeat: 2 / (entry?.tile ?? 1), ...o });
+    const m = assets?.manifest?.materials?.length
+      ? assets.standard(slug, {
+        repeat: 2 / (assets.manifest.materials.find((x) => x.slug === slug)?.tile ?? 1), ...o })
+      : null;
     return m ?? fallback();
   };
 

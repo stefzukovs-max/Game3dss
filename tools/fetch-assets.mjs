@@ -729,9 +729,29 @@ async function dirSize(dir) {
 const manifest = { version: 2, license: LICENSE, materials: [], props: [], hdris: [], models: [] };
 const prev = await fs.readFile(path.join(OUT, 'manifest.json'), 'utf8').then(JSON.parse, () => null);
 
+/*
+ * ── the scanned materials are no longer shipped ──
+ *
+ * ART.md put the game on a stylised direction, and photogrammetry is the one
+ * thing that cannot be pulled into it: a measured brick wall is photoreal by
+ * construction. The architecture is painted in `src/world/textures.js` now.
+ *
+ * The three character sets are the exception and they stay. They ship normal
+ * and ARM maps only — no albedo — so what they contribute is cloth weave and
+ * leather grain under the flat colour the outfit system sets, which is surface
+ * *response* rather than photographic detail, and reads correctly in a stylised
+ * frame. Nine sets of 1024² brick and plaster do not.
+ *
+ * This is 11 MB of the download, and it goes on `npm run assets` alone: the
+ * files stay in the cache, so reverting the direction is a one-line change here
+ * and a re-run, not a re-download.
+ */
+const STYLISED = !argv.includes('--scans');
 if (want('materials')) {
-  log(`\nMaterials — ambientCG (CC0), ${MATERIALS.length} sets`);
-  for (const m of MATERIALS) manifest.materials.push(await buildMaterial(m));
+  const wanted = STYLISED ? MATERIALS.filter((m) => m.maps && !m.maps.includes('color')) : MATERIALS;
+  log(`\nMaterials — ambientCG (CC0), ${wanted.length} sets` +
+    (STYLISED ? `  (${MATERIALS.length - wanted.length} scanned surfaces skipped — stylised; --scans to keep)` : ''));
+  for (const m of wanted) manifest.materials.push(await buildMaterial(m));
 } else if (prev) manifest.materials = prev.materials;
 
 if (want('hdri')) {

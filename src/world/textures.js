@@ -445,18 +445,21 @@ export function buildTextureLibrary() {
   };
 }
 
-/** The hillside palette: sun-bleached tropical paint over bare block. */
+/**
+ * The hillside palette — see ART.md.
+ *
+ * Twelve colours became five, and the cut is the point. Twelve tints sampled
+ * across the whole hue circle — lilac, sky blue, lime, rose — read as a
+ * seaside village, and they left nothing saturated enough to stand out, because
+ * everything was competing. Five, all sitting in the warm-ochre-to-sea-green
+ * band a real hillside actually repeats, gives the walls a family resemblance
+ * and hands the saturation budget to the things that need it: the Flamengo
+ * shirts, the police navy, the bunting.
+ */
 export const FAVELA_COLORS = [
-  '#e8c25a', // ochre
-  '#d9744a', // terracotta
-  '#6fb3a8', // faded teal
-  '#c9556a', // rose
-  '#7fa8d4', // sky blue
-  '#a8c060', // lime
-  '#e0a95c', // mango
-  '#b58ab5', // lilac
-  '#d9d2c2', // bone
-  '#5f8f7a', // deep green
-  '#e0e0d2', // whitewash
-  '#c46b3d', // rust orange
+  '#d8a15c', // render, warm — the commonest painted wall
+  '#e8ddc8', // render, pale — sun-bleached plaster
+  '#7fa0a8', // render, cool — the blue-green that turns up everywhere
+  '#c97a6d', // render, rose — terracotta and faded pink
+  '#9dbf9a', // render, mint
 ];
