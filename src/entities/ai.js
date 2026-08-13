@@ -189,6 +189,8 @@ export class Agent {
   _think(dt, game, t) {
     const lowHp = this.health / this.maxHealth < 0.32;
 
+    const was = this.state;
+
     if (this.visible && this.target) {
       const d = this.pos.distanceTo(this.target.pos);
       const wantCover = lowHp && this.rng() < 0.5;
@@ -202,6 +204,20 @@ export class Agent {
       this.state = STATES.SEARCH;
     } else {
       this.state = STATES.ADVANCE;
+    }
+
+    /*
+     * Two of the six barks live here, on the state edge rather than in the
+     * state, so they fire once when the thing happens instead of forty times
+     * a second while it is true.
+     */
+    if (this.state !== was) {
+      if (was !== STATES.ENGAGE && was !== STATES.COVER &&
+          (this.state === STATES.ENGAGE || this.state === STATES.COVER)) {
+        game.bark(this, 'contact');
+      } else if (was === STATES.SEARCH && this.state === STATES.ADVANCE) {
+        game.bark(this, 'push');   // lost him, moving up anyway
+      }
     }
 
     if (this.state === STATES.COVER && (!this.coverPoint || this.coverTimer <= 0)) {
@@ -483,6 +499,7 @@ export class Agent {
       w.reloading = true;
       w.reloadEnd = t + w.def.reload * (1.5 - this.skill * 0.5);
       audio.reload(this.pos);
+      this.game.bark(this, 'reload');
       return;
     }
 

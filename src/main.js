@@ -693,6 +693,7 @@ class Game {
     $('ab-icon').innerHTML = glyph(char.ability.icon);
 
     this.pickups.restock(5);
+    audio.attachWorld(this.world.collision);
     this.waves.start();
 
     this.state = STATE.PLAYING;
@@ -766,11 +767,46 @@ class Game {
 
   toMenu() {
     this._teardownRun();
+    audio.quiet();
     this.state = STATE.MENU;
     this.hud.show(false);
     this.input.exitLock();
     document.body.classList.toggle('side-police', this.selected.faction === 'police');
     this._showScreen('scr-menu');
+  }
+
+  /**
+   * Somebody shouts something.
+   *
+   * All six bark keys funnel through here for one reason: rate limiting. A
+   * bark is only information if it is rare. Twelve agents acquiring the
+   * player in the same second and all shouting "contato" is not twelve pieces
+   * of information, it is a wall, and after two waves of it the player stops
+   * hearing barks at all — which costs you the one they actually needed.
+   *
+   * So: one line at a time across the whole map, one line per speaker per six
+   * seconds, and nothing from someone the player cannot hear. The subtitle
+   * follows the same rule, because a caption for a sound that did not play is
+   * a lie about where the enemy is.
+   */
+  bark(who, key, force = false) {
+    if (!who?.alive && key !== 'down') return;
+    const t = now();
+    if (!force && t < (this._barkFloor ?? 0)) return;
+    if (t < (who._barkAt ?? 0)) return;
+
+    const faction = who.faction === 'police' ? 'police' : 'crew';
+    who._voiceSeed ??= Math.random() * 997;   // so the same man keeps the same throat
+    const said = audio.bark(faction, key, who.pos, who._voiceSeed);
+    if (!said) return;                       // out of earshot; costs no cooldown
+
+    this._barkFloor = t + 1.4;
+    who._barkAt = t + 6;
+    /*
+     * Captions only for your own side, and only close by. Reading the enemy's
+     * radio traffic through a wall would be an aimbot with subtitles.
+     */
+    if (who.faction === this.playerFaction && said.dist < 34) this.hud.radio(said.text);
   }
 
   /* ══════════════════ combat plumbing ══════════════════ */
@@ -896,6 +932,20 @@ class Game {
   onAgentDeath(agent, from) {
     agent.model.update(0.016, { speed: 0, dead: true, aiming: false, crouching: false, pitch: 0 });
 
+    /*
+     * Someone who saw it happen calls it in. Nearest surviving man of the
+     * same side, and only if he was close enough to have seen it — a call
+     * from across the map would tell the player about a kill they had no
+     * business knowing about.
+     */
+    let witness = null, wd = 26;
+    for (const a of this.agents) {
+      if (a === agent || !a.alive || a.faction !== agent.faction) continue;
+      const d = a.pos.distanceTo(agent.pos);
+      if (d < wd) { wd = d; witness = a; }
+    }
+    if (witness) this.bark(witness, 'down');
+
     if (from === this.player) {
       const p = this.player;
       p.kills++;
@@ -988,6 +1038,8 @@ class Game {
     }
     this.player.spawnAt(best);
     this.player.abilityCd = Math.min(this.player.abilityCd, 4);
+    // going down killed the score; getting back up brings it back
+    if (this.waves.phase === PHASE.ACTIVE) audio.score?.begin(this.waves.isBossWave);
     this.state = STATE.PLAYING;
     this._enterPlay();
     this.hud.banner('BACK UP', `${this.revives} ${this.revives === 1 ? 'life' : 'lives'} left`);
@@ -1028,6 +1080,11 @@ class Game {
 
   /* ══════════════════ draft ══════════════════ */
   onWaveCleared(n) {
+    const friends = this.agents.filter((a) => a.alive && a.faction === this.playerFaction);
+    if (friends.length) {
+      friends.sort((a, b) => a.pos.distanceTo(this.player.pos) - b.pos.distanceTo(this.player.pos));
+      this.bark(friends[0], 'clear', true);
+    }
     this.pickups.restock(4 + Math.min(4, Math.floor(n / 2)));
     for (const w of Object.values(this.player.weapons)) w.addAmmo(Math.round(w.def.mag * 1.5));
     if (this.player.secondWindLeft !== undefined) {
@@ -1152,6 +1209,7 @@ class Game {
     this._updateSun();
     this._updateReveal();
     this._updateAimTarget();
+    this._updateAudio(dt);
 
     this.hud.update(dt, this);
 
@@ -1164,6 +1222,86 @@ class Game {
     this.abilities.update(dt);
     this.combat.update(dt, this.camera);
     this.pickups.update(dt);
+  }
+
+  /**
+   * Tell the mix where it is and how much trouble it is in.
+   *
+   * Two things go out of here every frame and one goes out rarely:
+   *
+   *   LISTENER   position and facing, so distance and stereo mean something.
+   *   THREAT     0..1, driving the score. Distance to the nearest hostile
+   *              matters more than how many there are — being cornered by one
+   *              is scarier than being shot at from across the hill by six.
+   *   SPACE      how enclosed the player is, which decides the reverb every
+   *              gunshot sends to. Six rays is not cheap, so it runs eight
+   *              times a second and lerps; walls do not move fast.
+   */
+  _updateAudio(dt) {
+    const p = this.player;
+    if (!p) return;
+
+    const cam = this.camera;
+    /*
+     * The mix must never be able to stop the game.
+     *
+     * A non-finite write to an AudioParam throws, and an exception raised
+     * here unwinds the whole tick — during development one bad gain value in
+     * the ambience froze the simulation dead, sixty times a second. Audio is
+     * decoration; the frame is not. So it is caught, recorded once, and the
+     * subsystem is switched off rather than allowed to take the game with it.
+     * `audioFault` is asserted on by the audio check, so this cannot quietly
+     * become a way of shipping broken sound.
+     */
+    try {
+      audio.updateWorld(dt, cam.position, cam.getWorldDirection(_dir), this._threat(dt));
+    } catch (err) {
+      if (!this.audioFault) {
+        this.audioFault = String(err?.message || err);
+        console.error('audio disabled after fault:', err);
+      }
+      audio.ambience && (audio.ambience.enabled = false);
+      return;
+    }
+
+    this._spaceTick = (this._spaceTick ?? 0) - dt;
+    if (this._spaceTick > 0) return;
+    this._spaceTick = 0.125;
+
+    const col = this.world.collision;
+    const eye = _tmp.copy(p.pos); eye.y += 1.5;
+    let hits = 0, sum = 0;
+    const REACH = 9;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      _tmp2.set(Math.cos(a), 0, Math.sin(a));
+      const h = col.raycast(eye, _tmp2, REACH, _hit);
+      if (h) { hits++; sum += h.distance; } else { sum += REACH; }
+    }
+    // and one straight up: a roof over your head is most of what "enclosed" means
+    _tmp2.set(0, 1, 0);
+    const lid = col.raycast(eye, _tmp2, 7, _hit);
+    const walls = hits / 6;
+    const target = Math.min(1, walls * 0.72 + (lid ? 0.4 : 0));
+    const enc = audio.space.enclosure + (target - audio.space.enclosure) * 0.35;
+    audio.setSpace(enc, sum / 6);
+  }
+
+  _threat(dt) {
+    const p = this.player;
+    let near = Infinity, count = 0;
+    for (const a of this.agents) {
+      if (!a.alive || a.faction === this.playerFaction) continue;
+      const d = a.pos.distanceTo(p.pos);
+      if (d < 45) count++;
+      if (d < near) near = d;
+    }
+    const close = near === Infinity ? 0 : 1 - Math.min(1, near / 45);
+    const raw = Math.min(1, close * 0.75 + Math.min(1, count / 7) * 0.35);
+    // asymmetric: threat arrives fast, and leaves slowly
+    const prev = this._threatV ?? 0;
+    const k = Math.min(1, dt * (raw > prev ? 3.2 : 0.5));
+    return (this._threatV = prev + (raw - prev) * k);
   }
 
   /** Keep the shadow frustum on the player, along the sky's own sun axis. */

@@ -278,6 +278,12 @@ npm run check:mobile     # emulates a phone and drives the game through syntheti
 npm run check:shooting   # weapon bench on open ground, isolated from allied fire
 npm run check:anim       # where characters actually face and travel, measured on
                          # the rendered node — catches a model facing backwards
+npm run check:aim        # single shot, recoil and bloom zeroed, aim assist off:
+                         # hit rate per weapon at four ranges, hip and ADS
+npm run check:feel       # recoil pattern, hit-stop, per-surface impacts and sway
+npm run check:audio      # the only check that runs in real time (~40 s), because
+                         # the audio clock is a wall clock. Reports how many
+                         # distinct layers are sounding at once, and where
 npm run check:fit        # every screen at six real device sizes: no page overflow,
                          # and the button you must press is on screen and thumb-sized
 npm run check:outfits    # what each outfit preset actually cut, garment by garment

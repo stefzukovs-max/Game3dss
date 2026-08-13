@@ -121,7 +121,7 @@ export class WaveDirector {
     this.game.hud.banner(
       this.isBossWave ? `WAVE ${this.wave} — HEAVY PUSH` : `WAVE ${this.wave}`,
       label);
-    audio.waveStart();
+    audio.waveStart(this.isBossWave);
 
     /*
      * Give the wave a target. The spotter is picked a beat after the wave

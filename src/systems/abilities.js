@@ -206,6 +206,26 @@ export class AbilitySystem {
     }
     origin.addScaledVector(dir, 0.6);
 
+    /*
+     * Whoever it is heading for shouts about it — at the throw, not at the
+     * blast, because a warning that arrives with the explosion is not a
+     * warning. This is the one bark aimed at the player rather than at the
+     * fiction: it is how you learn a grenade is in the air behind you.
+     */
+    if (isPlayer && kind !== 'smoke') {
+      const g = this.game;
+      let seen = null, best = 26;
+      for (const a of g.agents) {
+        if (!a.alive || a.faction === g.playerFaction) continue;
+        const to = a.pos.clone().sub(origin);
+        const along = to.dot(dir);
+        if (along < 2 || along > best) continue;
+        if (to.length() - along > 9) continue;      // roughly in the throw's cone
+        best = along; seen = a;
+      }
+      if (seen) g.bark(seen, 'grenade', true);
+    }
+
     const power = kind === 'molotov' ? 17 : 19;
     const vel = dir.clone().multiplyScalar(power);
     vel.y += 3.4;
