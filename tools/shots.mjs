@@ -61,6 +61,20 @@ const views = [
   ['map-4-summit', [22, 22, -30], [0, 17, -56]],
   ['map-5-overview', [-96, 78, 66], [0, 8, -18]],
   ['map-6-street', [40, 6, 24], [42, 4, 6]],
+  /*
+   * Two views for reading the layout rather than admiring it.
+   *
+   * `plan` looks straight down from above the middle of the hill: the only
+   * angle that shows whether the lanes are lanes and the blocks are blocks. A
+   * three-quarter overview flatters a map — everything overlaps into a
+   * plausible-looking mass — and it is why the hillside read as "organised"
+   * from the air while being unreadable to stand in.
+   *
+   * `lane` stands in the west lane at eye height looking uphill, which is the
+   * view a player actually has.
+   */
+  ['map-7-plan', [0, 132, -6], [0, 0, -6]],
+  ['map-8-lane', [-44, 5.2, 20], [-44, 4.2, -30]],
 ];
 for (const [name, pos, look] of views) {
   await page.evaluate(([p, l]) => {

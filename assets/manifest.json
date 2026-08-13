@@ -1174,6 +1174,16 @@
     },
     {
       "pack": "people",
+      "slot": "crew",
+      "source": "supplied",
+      "file": "models/people/crew.glb",
+      "scale": 1,
+      "name": "Street vendor in a Flamengo shirt",
+      "use": "every crew character — a finished figure, so it wears no cut clothing",
+      "note": "supplied by the project owner; unrigged, re-bound onto the game rig with tools/rebind-character.py"
+    },
+    {
+      "pack": "people",
       "slot": "armored",
       "source": "supplied",
       "file": "models/people/armored.glb",

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TERRACES, WORLD } from './favela.js';
+import { TERRACES, WORLD, LANES, STREET_DEPTH } from './favela.js';
 
 /**
  * ══════════════════════════════════════════════════════════════════
@@ -160,7 +160,8 @@ export function dressSlums(B, assets, world, ctx) {
    * losing nine in ten to one bad guard, and the two need completely different
    * fixes. `npm run budget` prints this.
    */
-  const why = { seeds: 0, routes: 0, occupied: 0, offTerrace: 0, runsCut: 0 };
+  const why = { seeds: 0, routes: 0, occupied: 0, offTerrace: 0, runsCut: 0,
+    ring: 0, ringRoutes: 0, ringTaken: 0, ringOff: 0, ringOk: 0 };
 
   /*
    * Two radii, and the difference between them is what lets a terrace of shacks
@@ -221,7 +222,153 @@ export function dressSlums(B, assets, world, ctx) {
     return span > 0;
   };
 
-  /* ── 1. annexes on the flanks of the houses ───────────────────────
+  /*
+   * Terrace 0 is the plaza: paved, the battalion's staging ground, and the one
+   * genuinely open space on the map. Nothing here builds on it — filling the
+   * police start with cover would change the fight, not the scenery.
+   */
+  const onHill = (y) => TERRACES.some((t, i) => i > 0 && Math.abs(t.y - y) < 0.9);
+
+  /* ── 1. the blocks ────────────────────────────────────────────────
+   * The pass that gives the map a shape you can read while you are being shot
+   * at, and it comes from taking the reserved list literally rather than
+   * treating it as an obstacle.
+   *
+   * Four candidate points in five were being thrown away for landing inside a
+   * reserved rect, which looked like an over-strict guard and was not: the
+   * three lanes and the street band along each terrace genuinely do cover most
+   * of the hillside, because that is the fighting space and the map was built
+   * around it. The bare ground in an overhead shot *was* the route network —
+   * there was simply nothing standing along it to say so.
+   *
+   * What is left between those rects is a grid of rectangular blocks, and this
+   * builds each one as a continuous ring of shacks with deliberate gaps. That
+   * is the whole structural idea, and it is the same one every readable
+   * multiplayer map is built on:
+   *
+   *   · **The lanes become corridors.** A nine-metre gap between two solid
+   *     rows of housing is a street you can push or hold. The same gap with
+   *     nothing along it is a field, and a field gives a player no information
+   *     about where they are or where the fight is.
+   *
+   *   · **The gaps are chosen, not rolled.** Every block gets one opening per
+   *     side, at a position fixed by the block's own coordinates, so the
+   *     flanking routes are in the same place every match. Random gaps produce
+   *     a map that has to be relearned each round, which reads as noise.
+   *
+   *   · **The interiors stay open** as courtyards behind the frontage — the
+   *     pocket you cut into when the lane is covered.
+   *
+   * Where the map's own procedural houses already stand on a block edge, the
+   * ring runs into them and stops: the height check rejects those cells, and
+   * the house becomes that stretch of frontage. That is the intended outcome,
+   * not a tolerated one.
+   */
+  const RING_IN = CELL / 2 + 0.7;      // clear of the reserved corridor
+  const GAP = 2;                       // cells left out, per side, for a way in
+  const ALLEY = 4.4;                   // between blocks: wide enough to fight in
+  const laneX = Object.values(LANES).map((l) => l.x).sort((a, b) => a - b);
+  const HALF_LANE = 4.5 + RING_IN;
+
+  /**
+   * Cut a span into blocks of about `want` metres with an alley between each.
+   *
+   * The first version of this ringed the whole band between two lanes as one
+   * block — thirty-one metres by twelve. A rectangle that size has a small
+   * perimeter and an enormous middle, so it produced a thin scatter of
+   * buildings around an empty field, which is the thing being fixed. Blocks
+   * have to be small enough that their edges are most of their area.
+   */
+  const cut = (a, b, want) => {
+    const span = b - a;
+    if (span < want * 0.7) return span >= CELL * 2 ? [[a, b]] : [];
+    const n = Math.max(1, Math.round((span + ALLEY) / (want + ALLEY)));
+    const size = (span - ALLEY * (n - 1)) / n;
+    if (size < CELL * 2) return [[a, b]];
+    return Array.from({ length: n }, (_, i) => {
+      const s = a + i * (size + ALLEY);
+      return [s, s + size];
+    });
+  };
+
+  // the x bands between the lanes, plus the two outside them
+  const bands = [];
+  let x0 = WORLD.x0 + 4;
+  for (const lx of laneX) {
+    bands.push([x0, lx - HALF_LANE]);
+    x0 = lx + HALF_LANE;
+  }
+  bands.push([x0, WORLD.x1 - 4]);
+
+  const blocks = [];
+  for (let ti = 1; ti < TERRACES.length; ti++) {
+    const t = TERRACES[ti];
+    const tz0 = t.z0 + RING_IN;
+    const tz1 = t.z1 - STREET_DEPTH - RING_IN;
+    if (tz1 - tz0 < CELL * 2) continue;
+    for (const [bx0, bx1] of bands) {
+      for (const [cx0, cx1] of cut(bx0, bx1, 15)) {
+        for (const [cz0, cz1] of cut(tz0, tz1, 12)) blocks.push([cx0, cx1, cz0, cz1, ti]);
+      }
+    }
+  }
+
+  for (const [bx0, bx1, z0, z1, ti] of blocks) {
+    {
+      /*
+       * One opening per side, placed from the block's own coordinates so it is
+       * the same every match. The offsets are coprime-ish multiples that keep
+       * the four gaps from lining up into a straight shot through the block.
+       */
+      const nx = Math.floor((bx1 - bx0) / CELL);
+      const nz = Math.floor((z1 - z0) / CELL);
+      const key = Math.abs(Math.round(bx0 * 3 + z0 * 7 + ti * 11));
+      /*
+       * The opening is sized against the wall it is cut into, not fixed.
+       *
+       * A flat two-cell gap was five metres out of a thirteen-metre wall, so
+       * once the blocks were made small enough to be useful, forty per cent of
+       * every side was missing and the ring stopped reading as a building at
+       * all. Short walls get a single-cell doorway; the shortest get none,
+       * because a three-cell wall with a hole in it is not a wall.
+       */
+      const opening = (n) => (n >= 7 ? GAP : n >= 4 ? 1 : 0);
+      const gx = opening(nx), gz = opening(nz - 2);
+      const gapN = gx ? key % Math.max(1, nx - gx) : -1;
+      const gapS = gx ? (key * 3 + 2) % Math.max(1, nx - gx) : -1;
+      const gapW = gz ? (key * 5 + 1) % Math.max(1, nz - 2 - gz) + 1 : -1;
+      const gapE = gz ? (key * 7 + 3) % Math.max(1, nz - 2 - gz) + 1 : -1;
+      const out = (i, at, n) => at < 0 || i < at || i >= at + n;
+
+      const ring = [];
+      for (let i = 0; i < nx; i++) {
+        const x = bx0 + CELL * (i + 0.5);
+        if (out(i, gapN, gx)) ring.push([x, z0, 0]);
+        if (nz > 1 && out(i, gapS, gx)) ring.push([x, z1, Math.PI]);
+      }
+      for (let i = 1; i < nz - 1; i++) {
+        const z = z0 + CELL * (i + 0.5);
+        if (z > z1 - CELL / 2) break;
+        if (out(i, gapW, gz)) ring.push([bx0, z, Math.PI / 2]);
+        if (out(i, gapE, gz)) ring.push([bx1, z, -Math.PI / 2]);
+      }
+
+      for (const [x, z, yaw] of ring) {
+        if (placed >= 900) break;
+        why.ring++;
+        if (blocked(x, z, 0.2)) { why.ringRoutes++; continue; }
+        if (!free(x, z, TEST_R)) { why.ringTaken++; continue; }
+        const y = surface(x, z, 40);
+        if (y == null || !onHill(y)) { why.ringOff++; continue; }
+        why.ringOk++;
+        // a taller unit every so often, so a block is a skyline and not a fence
+        stack(x, y, z, yaw + rng.range(-0.03, 0.03), rng.chance(0.34));
+      }
+      settle();
+    }
+  }
+
+  /* ── 2. annexes on the flanks of the houses ───────────────────────
    * Hard against a wall, facing out. The map recorded every house it built, so
    * this walks each one's perimeter in two-metre cells and leans a shack on it
    * where there is ground to stand on and nothing else has claimed the spot.
@@ -251,7 +398,7 @@ export function dressSlums(B, assets, world, ctx) {
     }
   }
 
-  /* ── 2. another room on somebody's roof ───────────────────────────
+  /* ── 3. another room on somebody's roof ───────────────────────────
    * The most characteristic thing a favela does over time, and in a shooter it
    * also does real work: a rooftop with a shack on it is a rooftop with cover
    * on it, and the roofs were the flattest, emptiest surfaces on the map.
@@ -266,58 +413,6 @@ export function dressSlums(B, assets, world, ctx) {
       const y = ground(x, z, hs.roof, 0.7);
       if (y == null) continue;
       stack(x, y, z, rng() * Math.PI * 2, false);
-      settle();
-    }
-  }
-
-  /*
-   * Terrace 0 is the plaza: paved, the battalion's staging ground, and the one
-   * genuinely open space on the map. Nothing here builds on it — filling the
-   * police start with cover would change the fight, not the scenery.
-   */
-  const onHill = (y) => TERRACES.some((t, i) => i > 0 && Math.abs(t.y - y) < 0.9);
-
-  /* ── 3. frontage along the lanes and the terrace streets ──────────
-   * The change that actually remakes the map, and it comes from reading what
-   * the reserved list says rather than fighting it.
-   *
-   * Four candidate points in five were being thrown away for landing inside a
-   * reserved rect, which looked like the guard was too strict and was not: the
-   * lanes and the street band along each terrace really do cover most of the
-   * hillside, because that is the fighting space and the map is built around
-   * it. The bare ground in an overhead shot is the route network.
-   *
-   * So the kit lines it instead of filling it. Both long edges of every lane
-   * and every street get a row of shacks stepping along at the grid pitch, set
-   * just far enough out that the corridor keeps its full width, turned to face
-   * the road. A nine-metre gap between two rows of houses is a street; the same
-   * gap with nothing along it is a field, and that is the whole difference
-   * between how this map read before and after.
-   */
-  const FRONT_OFF = CELL / 2 + 0.7;    // clear of the rect, wall facing the road
-  for (const r of reserved) {
-    const kind = r.why?.startsWith('lane:') ? 'lane' : r.why;
-    if (kind !== 'lane' && kind !== 'street') continue;
-    const alongX = r.x1 - r.x0 > r.z1 - r.z0;
-    const from = alongX ? r.x0 : r.z0;
-    const to = alongX ? r.x1 : r.z1;
-
-    for (const side of [-1, 1]) {
-      const fixed = (side < 0 ? (alongX ? r.z0 : r.x0) : (alongX ? r.z1 : r.x1)) + side * FRONT_OFF;
-      // the road is on the other side of the row, so the shack turns back to it
-      const yaw = alongX ? (side < 0 ? 0 : Math.PI) : (side < 0 ? Math.PI / 2 : -Math.PI / 2);
-      for (let u = from + CELL / 2; u < to && placed < 1e9; u += CELL) {
-        if (!rng.chance(0.85 * density)) continue;
-        const x = alongX ? u : fixed;
-        const z = alongX ? fixed : u;
-        if (x < WORLD.x0 + 5 || x > WORLD.x1 - 5 || z < WORLD.z0 + 5 || z > WORLD.z1 - 5) continue;
-        if (blocked(x, z, 0) || !free(x, z, TEST_R)) continue;
-        const y = surface(x, z, 40);
-        if (y == null || !onHill(y)) continue;
-        stack(x, y, z, yaw + rng.range(-0.04, 0.04), rng.chance(0.3));
-      }
-      // one flush per row, for the same reason a run of shacks gets one: each
-      // shack in the row stands inside its neighbour's finished footprint
       settle();
     }
   }

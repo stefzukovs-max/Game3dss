@@ -58,7 +58,15 @@ export const LANES = {
 };
 
 const FLOOR_H = 2.75;
-const STREET_DEPTH = 8.0;
+/**
+ * How deep the lateral street is along each terrace's downhill edge.
+ *
+ * Exported because the block layout in slums.js has to know where the street
+ * ends and the buildable ground begins; deriving it from the reserved rects
+ * instead would work until the day a landmark reserves something the same
+ * shape.
+ */
+export const STREET_DEPTH = 8.0;
 
 /**
  * How tall the summit monument stands, in metres.

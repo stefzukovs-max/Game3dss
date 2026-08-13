@@ -285,14 +285,19 @@ export function makeOutfit(faction, rank, rng = makeRNG((Math.random() * 1e9) | 
     /*
      * Which body the skinned actor should wear.
      *
-     * The police get the supplied armoured model, which is a finished figure —
-     * plate carrier, helmet, kneepads, all modelled and textured — so it wants
-     * none of the cut-from-the-body clothing the rest of this file builds. The
-     * crew stay on the bare body plus cut clothing, which is what gives five
-     * gang members five different outfits from one mesh. One model for both
-     * would either put the crew in riot gear or the police in a t-shirt.
+     * Both factions are now supplied, finished figures — the police in riot
+     * gear, the crew in a Flamengo shirt and shorts — so both skip the
+     * cut-from-the-body clothing the rest of this file builds, and both skip
+     * the skin tint, which would recolour a plate carrier or a football shirt
+     * as though it were forearm.
+     *
+     * The cost is that the crew are now one man five times over, where the cut
+     * clothing gave five different outfits out of one mesh. That is the trade
+     * the supplied model makes: a much better-looking gangster, and only one of
+     * him. The procedural path is still here and still works, so the fallback
+     * when the pack is missing is the varied one.
      */
-    body: faction === 'police' ? 'armored' : 'base',
+    body: faction === 'police' ? 'armored' : 'crew',
   };
 }
 

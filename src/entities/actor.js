@@ -54,8 +54,10 @@ export function setActorSource(assets) {
    * back to the base body in cut clothing, exactly as before.
    */
   const bodies = { base: body };
-  const armored = assets.models.get('people:armored');
-  if (armored) bodies.armored = armored;
+  for (const kind of ['armored', 'crew']) {
+    const m = assets.models.get(`people:${kind}`);
+    if (m) bodies[kind] = m;
+  }
 
   SOURCE = { body, bodies, clips, grip: gripFromAimPose(body, clips) };
   return true;

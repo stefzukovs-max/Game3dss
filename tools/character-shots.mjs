@@ -59,7 +59,9 @@ const shot = async (name, faction, turn = 0) => {
   }, [faction, turn]);
   await p.waitForTimeout(700);
   await p.evaluate(() => window.__game.renderer.render(window.__game.scene, window.__game.camera));
-  await p.screenshot({ path: `${OUT}/${name}.png` });
+  // the supplied bodies are 20-28k triangles each, and five of them under
+  // swiftshader take well past the default half-second budget to compose
+  await p.screenshot({ path: `${OUT}/${name}.png`, timeout: 120000 });
 };
 
 await shot('chars-1-gang', 'gang');

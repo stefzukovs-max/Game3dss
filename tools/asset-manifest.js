@@ -204,6 +204,13 @@ export const LOCAL_MODELS = [
   },
 
   {
+    pack: 'people', slot: 'crew',
+    file: 'models/people/crew.glb',
+    source: 'supplied', name: 'Street vendor in a Flamengo shirt',
+    use: 'every crew character — a finished figure, so it wears no cut clothing',
+    note: 'supplied by the project owner; unrigged, re-bound onto the game rig with tools/rebind-character.py',
+  },
+  {
     pack: 'people', slot: 'armored',
     file: 'models/people/armored.glb',
     source: 'supplied', name: 'Armoured police officer',
