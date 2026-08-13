@@ -832,6 +832,18 @@ class Game {
       if (target.alive) {
         this.hud.hitmarker(false, zone === 'head');
         audio.hitmarker(false);
+        /*
+         * A short hitch on a non-fatal hit too, not only on the kill.
+         *
+         * The hitch already existed and only fired when something died, so
+         * every shot that landed without killing — which is most of them — had
+         * no physical feedback at all beyond a number floating up. Landing a
+         * shot should feel like landing a shot. Kept to roughly a third of the
+         * kill's duration so the kill still reads as the bigger event, and
+         * capped rather than accumulated so an automatic weapon does not chain
+         * them into slow motion.
+         */
+        this._hitstop = Math.max(this._hitstop || 0, zone === 'head' ? 0.045 : 0.03);
       }
       if (this.settings.dmgnum && point) this.hud.damageNumber(dealt, point, this.camera, zone === 'head');
     }

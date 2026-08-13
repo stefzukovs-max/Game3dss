@@ -26,7 +26,8 @@
     "view": "node tools/model-view.mjs",
     "budget": "node tools/scene-budget.mjs",
     "kit:sheet": "node tools/kit-sheet.mjs",
-    "check:aim": "node tools/aim-check.mjs"
+    "check:aim": "node tools/aim-check.mjs",
+    "check:feel": "node tools/feel-check.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.4.2",

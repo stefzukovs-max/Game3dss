@@ -56,6 +56,27 @@ function rayCylinder(ox, oy, oz, dx, dy, dz, cx, cz, r, y0, y1, maxT) {
   return -1;
 }
 
+/*
+ * What the map's collision tags are made of. The tags come from favela.js and
+ * props.js, which is where the author already had to say what each box was.
+ */
+const SURFACE = {
+  vehicle: 'metal', prop: 'metal', pole: 'metal', roof: 'metal', tank: 'metal',
+  railing: 'metal', catwalk: 'metal', fence: 'metal',
+  shack: 'wood', stall: 'wood', bench: 'wood', door: 'wood',
+  ground: 'dirt', ramp: 'dirt', pitch: 'dirt',
+  building: 'concrete', parapet: 'concrete', pillar: 'concrete',
+  stair: 'concrete', kerb: 'concrete', barrier: 'concrete', monument: 'concrete',
+};
+
+/** How each material answers a bullet. `dust` scales the puff; 0 means none. */
+const IMPACT = {
+  metal:    { sparks: 4, dust: 0.25, decal: true,  colour: 0xd8d8d8 },
+  concrete: { sparks: 0, dust: 1.0,  decal: true,  colour: 0xcfc9bd },
+  wood:     { sparks: 1, dust: 0.7,  decal: true,  colour: 0xb99a72 },
+  dirt:     { sparks: 0, dust: 1.15, decal: false, colour: 0xa08a68 },
+};
+
 export class CombatSystem {
   constructor(scene, collision, tex) {
     this.scene = scene;
@@ -100,6 +121,20 @@ export class CombatSystem {
       blood: new THREE.MeshBasicMaterial({ map: this.tex.smoke, transparent: true,
         depthWrite: false, color: 0x9e1b1b }),
     };
+    /*
+     * One dust material per surface, built up front.
+     *
+     * The puff pool shares a single material per kind, so tinting a puff at
+     * spawn time would recolour every other particle already on screen using
+     * it. Four materials is the whole cost of concrete dust being pale grey and
+     * dirt being brown.
+     */
+    for (const [k, v] of Object.entries(IMPACT)) {
+      this.puffMats['dust_' + k] = new THREE.MeshBasicMaterial({
+        map: this.tex.smoke, transparent: true, depthWrite: false,
+        opacity: 0.5, color: v.colour,
+      });
+    }
     this.puffs = [];
     for (let i = 0; i < 110; i++) {
       const m = new THREE.Mesh(this.puffGeo, this.puffMats.spark);
@@ -260,14 +295,26 @@ export class CombatSystem {
   }
 
   impact(point, normal, tag = 'world') {
-    const kind =
-      tag === 'vehicle' || tag === 'prop' || tag === 'pole' ? 'metal' :
-      tag === 'shack' || tag === 'stall' ? 'wood' : 'concrete';
+    const kind = SURFACE[tag] ?? 'concrete';
+    const look = IMPACT[kind];
     audio.impact(point, kind);
     if (!this.effectsOn) return;
 
-    // sparks kick back along the surface normal
-    for (let i = 0; i < 3; i++) {
+    /*
+     * The impact should say what was hit.
+     *
+     * Every surface used to throw the same three orange sparks and the same
+     * grey puff, so a round into a plaster wall struck sparks off it like an
+     * anvil and a round into a corrugated roof looked identical to one into
+     * dirt. The collision world already tags every box — the map author wrote
+     * `tag: 'roof'`, `tag: 'shack'`, `tag: 'railing'` — so the information was
+     * sitting there unused.
+     *
+     * Metal sparks and does not dust. Masonry dusts and does not spark. Wood
+     * throws a few pale splinters. Dirt is the muted one, because a bullet into
+     * a hillside is a thud and a small cloud.
+     */
+    for (let i = 0; i < look.sparks; i++) {
       this.puff(point, 'spark', {
         size0: 0.14, size1: 0.02, life: 0.13 + Math.random() * 0.1,
         vel: new THREE.Vector3(
@@ -277,12 +324,14 @@ export class CombatSystem {
         grav: 7,
       });
     }
-    this.puff(point, 'smoke', {
-      size0: 0.15, size1: 0.85, life: 0.55,
-      vel: new THREE.Vector3(normal.x * 0.7, normal.y * 0.7 + 0.5, normal.z * 0.7),
-      grav: -0.5,
-    });
-    this.decal(point, normal);
+    if (look.dust > 0) {
+      this.puff(point, 'dust_' + kind, {
+        size0: 0.15, size1: 0.85 * look.dust, life: 0.55 * look.dust,
+        vel: new THREE.Vector3(normal.x * 0.7, normal.y * 0.7 + 0.5, normal.z * 0.7),
+        grav: -0.5,
+      });
+    }
+    if (look.decal) this.decal(point, normal);
   }
 
   bloodBurst(point, dir) {
@@ -353,7 +402,7 @@ export class CombatSystem {
       if (camera) p.mesh.quaternion.copy(camera.quaternion);
       const m = p.mesh.material;
       // opacity is shared per-material; fade the flash pool by scale instead
-      if (p.kind === 'smoke') m.opacity = 0.45 * (1 - k);
+      if (p.kind === 'smoke' || p.kind.startsWith('dust_')) m.opacity = 0.45 * (1 - k);
       else if (p.kind === 'blood') m.opacity = 1 - k * k;
     }
 

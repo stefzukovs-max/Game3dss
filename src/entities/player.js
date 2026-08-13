@@ -349,7 +349,17 @@ export class Player {
       this.fire(t);
       if (!def.auto) this._semiLatch = true;
     }
-    if (!input.firing) this._semiLatch = false;
+    if (!input.firing) {
+      this._semiLatch = false;
+      /*
+       * A quarter of a second off the trigger is a new burst, and the recoil
+       * pattern starts again from the top. Without this the pattern belongs to
+       * the magazine rather than to the burst, and tapping single shots would
+       * climb the same curve as holding the trigger down — which would punish
+       * exactly the trigger discipline the pattern is there to reward.
+       */
+      if (t - this.lastFired > 0.25) w.resetPattern();
+    }
 
     if (input.firing && w.mag <= 0 && !w.reloading && t >= w.nextShot) {
       w.nextShot = t + 0.35;
@@ -371,6 +381,7 @@ export class Player {
     const w = this.weapon;
     if (!w.canReload) return;
     w.reloading = true;
+    w.resetPattern();                  // a fresh magazine starts the burst over
     w.reloadStart = now();
     const mul = this.char.passive.id === 'command' ? 0.8 : 1;
     w.reloadEnd = w.reloadStart + w.def.reload * mul / this.upgrades.reload;
@@ -425,12 +436,22 @@ export class Player {
     // behind the camera; the procedural rig has no such method, hence the guard
     this.model.kick?.(def.recoil);
 
-    // recoil
-    const kick = def.recoil / this.control * (this.aiming ? 0.62 : 1) * (this.crouching ? 0.8 : 1);
+    /*
+     * Recoil, from the weapon's pattern rather than from a random number.
+     *
+     * `recoilPitch` is the part that snaps back on its own — the visual kick.
+     * `pitch`/`yaw` is the part that stays until the player corrects it, which
+     * is what makes pulling down a skill. Both come off the same pattern, so
+     * the burst walks the same way every magazine and can be learned.
+     */
+    const pat = w.pattern();
+    const soft = 1 / this.control * (this.aiming ? 0.62 : 1) * (this.crouching ? 0.8 : 1);
+    const kick = pat.up * soft;
     this.recoilPitch += kick * 0.011;
     this.pitch += kick * 0.009;
-    this.recoilYaw += (Math.random() - 0.5) * def.recoilSide * 0.01;
-    this.yaw += (Math.random() - 0.5) * def.recoilSide * 0.006;
+    this.recoilYaw += pat.side * soft * 0.010;
+    this.yaw += pat.side * soft * 0.006;
+    w.shotIndex++;
     game.camera.userData.shake = Math.min(1, (game.camera.userData.shake || 0) + kick * 0.09);
 
     // damage bonuses

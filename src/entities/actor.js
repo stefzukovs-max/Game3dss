@@ -409,6 +409,50 @@ export class SkinnedActor {
       if (spine) spine.rotation.x -= this._kick;
       this._kick = damp(this._kick, 0, 16, dt);
     }
+
+    this._sway(dt, s);
+  }
+
+  /**
+   * Weapon sway — the small motion of the gun that is not the animation.
+   *
+   * The clips move the whole body, so the weapon was rigidly welded to the hand
+   * and perfectly still relative to it. A gun that never moves in its own right
+   * is the difference between holding a weapon and carrying a prop.
+   *
+   * Two sources, both cheap:
+   *
+   *   · **Walking** swings the muzzle in a figure of eight, at a rate tied to
+   *     how fast the feet are actually going, so it stays in sympathy with the
+   *     stride rather than drifting against it.
+   *
+   *   · **Breathing**, only while aimed and only once the body has stopped.
+   *     It is the slow one, and it is what makes holding a sight line feel like
+   *     an effort being made rather than a state being in.
+   *
+   * Both fade out as the other takes over, so there is never a moment where the
+   * weapon is doing two unrelated things at once.
+   */
+  _sway(dt, s) {
+    const m = this.weaponModel;
+    if (!m) return;
+    this._swayT = (this._swayT ?? 0) + dt;
+
+    const speed = s.speed || 0;
+    const walk = Math.min(1, speed / 4.5);
+    const t = this._swayT;
+    // the stride rate rises with speed; 4.2 rad/s is about a walking cadence
+    const stride = t * (4.2 + walk * 3.4);
+    const breathe = (1 - walk) * (s.aiming ? 1 : 0.45);
+
+    const x = Math.sin(stride) * 0.012 * walk + Math.sin(t * 1.5) * 0.004 * breathe;
+    const y = Math.sin(stride * 2) * 0.009 * walk + Math.sin(t * 1.15 + 0.7) * 0.005 * breathe;
+    // aiming pulls the weapon in toward the sight line rather than only zooming
+    const inward = (s.aiming ? 1 : 0);
+    this._ads = damp(this._ads ?? 0, inward, 12, dt);
+
+    m.position.set(x - 0.02 * this._ads, y + 0.012 * this._ads, -0.035 * this._ads);
+    m.rotation.z = Math.sin(stride) * 0.03 * walk;
   }
 
   /**

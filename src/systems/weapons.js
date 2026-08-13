@@ -523,6 +523,40 @@ export class WeaponState {
     this.nextShot = 0;
     this.bloom = 0;
     this.owned = true;
+    this.shotIndex = 0;
+  }
+
+  /**
+   * Where the nth round of a magazine kicks the sights.
+   *
+   * Recoil was `Math.random()` per shot, which cannot be learned and therefore
+   * cannot be countered — the only counter to noise is to stop firing. A
+   * pattern is the opposite: the same every magazine, so a player who has spent
+   * time with a weapon can pull down through it and one who has not cannot.
+   * That difference is most of what makes an automatic weapon satisfying rather
+   * than a damage tap.
+   *
+   * The shape is the familiar one: nearly vertical for the first few rounds
+   * while the climb builds, then a horizontal drift that reverses, so the burst
+   * traces a lazy S. The trig is doing the work of an authored curve — it is
+   * deterministic, cheap, and different per weapon because the constants come
+   * from the weapon's own recoil figures.
+   *
+   * @returns {{up:number, side:number}} in the weapon's own recoil units
+   */
+  pattern(n = this.shotIndex) {
+    const d = this.def;
+    // climb ramps in over the first four rounds, then holds
+    const up = 0.55 + 0.45 * Math.min(1, n / 4);
+    /*
+     * The drift. Two waves at incommensurate rates so the pattern does not
+     * simply repeat every few rounds, scaled by how far into the magazine we
+     * are — the first couple of shots stay honest, which is what keeps tapping
+     * accurate and rewards burst discipline.
+     */
+    const ramp = Math.min(1, n / 6);
+    const side = ramp * (Math.sin(n * 0.9) * 0.7 + Math.sin(n * 0.37 + 1.1) * 0.5);
+    return { up: up * d.recoil, side: side * d.recoilSide };
   }
 
   get full() { return this.mag >= this.def.mag; }
@@ -543,6 +577,16 @@ export class WeaponState {
   addBloom() {
     this.bloom = Math.min(this.def.bloomMax, this.bloom + this.def.bloom);
   }
+
+  /**
+   * Back to the top of the recoil pattern.
+   *
+   * Called when the trigger has been off long enough to count as a new burst,
+   * and on reload. Without it the pattern would be a property of the magazine
+   * rather than of the burst, and tapping single shots would walk up the same
+   * curve as holding the trigger down.
+   */
+  resetPattern() { this.shotIndex = 0; }
 
   decayBloom(dt) {
     this.bloom = Math.max(0, this.bloom - dt * (this.def.bloomMax * 1.6 + 0.02));
