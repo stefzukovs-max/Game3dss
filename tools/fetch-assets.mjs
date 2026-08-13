@@ -28,9 +28,10 @@ import { pipeline } from 'node:stream/promises';
 import sharp from 'sharp';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, weld, textureCompress, quantize, mergeDocuments } from '@gltf-transform/functions';
+import { dedup, prune, weld, simplify, textureCompress, quantize, mergeDocuments } from '@gltf-transform/functions';
+import { MeshoptSimplifier } from 'meshoptimizer';
 import { fetchItchPack } from './itch-fetch.mjs';
-import { MATERIALS, PROPS, HDRIS, MODEL_PACKS, LOCAL_MODELS, LICENSE, SOURCES } from './asset-manifest.js';
+import { MATERIALS, PROPS, DEFAULT_TRIS, HDRIS, MODEL_PACKS, LOCAL_MODELS, LICENSE, SOURCES } from './asset-manifest.js';
 
 const exec = promisify(execFile);
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -175,6 +176,18 @@ function manifestEntryFor(m, maps, dir) {
  * meshopt would compress harder but each needs a WASM decoder shipped
  * alongside, and the download saving does not pay for that here.
  */
+/** Triangles in a document, for deciding how hard to decimate it. */
+function triCount(doc) {
+  let n = 0;
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const idx = prim.getIndices();
+      n += (idx ? idx.getCount() : prim.getAttribute('POSITION').getCount()) / 3;
+    }
+  }
+  return Math.round(n);
+}
+
 async function buildProp(p) {
   const out = path.join(OUT, 'props', `${p.id}.glb`);
   if (!FORCE && await exists(out)) {
@@ -207,6 +220,40 @@ async function buildProp(p) {
     dedup(),
     prune({ keepAttributes: false }),
     weld(),
+  );
+
+  /*
+   * ── decimate to the budget ──
+   *
+   * This step did not exist, and its absence was the single largest problem in
+   * the project. Poly Haven's "1k" refers to the texture; the mesh comes at
+   * scan density. Shipped untouched, twenty-six props accounted for 2.04 of the
+   * scene's 2.54 million triangles — a concrete road barrier at 60,928, a
+   * cardboard box at 16,952.
+   *
+   * Ratio is computed from the actual count against the budget in the manifest,
+   * rather than a flat percentage, because these arrive anywhere between two
+   * thousand and sixty thousand triangles and one ratio cannot serve both.
+   *
+   * `lockBorder` is off, unlike the vehicle path in `bake-glb.mjs`. There it
+   * stops a car's separate panels tearing apart from each other; here it would
+   * pin every open edge of a scan and block the reduction entirely. The error
+   * bound is loose for the same reason — a barrel seen from eight metres has no
+   * silhouette detail worth a thousand triangles.
+   */
+  const budget = p.tris ?? DEFAULT_TRIS;
+  const before = triCount(doc);
+  if (before > budget * 1.15) {
+    await doc.transform(simplify({
+      simplifier: MeshoptSimplifier,
+      ratio: Math.max(0.005, budget / before),
+      error: 0.02,
+      lockBorder: false,
+    }), prune({ keepAttributes: false }));
+  }
+  const after = triCount(doc);
+
+  await doc.transform(
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [p.size, p.size], quality: 86 }),
     quantize({ pattern: /^(POSITION|TEXCOORD|NORMAL|TANGENT)/ }),
   );
@@ -214,8 +261,9 @@ async function buildProp(p) {
   await fs.mkdir(path.dirname(out), { recursive: true });
   await fs.writeFile(out, await io.writeBinary(doc));
   const authors = await propAuthors(p.id);
-  log(`  ✓ ${p.id.padEnd(30)} ${mb((await fs.stat(out)).size)}`);
-  return { id: p.id, source: 'polyhaven', file: `props/${p.id}.glb`, use: p.use, authors };
+  const cut = before > after ? `  ${before} → ${after} tris` : `  ${after} tris`;
+  log(`  ✓ ${p.id.padEnd(30)} ${mb((await fs.stat(out)).size)}${cut}`);
+  return { id: p.id, source: 'polyhaven', file: `props/${p.id}.glb`, use: p.use, tris: after, authors };
 }
 
 const authorCache = new Map();

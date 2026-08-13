@@ -117,12 +117,34 @@ class PropBatcher {
       source.updateMatrixWorld(true);
       const inv = new THREE.Matrix4().copy(source.matrixWorld).invert();
 
+      /*
+       * ── who casts a shadow ──
+       *
+       * The shadow map is a second full pass over the scene, so every object
+       * that casts is drawn twice. Measured, that pass was most of the frame:
+       * 758k triangles of geometry were costing 1.46M drawn.
+       *
+       * A shadow earns its second draw when you can tell what threw it. A
+       * doorway, a stair flight, a parked van, a palm — yes. A gas bottle, a
+       * tyre, a manhole cover, a drain: the shadow is a smudge a few pixels
+       * across that is already inside the shadow of the wall the object is
+       * leaning on. So the test is the object's own size, measured rather than
+       * listed, because the next prop added should not need this file edited.
+       *
+       * Receiving stays on for everything. It is free — it happens in the
+       * material during the pass that was already going to run — and it is what
+       * stops a small prop looking pasted onto the ground.
+       */
+      _box.setFromObject(source);
+      _box.getSize(_size);
+      const big = Math.max(_size.x, _size.y, _size.z) >= 1.2;
+
       source.traverse((o) => {
         if (!o.isMesh) return;
         const local = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
         const inst = new THREE.InstancedMesh(o.geometry, o.material, matrices.length);
         inst.name = `prop:${key}`;
-        inst.castShadow = true;
+        inst.castShadow = big;
         inst.receiveShadow = true;
         for (let i = 0; i < matrices.length; i++) {
           inst.setMatrixAt(i, new THREE.Matrix4().multiplyMatrices(matrices[i], local));
@@ -409,9 +431,12 @@ export function scatterProps(scene, assets, world, opts = {}) {
   };
 
   /*
-   * The battalion rolls in an armoured truck rather than saloons. The
-   * interceptor stays as the second choice and the kit car as the third, so the
-   * map still populates if a supplied model is missing.
+   * The battalion rolls in an armoured truck rather than saloons, with the
+   * supplied sedan behind it and the kit car behind that, so the map still
+   * populates if a model is missing. The sedan is currently unregistered — it
+   * was never reached, and paying 1.6 MB on every load for a fallback that
+   * cannot fire is not a fallback, it is a leak — but the lookup stays, because
+   * that is what makes putting it back a one-line change.
    */
   const heroCar = supplied('police', 'caveirao') ?? supplied('police', 'interceptor');
 

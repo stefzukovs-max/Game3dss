@@ -92,6 +92,18 @@ class Game {
       canvas: this.canvas, antialias: true, powerPreference: 'high-performance', stencil: false,
     });
     this.renderer.setClearColor(0x8fb4cf);
+    /*
+     * Count the whole frame, not just its last pass.
+     *
+     * `renderer.info` resets itself at the start of every `render()` call by
+     * default, and the post chain makes several — the scene into a target, then
+     * one or more fullscreen quads to the screen. So anything reading the
+     * counters after the frame was reading the final quad and reporting "1 draw
+     * call", which is how the overlay and the budget tool both came to describe
+     * a scene of a few hundred draws as one. Reset once per frame instead, in
+     * `_frame`, and the numbers mean what they say.
+     */
+    this.renderer.info.autoReset = false;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -126,7 +138,20 @@ class Game {
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.camera.near = 1;
     this.sun.shadow.camera.far = 260;
-    const S = 52;
+    /*
+     * ── how much of the map is in the shadow map ──
+     *
+     * This was ±52 m, a 104-metre box on a 140-metre map, which meant the
+     * shadow pass was re-drawing essentially the whole level every frame — most
+     * of the frame's triangles, for shadows cast by buildings the player cannot
+     * see past the fog.
+     *
+     * ±34 m is about as far as a shadow is readable here before the fog closes
+     * in, and shrinking the box makes the shadows *better* as well as cheaper:
+     * the same 2048² map now covers a smaller area, so texel density goes from
+     * 20 per metre to 30 and contact edges stop looking chewed.
+     */
+    const S = 34;
     Object.assign(this.sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S });
     // Without this the shadow camera keeps its default ±5 frustum and every
     // surface outside that tiny box samples the shadow map as occluded.
@@ -1044,6 +1069,7 @@ class Game {
   /* ══════════════════ frame ══════════════════ */
   _frame(t) {
     requestAnimationFrame((n) => this._frame(n));
+    this.renderer.info.reset();          // see autoReset, above
     const raw = (t - this._lastT) / 1000;
     this._lastT = t;
     const dt = Math.min(0.05, raw);

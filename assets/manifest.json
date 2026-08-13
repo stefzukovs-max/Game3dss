@@ -334,6 +334,7 @@
       "source": "polyhaven",
       "file": "props/modular_chainlink_fence.glb",
       "use": "court cage, alley fencing, rooftop edges",
+      "tris": 12091,
       "authors": {
         "name": "Modular Chainlink Fence",
         "authors": [
@@ -347,6 +348,7 @@
       "source": "polyhaven",
       "file": "props/modular_electricity_poles.glb",
       "use": "power poles along the lanes",
+      "tris": 25688,
       "authors": {
         "name": "Modular Electricity Poles",
         "authors": [
@@ -359,6 +361,7 @@
       "source": "polyhaven",
       "file": "props/modular_electric_cables.glb",
       "use": "the overhead cable tangle between poles",
+      "tris": 12221,
       "authors": {
         "name": "Modular Electric Cables",
         "authors": [
@@ -371,6 +374,7 @@
       "source": "polyhaven",
       "file": "props/modular_metal_gutter.glb",
       "use": "downpipes and gutters on the facades",
+      "tris": 2248,
       "authors": {
         "name": "Modular Metal Gutter",
         "authors": [
@@ -383,6 +387,7 @@
       "source": "polyhaven",
       "file": "props/modular_pipes.glb",
       "use": "surface plumbing runs up the walls",
+      "tris": 16264,
       "authors": {
         "name": "Modular Pipes",
         "authors": [
@@ -395,6 +400,7 @@
       "source": "polyhaven",
       "file": "props/modular_fire_escape.glb",
       "use": "external stair runs on the taller blocks",
+      "tris": 4541,
       "authors": {
         "name": "Modular Fire Escape",
         "authors": [
@@ -407,6 +413,7 @@
       "source": "polyhaven",
       "file": "props/exterior_aircon_unit.glb",
       "use": "wall-mounted air conditioners",
+      "tris": 1710,
       "authors": {
         "name": "Exterior Aircon Unit",
         "authors": [
@@ -419,6 +426,7 @@
       "source": "polyhaven",
       "file": "props/rollershutter_door.glb",
       "use": "closed shopfronts at street level",
+      "tris": 352,
       "authors": {
         "name": "Rollershutter Door",
         "authors": [
@@ -431,6 +439,7 @@
       "source": "polyhaven",
       "file": "props/rollershutter_window_01.glb",
       "use": "graffitied shutters",
+      "tris": 814,
       "authors": {
         "name": "Rollershutter Window 01",
         "authors": [
@@ -443,6 +452,7 @@
       "source": "polyhaven",
       "file": "props/rollershutter_window_03.glb",
       "use": "graffitied shutters (variant)",
+      "tris": 254,
       "authors": {
         "name": "Rollershutter Window 03",
         "authors": [
@@ -455,6 +465,7 @@
       "source": "polyhaven",
       "file": "props/utility_box_01.glb",
       "use": "street-side utility cabinets",
+      "tris": 398,
       "authors": {
         "name": "Utility Box 01",
         "authors": [
@@ -467,6 +478,7 @@
       "source": "polyhaven",
       "file": "props/utility_box_02.glb",
       "use": "street-side utility cabinets (large)",
+      "tris": 502,
       "authors": {
         "name": "Utility Box 02",
         "authors": [
@@ -479,6 +491,7 @@
       "source": "polyhaven",
       "file": "props/water_manhole_cover.glb",
       "use": "manholes in the plaza and road",
+      "tris": 934,
       "authors": {
         "name": "Water Manhole Cover",
         "authors": [
@@ -491,6 +504,7 @@
       "source": "polyhaven",
       "file": "props/propane_tank.glb",
       "use": "gas bottles beside doorways",
+      "tris": 962,
       "authors": {
         "name": "Propane Tank",
         "authors": [
@@ -503,6 +517,7 @@
       "source": "polyhaven",
       "file": "props/small_lpg_tank.glb",
       "use": "gas bottles beside doorways (small)",
+      "tris": 544,
       "authors": {
         "name": "Small Lpg Tank",
         "authors": [
@@ -515,6 +530,7 @@
       "source": "polyhaven",
       "file": "props/Barrel_01.glb",
       "use": "steel drums used as cover",
+      "tris": 470,
       "authors": {
         "name": "Barrel_01",
         "authors": [
@@ -527,6 +543,7 @@
       "source": "polyhaven",
       "file": "props/Barrel_02.glb",
       "use": "blue plastic water drums",
+      "tris": 598,
       "authors": {
         "name": "Barrel 02",
         "authors": [
@@ -539,6 +556,7 @@
       "source": "polyhaven",
       "file": "props/barrel_stove.glb",
       "use": "burnt-out oil drums",
+      "tris": 1936,
       "authors": {
         "name": "Barrel Stove",
         "authors": [
@@ -551,6 +569,7 @@
       "source": "polyhaven",
       "file": "props/metal_trash_can.glb",
       "use": "bins along the lanes",
+      "tris": 1287,
       "authors": {
         "name": "Metal Trash Can",
         "authors": [
@@ -563,6 +582,7 @@
       "source": "polyhaven",
       "file": "props/old_tyre.glb",
       "use": "tyre piles",
+      "tris": 398,
       "authors": {
         "name": "Old Tyre",
         "authors": [
@@ -575,6 +595,7 @@
       "source": "polyhaven",
       "file": "props/cardboard_box_01.glb",
       "use": "stacked boxes behind the market",
+      "tris": 120,
       "authors": {
         "name": "Cardboard Box 01",
         "authors": [
@@ -587,6 +608,7 @@
       "source": "polyhaven",
       "file": "props/concrete_road_barrier.glb",
       "use": "police roadblock at the foot of the hill",
+      "tris": 302,
       "authors": {
         "name": "Concrete Road Barrier",
         "authors": [
@@ -599,6 +621,7 @@
       "source": "polyhaven",
       "file": "props/covered_car.glb",
       "use": "the tarped car on the lower street",
+      "tris": 2846,
       "authors": {
         "name": "Covered Car",
         "authors": [
@@ -611,6 +634,7 @@
       "source": "polyhaven",
       "file": "props/ladder_sectioned_01.glb",
       "use": "ladders against the roof edges",
+      "tris": 2245,
       "authors": {
         "name": "Ladder Sectioned 01",
         "authors": [
@@ -623,6 +647,7 @@
       "source": "polyhaven",
       "file": "props/wooden_ladder.glb",
       "use": "ladders against the roof edges (timber)",
+      "tris": 1444,
       "authors": {
         "name": "Wooden Ladder",
         "authors": [
@@ -635,6 +660,7 @@
       "source": "polyhaven",
       "file": "props/SchoolChair_01.glb",
       "use": "plastic chairs outside the bar",
+      "tris": 498,
       "authors": {
         "name": "School Chair 01",
         "authors": [
@@ -1160,16 +1186,6 @@
       "scale": 1,
       "name": "Modular slum blocks",
       "use": "stacked hillside housing",
-      "note": "supplied by the project owner; not from the CC0 libraries above"
-    },
-    {
-      "pack": "police",
-      "slot": "interceptor",
-      "source": "supplied",
-      "file": "models/police/interceptor.glb",
-      "scale": 1,
-      "name": "Police interceptor sedan",
-      "use": "the patrol cars at the foot of the hill",
       "note": "supplied by the project owner; not from the CC0 libraries above"
     },
     {

@@ -284,7 +284,6 @@ from a clean clone.
 | `police:caveirao` | Armoured personnel truck | the battalion vehicle at the foot of the hill |
 | `landmark:christ` | Hilltop statue | the summit landmark, in place of the plain cross |
 | `slums:kit` | Modular slum blocks | stacked hillside housing |
-| `police:interceptor` | Police interceptor sedan | the patrol cars at the foot of the hill |
 | `people:crew` | Street vendor in a Flamengo shirt | every crew character — a finished figure, so it wears no cut clothing |
 | `people:armored` | Armoured police officer | every police character — a finished figure, so it wears no cut clothing |
 | `guns:pistol` | Makarov PM | the sidearm |

@@ -84,40 +84,60 @@ export const MATERIALS = [
  * All photogrammetry or scan-derived, all CC0. `size` picks the glTF texture
  * LOD to start from and the resolution to bake down to.
  */
+/*
+ * ── triangle budgets ──
+ *
+ * Poly Haven publishes photogrammetry, and its "1k" variant refers to the
+ * texture, not the mesh. Downloaded and shipped as-is, these arrived at scan
+ * density: a concrete road barrier — a box with a chamfer — at 60,928
+ * triangles, a cardboard box at 16,952, and 80% of the whole scene's triangle
+ * count spent on background clutter nobody looks at.
+ *
+ * `tris` is the ceiling the build decimates to. The numbers come from what the
+ * shape actually needs, not from a fixed percentage: a barrel is a cylinder and
+ * a chainlink fence is a texture on a plane, so neither needs four figures.
+ * Anything without a `tris` gets DEFAULT_TRIS.
+ *
+ * Two of them are deliberately generous. `covered_car` is a draped tarp whose
+ * whole appeal is the fabric silhouette, and `modular_fire_escape` is
+ * see-through ironwork where the holes are the shape.
+ */
+export const DEFAULT_TRIS = 600;
+
 export const PROPS = [
   // structure — the things that actually change the map's silhouette
-  { id: 'modular_chainlink_fence',   size: 1024, use: 'court cage, alley fencing, rooftop edges' },
+  { id: 'modular_chainlink_fence',   size: 1024, tris: 400, use: 'court cage, alley fencing, rooftop edges' },
   // the pole kit ships eight variants sharing one atlas; at 1024 it alone was
   // 3.9 MB, and poles are almost never the thing you are standing next to
-  { id: 'modular_electricity_poles', size: 512, use: 'power poles along the lanes' },
-  { id: 'modular_electric_cables',   size: 512,  use: 'the overhead cable tangle between poles' },
-  { id: 'modular_metal_gutter',      size: 512,  use: 'downpipes and gutters on the facades' },
-  { id: 'modular_pipes',             size: 512,  use: 'surface plumbing runs up the walls' },
-  { id: 'modular_fire_escape',       size: 512,  use: 'external stair runs on the taller blocks' },
+  { id: 'modular_electricity_poles', size: 512, tris: 1200, use: 'power poles along the lanes' },
+  { id: 'modular_electric_cables',   size: 512, tris: 300,  use: 'the overhead cable tangle between poles' },
+  { id: 'modular_metal_gutter',      size: 512, tris: 250,  use: 'downpipes and gutters on the facades' },
+  { id: 'modular_pipes',             size: 512, tris: 400,  use: 'surface plumbing runs up the walls' },
+  { id: 'modular_fire_escape',       size: 512, tris: 2000,  use: 'external stair runs on the taller blocks' },
 
   // facade dressing
-  { id: 'exterior_aircon_unit',   size: 512, use: 'wall-mounted air conditioners' },
-  { id: 'rollershutter_door',     size: 512, use: 'closed shopfronts at street level' },
-  { id: 'rollershutter_window_01', size: 512, use: 'graffitied shutters' },
-  { id: 'rollershutter_window_03', size: 512, use: 'graffitied shutters (variant)' },
-  { id: 'utility_box_01',         size: 512, use: 'street-side utility cabinets' },
-  { id: 'utility_box_02',         size: 512, use: 'street-side utility cabinets (large)' },
-  { id: 'water_manhole_cover',    size: 512, use: 'manholes in the plaza and road' },
+  { id: 'exterior_aircon_unit',   size: 512, tris: 500, use: 'wall-mounted air conditioners' },
+  { id: 'rollershutter_door',     size: 512, tris: 300, use: 'closed shopfronts at street level' },
+  { id: 'rollershutter_window_01', size: 512, tris: 250, use: 'graffitied shutters' },
+  { id: 'rollershutter_window_03', size: 512, tris: 250, use: 'graffitied shutters (variant)' },
+  { id: 'utility_box_01',         size: 512, tris: 300, use: 'street-side utility cabinets' },
+  { id: 'utility_box_02',         size: 512, tris: 300, use: 'street-side utility cabinets (large)' },
+  { id: 'water_manhole_cover',    size: 512, tris: 150, use: 'manholes in the plaza and road' },
 
   // clutter — cover, silhouette breakup, and the stuff that sells "lived in"
-  { id: 'propane_tank',         size: 512, use: 'gas bottles beside doorways' },
-  { id: 'small_lpg_tank',       size: 512, use: 'gas bottles beside doorways (small)' },
-  { id: 'Barrel_01',            size: 512, use: 'steel drums used as cover' },
-  { id: 'Barrel_02',            size: 512, use: 'blue plastic water drums' },
-  { id: 'barrel_stove',         size: 512, use: 'burnt-out oil drums' },
-  { id: 'metal_trash_can',      size: 512, use: 'bins along the lanes' },
-  { id: 'old_tyre',             size: 512, use: 'tyre piles' },
-  { id: 'cardboard_box_01',     size: 512, use: 'stacked boxes behind the market' },
-  { id: 'concrete_road_barrier', size: 512, use: 'police roadblock at the foot of the hill' },
-  { id: 'covered_car',          size: 1024, use: 'the tarped car on the lower street' },
-  { id: 'ladder_sectioned_01',  size: 512, use: 'ladders against the roof edges' },
-  { id: 'wooden_ladder',        size: 512, use: 'ladders against the roof edges (timber)' },
-  { id: 'SchoolChair_01',       size: 512, use: 'plastic chairs outside the bar' },
+  { id: 'propane_tank',         size: 512, tris: 400, use: 'gas bottles beside doorways' },
+  { id: 'small_lpg_tank',       size: 512, tris: 350, use: 'gas bottles beside doorways (small)' },
+  { id: 'Barrel_01',            size: 512, tris: 400, use: 'steel drums used as cover' },
+  { id: 'Barrel_02',            size: 512, tris: 400, use: 'blue plastic water drums' },
+  { id: 'barrel_stove',         size: 512, tris: 500, use: 'burnt-out oil drums' },
+  { id: 'metal_trash_can',      size: 512, tris: 400, use: 'bins along the lanes' },
+  { id: 'old_tyre',             size: 512, tris: 350, use: 'tyre piles' },
+  { id: 'cardboard_box_01',     size: 512, tris: 120, use: 'stacked boxes behind the market' },
+  { id: 'concrete_road_barrier', size: 512, tris: 200, use: 'police roadblock at the foot of the hill' },
+  { id: 'covered_car',          size: 1024, tris: 2500, use: 'the tarped car on the lower street' },
+  { id: 'ladder_sectioned_01',  size: 512, tris: 500, use: 'ladders against the roof edges' },
+  { id: 'wooden_ladder',        size: 512, tris: 400, use: 'ladders against the roof edges (timber)' },
+  { id: 'SchoolChair_01',       size: 512, tris: 500, use: 'plastic chairs outside the bar' },
 ];
 
 /* ── Poly Haven HDRI ─────────────────────────────────────────────────────
@@ -192,16 +212,21 @@ export const LOCAL_MODELS = [
    * have read as a bug rather than as a bystander. Registering it anyway would
    * put 0.45 MB in front of every player for something never drawn.
    */
-  {
-    pack: 'police', slot: 'interceptor',
-    file: 'models/police/interceptor.glb',
-    source: 'supplied',
-    name: 'Police interceptor sedan',
-    use: 'the patrol cars at the foot of the hill',
-    // exported from the .blend in metres, so it needs no rescaling
-    scale: 1,
-    note: 'supplied by the project owner; not from the CC0 libraries above',
-  },
+  /*
+   * The interceptor sedan is deliberately not registered.
+   *
+   * It was superseded the day the armoured van arrived — "a new police van to
+   * use instead of cars" — and the prop pass has preferred the van ever since,
+   * with the sedan as a fallback that never fires. Measured, it was being
+   * downloaded, decoded and held in memory on every single load, at 1.6 MB and
+   * 65,498 triangles, and then never placed in the world. The most expensive
+   * asset in the game was one nobody could see.
+   *
+   * The file stays in the repository: it was supplied by the owner, it cannot
+   * be rebuilt from anything here, and un-registering it is reversible in a way
+   * that deleting it is not.
+   */
+
 
   {
     pack: 'people', slot: 'crew',
