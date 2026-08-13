@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { damp, clamp, angleDelta } from '../core/utils.js';
 import { dress, reshapeBody } from './outfit.js';
+import { chibify } from './chibi.js';
 
 /**
  * ══════════════════════════════════════════════════════════════════
@@ -58,6 +59,18 @@ export function setActorSource(assets) {
     const m = assets.models.get(`people:${kind}`);
     if (m) bodies[kind] = m;
   }
+
+  /*
+   * The stylised build. Every body shares this skeleton by construction — that
+   * is the whole reason the re-bind tool exists — so each one gets the same
+   * per-bone factors, and the clips are restyled once for all of them.
+   *
+   * Order matters: this runs before anything is cloned, before the grip is
+   * measured off the aim pose, and before the clothing is cut from the body
+   * surface. Measuring the grip on a normal arm and then shortening it would
+   * leave every barrel pointing somewhere it was not calibrated for.
+   */
+  for (const b of Object.values(bodies)) chibify(b, assets.clips);
 
   /*
    * ── an upper-body-only copy of the aim pose ──
@@ -163,6 +176,18 @@ const LOCO = {
 const AIM_UPPER = 'Aim_Upper';
 
 const HAND_BONE = 'hand_r';
+
+/*
+ * How big a gun reads, as a multiplier on its real-world length.
+ *
+ * Above 1 on purpose. Oversized weapons are part of the stylised register —
+ * a correctly scaled pistol on a four-heads-tall figure disappears into the
+ * fist and the silhouette stops telling you what the character is carrying,
+ * which in a shooter is information the player needs at a glance.
+ */
+const WEAPON_SCALE = 1.35;
+
+const _ws = new THREE.Vector3();
 const SPINE = ['spine_03', 'spine_02'];
 
 export class SkinnedActor {
@@ -231,8 +256,10 @@ export class SkinnedActor {
       mount.position.set(0, -0.012, 0.035);   // wrist bone to the middle of the fist
       hand.add(mount);
       this.rightHand = mount;
+      this._handBone = hand;
     } else {
       this.rightHand = body;
+      this._handBone = null;
     }
     // the mount is already oriented; the legacy pose is for the capsule rig
     this.weaponPose = { position: new THREE.Vector3(0, 0, 0), rotation: new THREE.Euler(0, 0, 0) };
@@ -410,7 +437,32 @@ export class SkinnedActor {
       this._kick = damp(this._kick, 0, 16, dt);
     }
 
+    this._holdWeaponSize();
     this._sway(dt, s);
+  }
+
+  /**
+   * Keep the gun the size it was authored to be.
+   *
+   * The weapon mount hangs off `hand_r`, so it inherits that bone's world
+   * scale — and bone scale is exactly what the stylised build uses to change
+   * the proportions. Scaling the hand up to make it chunky scaled the rifle
+   * with it, and because the clips carry their own scale tracks the factor
+   * compounded down the arm: the first render of the police squad had five
+   * officers holding twenty-metre rifles across the sky, which is a strange
+   * thing to look at and took a while to recognise as a gun rather than a
+   * building.
+   *
+   * The fix is to make weapon size an explicit decision. `WEAPON_SCALE` is
+   * the one number that controls how big guns read; the bone's own scale is
+   * divided straight back out, so the rig can be restyled freely and the
+   * weapon stays where the art direction put it.
+   */
+  _holdWeaponSize() {
+    const bone = this._handBone;
+    if (!bone) return;
+    const s = bone.getWorldScale(_ws).x;
+    if (s > 1e-4) this.rightHand.scale.setScalar(WEAPON_SCALE / s);
   }
 
   /**

@@ -28,7 +28,9 @@
     "kit:sheet": "node tools/kit-sheet.mjs",
     "check:aim": "node tools/aim-check.mjs",
     "check:feel": "node tools/feel-check.mjs",
-    "check:audio": "node tools/audio-check.mjs"
+    "check:audio": "node tools/audio-check.mjs",
+    "proportions": "node tools/proportions.mjs",
+    "look": "node tools/look.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.4.2",

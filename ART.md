@@ -1,9 +1,33 @@
 # Art direction
 
-**Stylised low-poly. Not photoreal, not cartoon.** Readable shapes, flat
-surfaces, a small saturated palette, and light that models form rather than
-texture. Decided 13 Aug 2026; this file is the reference every asset decision
-answers to.
+**Stylised, in the Brawl Stars register.** Chunky proportions, readable
+shapes, flat surfaces, a saturated palette, and high-key light with lifted
+shadows. Decided 13 Aug 2026, moved to the fully stylised end the same day;
+this file is the reference every asset decision answers to.
+
+## The build
+
+Characters are roughly **four and a quarter heads tall** — real people are
+seven and a half, and so were these models. That one ratio is more of the
+difference between the two looks than the palette or the lighting, because it
+is what the eye reads first and from furthest away.
+
+No remodelling: it is a table of per-bone scale factors in
+`src/entities/chibi.js`, multiplied into the rest pose and into every clip's
+scale tracks at load. `npm run proportions` measures what the table actually
+produced and fails if the figure stops fitting the 1.82 m collision capsule
+or stops reading as stylised. `?realistic` on the URL boots the original
+human proportions for comparison.
+
+**Hands and feet are the exception, and it is an asset problem, not a
+choice.** The reference has shovels for hands; this does not, because the
+supplied police body was re-bound onto the game's skeleton and its bind pose
+is very slightly off its rest pose. At scale 1 that is invisible. Scale a
+bone and the residual is multiplied instead of cancelling, and the squad
+renders as a heap of blue the size of a building. The head survives a 3.5×
+local factor; the extremities came apart at 1.4. So the extremities inherit
+their parent's scale exactly and nothing amplifies. The long version is in
+`chibi.js`; the fix is to re-export that body with its bind pose baked.
 
 ## Why this direction and not the other one
 
@@ -83,8 +107,26 @@ them read.
 
 ## Light
 
-One warm key from the sky, one cool ambient, shadows toward `#2a3138` rather
-than toward black. Contrast comes from the palette, not from the exposure.
+**High key, lifted shadows, saturated ambient.** Late morning rather than
+golden hour: the sun sits at about forty degrees so most of what you see is
+lit, because shadow is where saturation goes to die. Form comes from the
+hemisphere gradient and contact occlusion rather than from long cast shadows.
+
+Four decisions carry it, and all four are reversible in a line:
+
+| | | why |
+|---|---|---|
+| tone map | `NeutralToneMapping` | ACES desaturates as it compresses highlights, so a red shirt in sun drifts to white — right for film, wrong for the one thing the eye is meant to track |
+| sky | the procedural dome, **not** the HDRI | a photographed sky carries a huge range, and the exposure needed to hold its highlights (0.45) pushes everything else to the bottom of the curve where there is no colour left |
+| ambient | hemisphere at 0.55, sky-blue over warm | in the photoreal balance this was 0 and the environment map did the fill; here it is what makes an unlit face a *colour* rather than an absence of one |
+| grade | lift → saturation → contrast, after tone mapping | nothing on screen is ever actually black; the darkest thing is a saturated blue-violet |
+
+The grade runs on **every** quality tier, including the cheapest — it is one
+full-screen pass with no extra texture reads, and it carries most of the art
+direction, so a phone should not get a different-looking game.
+
+`npm run look` renders four views through the game's own camera, which is the
+only honest way to judge any of the above.
 
 ## Out of scope
 

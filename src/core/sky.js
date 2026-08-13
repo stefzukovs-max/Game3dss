@@ -58,20 +58,29 @@ const SKY_FRAG = /* glsl */`
 `;
 
 /**
- * Golden hour. This is the single highest-value choice in the whole renderer:
- * a low sun rakes across the terraces and throws long shadows down the stairs,
- * which is what gives flat procedural geometry its form. A midday sun lights
- * every surface evenly and the hill reads as cardboard no matter how good the
- * materials are.
+ * Late morning, not golden hour.
+ *
+ * This used to be a low raking sun, chosen because long shadows give flat
+ * procedural geometry its form. That was the right call for a photoreal
+ * hillside and it is the wrong one for a stylised game: a low sun means half
+ * of every surface is in shadow, and shadow is where saturation goes to die.
+ *
+ * The stylised register wants the opposite trade. The sun comes up to about
+ * forty degrees so most of what you see is lit, the sky is a clean saturated
+ * blue rather than a hazy gradient, and the ground bounce is warm and strong
+ * enough that the shadow side of a wall is a *colour* rather than an absence
+ * of one. Form then comes from the hemisphere gradient and contact occlusion
+ * instead of from cast shadows, which is how every game in this register does
+ * it.
  */
 export const SKY_PRESET = {
-  sunDir: new THREE.Vector3(-0.62, 0.17, 0.76).normalize(),
-  zenith: new THREE.Color(0x2a5f9e),
-  horizon: new THREE.Color(0xe8b98a),
-  ground: new THREE.Color(0x4a4034),
-  sunColor: new THREE.Color(0xffb45e),
-  haze: 1.15,
-  sunIntensity: 4.6,
+  sunDir: new THREE.Vector3(-0.42, 0.66, 0.62).normalize(),
+  zenith: new THREE.Color(0x2f7fd6),
+  horizon: new THREE.Color(0xb9e2f5),
+  ground: new THREE.Color(0x8a7a5e),   // warm bounce, and bright — this is fill, not dirt
+  sunColor: new THREE.Color(0xfff0cc),
+  haze: 0.55,
+  sunIntensity: 3.2,
 };
 
 export class ProceduralSky {

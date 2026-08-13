@@ -107,7 +107,21 @@ class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    /*
+     * Neutral, not ACES.
+     *
+     * ACES is the right filmic curve for a photoreal scene and the wrong one
+     * here: its highlight rolloff desaturates as it compresses, so anything
+     * bright drifts toward white. That is exactly what you want from film
+     * stock and exactly what you do not want from a red football shirt in
+     * direct sun, which is the single most saturated thing on screen and the
+     * thing the eye is meant to track.
+     *
+     * Khronos PBR Neutral compresses the same range while holding hue and
+     * saturation, which is why every game in this register uses something
+     * like it.
+     */
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.0;
 
     this.scene = new THREE.Scene();
@@ -299,42 +313,70 @@ class Game {
     const a = this.assets;
     if (!a.env) return;
 
-    this.scene.environment?.dispose?.();
-    this.scene.environment = a.env;
-    this.scene.background = a.background;
-    this.scene.backgroundIntensity = 1.0;
-
-    // the procedural dome would now be drawing over the real sky
-    this.skyDome.visible = false;
+    /*
+     * ── the photographed sky is deliberately not used ──
+     *
+     * This function used to swap in a real HDRI: visible background,
+     * pre-filtered environment, and the sun direction read from its brightest
+     * pixel. Physically that is the better answer and the scene it produced
+     * was correctly lit. It was also grey, because an outdoor photograph
+     * carries an enormous dynamic range and the exposure needed to hold its
+     * highlights (0.45) pushes everything else down into the bottom of the
+     * curve, where there is no saturation left.
+     *
+     * The stylised direction wants the opposite: a clean saturated gradient
+     * with a narrow range, which is exactly what the procedural dome already
+     * produces analytically. So the dome stays visible and its own PMREM
+     * stays as the environment, and the HDRI is kept loading only for the
+     * sun direction — one vector out of a megabyte, which Phase 6 should
+     * reclaim.
+     *
+     * See ART.md. This is a direction call, not an optimisation, and it is
+     * reversible by restoring the three lines below.
+     */
+    this.skyDome.visible = true;
+    this.scene.background = null;
 
     if (a.sun) {
-      this.sun.position.copy(a.sun.dir).multiplyScalar(100);
-      this.sun.color.copy(a.sun.color);
+      /*
+       * Keep the measured sun *direction* if the HDRI has one, but not its
+       * colour — a photographed sun carries the whole scene's white balance
+       * with it and drags the palette back toward the grey this pass exists
+       * to get rid of.
+       */
+      this.sky.preset.sunDir.copy(a.sun.dir).normalize();
+      this.sun.position.copy(this.sky.preset.sunDir).multiplyScalar(100);
+      this.sky.uniforms.uSun.value.copy(this.sky.preset.sunDir);
+      this.scene.environment?.dispose?.();
+      this.scene.environment = this.sky.generateEnvironment(this.renderer, 256);
     }
 
     /*
-     * Re-balance for a photographed sky.
+     * ── the stylised balance ──
      *
-     * The procedural dome was a dim analytic gradient, so it needed a strong
-     * key light and generous exposure to read at all. A real HDRI carries the
-     * full outdoor range — the sky alone lights the scene to a sensible level —
-     * so leaving the old numbers in place blows every surface to white. The
-     * key drops to roughly a real sun's contribution over that ambient, the
-     * two crutch lights that existed to stop shadows going black are almost
-     * off (the environment does that job properly now), and exposure comes
-     * down to where the sky's own highlights stop clipping.
+     * High key, lifted shadows, saturated ambient. The numbers that matter:
+     *
+     *   ambient at 0.55 rather than 0 is the whole trick. In the photoreal
+     *   balance the environment map did all the fill work, which is correct
+     *   and which leaves the shadow side of every surface dark. Here a strong
+     *   hemisphere light tinted sky-blue above and warm below means an
+     *   unlit face is still a colour.
+     *
+     *   exposure back up to 1.0, because the procedural dome's range is
+     *   narrow enough not to clip.
      */
-    this.sun.intensity = 2.8;
-    this.fill.intensity = 0.05;
-    this.ambient.intensity = 0.0;
-    this.scene.environmentIntensity = 0.6;
-    this._exposure = 0.45;
+    this.sun.intensity = 2.5;
+    this.fill.intensity = 0.35;
+    this.ambient.intensity = 0.55;
+    this.scene.environmentIntensity = 0.9;
+    this._exposure = 1.0;
     this.renderer.toneMappingExposure = this._exposure;
 
-    // fog tinted to the horizon of the sky actually in use, so distance still
-    // reads as air rather than as a grey card in front of a photograph
-    this.scene.fog.color.set(0xbcc6cf);
-    this.renderer.setClearColor(0xbcc6cf);
+    // fog tinted to the dome's own horizon, so distance reads as air
+    this.scene.fog.color.set(0xbfe4f4);
+    this.scene.fog.near = 120;
+    this.scene.fog.far = 400;
+    this.renderer.setClearColor(0xbfe4f4);
   }
 
   /**
@@ -1393,6 +1435,19 @@ window.addEventListener('error', (e) => {
   const el = document.getElementById('loadmsg');
   if (el) el.textContent = 'Error: ' + e.message;
 });
+
+/*
+ * `?realistic` boots the game on the original human proportions instead of
+ * the stylised build. Kept as a switch rather than as a deleted branch
+ * because the two are worth putting side by side, and because it is the only
+ * way to tell a bug in the stylised build from a bug that was always there.
+ */
+{
+  const q = new URLSearchParams(location.search);
+  if (q.has('realistic')) globalThis.__noChibi = true;
+  // ?chibi=Head,hand — apply only these bone families, the rest left at 1
+  if (q.has('chibi')) globalThis.__chibiOnly = q.get('chibi').split(',');
+}
 
 // exposed for debugging from the console
 window.__game = new Game();
