@@ -311,6 +311,7 @@ ARM = None
 DONOR = None
 HEADCUT = 0.0
 DESPIKE = 0.0
+KEEPMAT = False
 for a in argv[3:]:
     if a.startswith('--arm='):
         ARM = [math.radians(float(x)) for x in a[6:].split(',')]
@@ -320,6 +321,8 @@ for a in argv[3:]:
         HEADCUT = float(a[10:])
     if a.startswith('--despike='):
         DESPIKE = float(a[10:])
+    if a == '--keepmat':
+        KEEPMAT = True
 
 UNRIGGED = src_arm is None
 if UNRIGGED:
@@ -508,14 +511,27 @@ if UNRIGGED:
         for v in src_mesh.data.vertices:
             if v.co.z < cut:
                 continue
-            wrong = [g for g in v.groups if g.group in arms and g.weight > 0]
+            """
+            Read the whole vertex first, then edit it.
+
+            `v.groups` is a live collection and `VertexGroupElement` is a
+            reference into it, so removing one entry invalidates the others —
+            reading `.group` or `.weight` off a sibling afterwards returns
+            whatever is now at that slot. Iterating and removing in the same
+            pass therefore silently rewrites the wrong weights, which on this
+            model put several hundred hood vertices onto bones they had no
+            business being on and blew the un-skin out to five metres.
+
+            Plain integers and floats copied out up front cannot go stale.
+            """
+            owned = [(g.group, g.weight) for g in v.groups if g.weight > 0]
+            wrong = [gi for gi, _ in owned if gi in arms]
             if not wrong:
                 continue
             fixed += 1
-            for g in wrong:
-                src_mesh.vertex_groups[gname[g.group]].remove([v.index])
-            keep = [(gname[g.group], g.weight) for g in v.groups
-                    if g.group not in arms and g.weight > 0]
+            for gi in wrong:
+                src_mesh.vertex_groups[gname[gi]].remove([v.index])
+            keep = [(gname[gi], w) for gi, w in owned if gi not in arms]
             total = sum(w for _, w in keep)
             if total < 1e-5:
                 if head_g:
@@ -716,7 +732,14 @@ for a in argv[3:]:
         if a.startswith(flag):
             NAMED[socket] = a[len(flag):]
 
-if NAMED:
+if KEEPMAT:
+    # The model already carries the material it should ship with — a baked
+    # palette from `tools/palette-bake.py`, packed into the FBX. Rebuilding it
+    # from files in a texture directory would throw that away and bind an
+    # untextured figure.
+    print('MATERIAL kept as authored:',
+          [m.name if m else None for m in src_mesh.data.materials])
+elif NAMED:
     src_mesh.data.materials.clear()
     src_mesh.data.materials.append(build('Rebound', {
         socket: (find(key.lower()), socket != 'Base Color')
