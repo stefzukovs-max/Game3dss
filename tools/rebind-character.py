@@ -303,7 +303,7 @@ CHIBI_LOCAL = {
     'pelvis': 0.96, 'spine_01': 1.0625, 'spine_02': 1.0196, 'spine_03': 1.0192,
     'neck_01': 0.5189, 'Head': 3.4909,
     **{f'{b}_{s}': v for s in 'lr' for b, v in (
-        ('clavicle', 0.9434), ('upperarm', 0.7200), ('lowerarm', 0.8611),
+        ('clavicle', 0.9434), ('upperarm', 1.0000), ('lowerarm', 0.9500),
         ('thigh', 0.8542), ('calf', 0.9024))},
 }
 

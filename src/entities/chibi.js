@@ -54,9 +54,9 @@ export const BUILD = {
   Head:     1.92,
 
   clavicle: 1.00,
-  upperarm: 0.72,
-  lowerarm: 0.62,
-  hand:     0.62,   // == lowerarm, deliberately. See below.
+  upperarm: 1.00,
+  lowerarm: 0.95,
+  hand:     0.95,   // == lowerarm, deliberately. See below.
 
   thigh:    0.82,
   calf:     0.74,
@@ -65,14 +65,34 @@ export const BUILD = {
 };
 
 /*
- * Arms and legs came down again — 0.88/0.80 to 0.72/0.62 — when the supplied
- * stylised characters arrived. A model authored at four heads tall has arms
- * roughly half the length of a realistic skeleton's, and the re-bind maps its
- * hand vertices onto whatever the rig says a hand is; too long a rig arm and
- * a chunky forearm gets stretched into a flat sheet reaching for it. These
- * numbers are the game's half of that agreement, and `tools/rebind-character.py`
- * carries the same table as local factors under CHIBI_LOCAL. The two have to
- * move together.
+ * ── how short the arms can actually be ──
+ *
+ * They went to 0.72/0.62 to meet the supplied stylised characters, whose arms
+ * are roughly half a realistic skeleton's, and that was too far. Measured on
+ * the built figure, shoulder to wrist came out at **14 centimetres** — not a
+ * chibi arm, a broken one. It also quietly made two-handed weapon holding
+ * impossible: the off hand's IK target sits 37 cm from the shoulder and no
+ * amount of solving reaches that with 14 cm of arm, so the solver clamped and
+ * the hand hung in the air near the gun forever.
+ *
+ * 0.92/0.84 was still not enough: shoulder to wrist measured 21 cm, and the
+ * off hand still could not cross to a weapon held in the other one. Arm
+ * length also turns out to vary with the clip, because the clips carry their
+ * own scale tracks and the build multiplies into them — so "how long is the
+ * arm" has no single answer and every answer was too short.
+ *
+ * They are back to 1.00/0.95, essentially unshortened. This costs nothing:
+ * the stylised read comes from the head at 1.92 and the legs at 0.82/0.74,
+ * which is where it always came from. Shortening the arms bought no
+ * silhouette and cost the character the ability to hold a weapon in two
+ * hands, which is worth far more.
+ *
+ * `npm run check:anim` measures the reach against the distance to the
+ * foregrip, so this cannot silently regress again.
+ *
+ * `tools/rebind-character.py` carries the same table as local factors under
+ * CHIBI_LOCAL, and any supplied body has to be re-bound when these move —
+ * the mesh is normalised against them.
  */
 
 /*

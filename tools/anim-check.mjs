@@ -187,6 +187,53 @@ const out = await page.evaluate(async () => {
     res.pitchSwingZ = +Math.abs(up[2] - down[2]).toFixed(3);
     res.pitchSwingX = +Math.abs(up[0] - down[0]).toFixed(3);
   }
+  /* ── the off hand on the weapon ── */
+  {
+    const pl = g.player;
+    pl.switchTo?.('smg');
+    // aiming, because that is when the weapon comes to the centre line and
+    // the off hand can physically reach it — see _offHand in actor.js
+    g.input.buttons[2] = true;
+    for (let i = 0; i < 60; i++) g._tick(1 / 60);
+    const m = pl.model;
+    m.root.updateMatrixWorld(true);
+    const bone = (n) => { let f = null; m.root.traverse((o) => { if (o.name === n) f = o; }); return f; };
+    const lh = bone('hand_l');
+    const grip = m.foregripNode;
+    if (lh && grip) {
+      const a = new THREE.Vector3(), b = new THREE.Vector3();
+      lh.getWorldPosition(a); grip.getWorldPosition(b);
+      res.gripGap = +a.distanceTo(b).toFixed(3);
+      res.twoHanded = !!m.twoHanded;
+      // can the arm even get there? shoulder-to-target against its own length
+      const sh = bone('upperarm_l'), el = bone('lowerarm_l');
+      if (sh && el) {
+        const S = new THREE.Vector3(), E = new THREE.Vector3();
+        sh.getWorldPosition(S); el.getWorldPosition(E);
+        res.armReach = +(S.distanceTo(E) + E.distanceTo(a)).toFixed(3);
+        res.gripDist = +S.distanceTo(b).toFixed(3);
+        // where is the gun, actually?
+        const rh = bone('hand_r'), R = new THREE.Vector3();
+        rh?.getWorldPosition(R);
+        const mz = new THREE.Vector3();
+        m.muzzleNode?.getWorldPosition(mz);
+        res.gun = {
+          handToMuzzle: +R.distanceTo(mz).toFixed(3),
+          handToGrip: +R.distanceTo(b).toFixed(3),
+          mountScale: +(m.rightHand?.scale.x ?? 0).toFixed(3),
+          shoulderToHand: +S.distanceTo(R).toFixed(3),
+        };
+      }
+    } else {
+      res.gripMissing = { hand: !!lh, grip: !!grip, weapon: !!m.weaponModel };
+    }
+    // and a pistol should not drag the off hand onto it
+    pl.switchTo?.('pistol');
+    for (let i = 0; i < 40; i++) g._tick(1 / 60);
+    res.pistolTwoHanded = !!m.twoHanded;
+    g.input.buttons[2] = false;
+  }
+
   return res;
 });
 
@@ -215,6 +262,33 @@ if (out.pitchSwingZ != null) {
     `head moves ${out.pitchSwingZ} m along the nose`);
   say(out.pitchSwingX < out.pitchSwingZ * 0.6, 'and does not tip it sideways',
     `sideways ${out.pitchSwingX} m vs forward ${out.pitchSwingZ} m`);
+}
+
+if (out.gripMissing) console.log('\n  grip probe found nothing:', JSON.stringify(out.gripMissing));
+if (out.gripGap != null) {
+  console.log('\n── holding the weapon ──');
+  /*
+   * Every clip in the library was authored with a pistol, so the left arm
+   * swings free through all of them and a rifle was carried one-handed. A
+   * two-bone solve now puts the off hand on the weapon's foregrip after the
+   * mixer has run. This is the number that says whether it landed — and it
+   * is worth asserting rather than eyeballing, because an IK solve that
+   * silently stops converging looks like an animation choice.
+   */
+  console.log(`   arm reach ${out.armReach} m, shoulder to foregrip ${out.gripDist} m`);
+  console.log(`   gun: ${JSON.stringify(out.gun)}`);
+  /*
+   * The off-hand grip is switched off in actor.js — see OFF_HAND_IK there for
+   * why. These stay as printed diagnostics rather than assertions, because a
+   * check that fails on a deliberately disabled feature trains people to
+   * ignore the suite. What IS asserted is the weapon's size, which is the
+   * part that shipped: a submachine gun should measure about its real length
+   * from the hand, and at one point measured 94 cm.
+   */
+  say(out.gun && out.gun.handToMuzzle < 0.70,
+    'the weapon is the size of a weapon',
+    `${out.gun?.handToMuzzle} m hand to muzzle`);
+  say(out.pistolTwoHanded === false, 'and a pistol is still held one-handed');
 }
 
 if (res_ = out.aimLayerFwd, res_ != null) {

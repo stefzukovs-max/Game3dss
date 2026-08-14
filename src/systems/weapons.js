@@ -403,6 +403,15 @@ function buildGeometry(id) {
  * is scaled to; `grip` shifts the model so the hand lands on the grip rather
  * than on the model's arbitrary origin.
  */
+/*
+ * How far along the barrel the supporting hand sits, as a fraction of the
+ * distance from grip to muzzle. On a realistic figure a hand goes about
+ * 0.45 along the handguard; on this build the arms are short enough that
+ * 0.45 puts the target outside the off hand's reach entirely, so it comes in
+ * to 0.32 — still forward of the trigger hand, still reads as support.
+ */
+const SUPPORT_ALONG = 0.32;
+
 const PACKED = {
   pistol:  { len: 0.21, grip: [-0.055, 0.020, 0.020] },
   smg:     { len: 0.52, grip: [-0.140, 0.028, 0.020] },
@@ -448,6 +457,27 @@ function packedModel(id) {
   muzzle.position.set(0, (world.min.y + world.max.y) / 2, world.min.z);
   muzzle.name = 'muzzle';
   g.add(muzzle);
+
+  /*
+   * Where the off hand goes.
+   *
+   * Everything in the animation library was authored holding a pistol, so the
+   * left arm swings free through every clip — which reads as a character
+   * carrying a rifle one-handed with the other arm dangling, and is the
+   * loudest possible signal that nobody is really holding anything.
+   *
+   * The grip sits at the model's own origin and the muzzle at the far end, so
+   * the foregrip is simply a fraction along that line — far enough forward to
+   * look supported, not so far that the hand ends up past the barrel on a
+   * pistol. Derived rather than typed, so it is right for every gun in the
+   * pack and for any gun added later.
+   */
+  const support = new THREE.Object3D();
+  support.position.set(0, muzzle.position.y * 0.5, world.min.z * SUPPORT_ALONG);
+  support.name = 'foregrip';
+  g.add(support);
+  g.userData.foregrip = support;
+  g.userData.twoHanded = spec.len > 0.34;   // a pistol is held in one hand
   g.userData.muzzle = muzzle;
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   return g;
@@ -506,6 +536,8 @@ export function attachWeapon(character, id) {
   character.rightHand.add(m);
   character.weaponModel = m;
   character.muzzleNode = m.userData.muzzle;
+  character.foregripNode = m.userData.foregrip ?? null;
+  character.twoHanded = !!m.userData.twoHanded;
   return m;
 }
 

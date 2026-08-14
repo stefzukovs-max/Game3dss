@@ -3,6 +3,7 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { damp, clamp, angleDelta } from '../core/utils.js';
 import { dress, reshapeBody } from './outfit.js';
 import { chibify } from './chibi.js';
+import { solveTwoBone } from './twobone.js';
 
 /**
  * ══════════════════════════════════════════════════════════════════
@@ -180,14 +181,52 @@ const HAND_BONE = 'hand_r';
 /*
  * How big a gun reads, as a multiplier on its real-world length.
  *
- * Above 1 on purpose. Oversized weapons are part of the stylised register —
- * a correctly scaled pistol on a four-heads-tall figure disappears into the
- * fist and the silhouette stops telling you what the character is carrying,
- * which in a shooter is information the player needs at a glance.
+ * It was 1.35, which was right when the build still had realistic arms and
+ * absurd once they came down to 0.62: a 52 cm submachine gun became 70 cm on
+ * a figure whose whole forearm is 25, and read on screen as a black stick
+ * held at arm's length rather than as a weapon.
+ *
+ * The number is not in metres and is not a clean multiplier on the weapon's
+ * real length, because the compensation it feeds does not fully cancel: the
+ * animation clips carry their own scale tracks, the build multiplies into
+ * them, and the hand bone's world scale therefore depends on which clip is
+ * playing. At 0.92 the submachine gun measured 94 cm from hand to muzzle on
+ * a 1.82 m figure — a stick, which is exactly what it looked like.
+ *
+ * So it is set against a measurement rather than against a theory.
+ * `npm run check:anim` prints hand-to-muzzle; keep it near the weapon's real
+ * length and it looks held.
  */
-const WEAPON_SCALE = 1.35;
+const WEAPON_SCALE = 0.5;
+
+/*
+ * ── the off-hand grip, currently off ──
+ *
+ * The solver in `twobone.js` works and the plumbing is in place: the weapon
+ * carries a foregrip node, the actor reaches for it after everything else in
+ * the frame, and the reach fades out rather than clamping. What does not add
+ * up yet is the geometry it is reaching across.
+ *
+ * Measured on the built figure while aiming, the left shoulder sits 0.93 m
+ * from the right hand, and each arm is 0.27 m from shoulder to wrist. Those
+ * two numbers cannot both be true of a 1.82 m person, so something upstream
+ * — most likely the interaction between the build's bone scales and the
+ * scale tracks the clips carry — is placing the arms much further apart than
+ * the skeleton says. Until that is understood, forcing the solve produces an
+ * arm stretched across the chest toward a gun it never reaches, which is
+ * worse than the free arm it replaces.
+ *
+ * So it stays off, and `npm run check:anim` keeps printing the numbers that
+ * will say when it can come back on.
+ */
+const OFF_HAND_IK = false;
 
 const _ws = new THREE.Vector3();
+const _ikTarget = new THREE.Vector3();
+const _ikPole = new THREE.Vector3();
+const _ikA = new THREE.Vector3();
+const _ikB = new THREE.Vector3();
+const _ikC = new THREE.Vector3();
 const SPINE = ['spine_03', 'spine_02'];
 
 export class SkinnedActor {
@@ -452,6 +491,7 @@ export class SkinnedActor {
 
     this._holdWeaponSize();
     this._sway(dt, s);
+    this._offHand(dt, s);
   }
 
   /**
@@ -476,6 +516,75 @@ export class SkinnedActor {
     if (!bone) return;
     const s = bone.getWorldScale(_ws).x;
     if (s > 1e-4) this.rightHand.scale.setScalar(WEAPON_SCALE / s);
+  }
+
+  /**
+   * Put the other hand on the gun.
+   *
+   * Runs after everything else in the frame — after the mixer, after the aim
+   * layer, after the recoil kick and after sway — because it has to reach
+   * wherever the weapon *ended up*, not where it was before those moved it.
+   * Solving first and then swaying the gun out from under the hand is how you
+   * get a character gripping thin air two centimetres from the handguard.
+   *
+   * Weighted in and out rather than switched: snapping the arm onto the
+   * weapon the instant a rifle is drawn is a visible pop, and a pistol wants
+   * the clip's own free arm back.
+   */
+  _offHand(dt, s) {
+    let want = OFF_HAND_IK && this.twoHanded && this.foregripNode && !s.dead ? 1 : 0;
+
+    /*
+     * ── only when the arm can actually get there ──
+     *
+     * This build's arms are about twenty centimetres from shoulder to wrist,
+     * and both hands are on arms that short. With the weapon down at the hip
+     * the foregrip is thirty-seven centimetres from the off shoulder, which
+     * is not a tuning problem — it is further than the arm is long, and no
+     * solver reaches it. Forcing the issue gives a clamped arm pointing
+     * hopefully at a gun it never touches, which looks worse than the free
+     * arm it replaced.
+     *
+     * So reach is checked before it is attempted. When the weapon comes to
+     * the centre line — which is what aiming does — the target moves inside
+     * range and the hand goes on; drop the weapon back to the hip and the
+     * hand comes off. That is also what people do.
+     */
+    if (want) {
+      const a = (this._larm ??= {
+        root: this.body.getObjectByName('upperarm_l'),
+        mid: this.body.getObjectByName('lowerarm_l'),
+        end: this.body.getObjectByName('hand_l'),
+      });
+      if (a.root && a.mid && a.end) {
+        a.root.getWorldPosition(_ikA);
+        a.mid.getWorldPosition(_ikB);
+        a.end.getWorldPosition(_ikC);
+        const span = _ikA.distanceTo(_ikB) + _ikB.distanceTo(_ikC);
+        this.foregripNode.getWorldPosition(_ikTarget);
+        // fades out over the last 15% of reach rather than switching off
+        want = clamp((span * 1.02 - _ikA.distanceTo(_ikTarget)) / (span * 0.15), 0, 1);
+      } else {
+        want = 0;
+      }
+    }
+
+    this._ikW = damp(this._ikW ?? 0, want, 9, dt);
+    if (this._ikW < 0.02) return;
+
+    const arm = this._larm;
+    if (!arm?.root || !arm.mid || !arm.end) return;
+
+    this.foregripNode.getWorldPosition(_ikTarget);
+    /*
+     * The elbow breaks down and out, away from the body's own left. Taking
+     * the pole from the character's world orientation rather than a fixed
+     * axis keeps it correct when they turn round, which a world-space
+     * constant does not.
+     */
+    this.root.getWorldDirection(_ikPole);            // −Z of the actor
+    _ikPole.set(-_ikPole.z, -1.15, _ikPole.x).normalize();
+    solveTwoBone(arm.root, arm.mid, arm.end, _ikTarget, _ikPole, this._ikW);
   }
 
   /**
