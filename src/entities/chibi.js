@@ -54,15 +54,26 @@ export const BUILD = {
   Head:     1.92,
 
   clavicle: 1.00,
-  upperarm: 0.88,
-  lowerarm: 0.80,
-  hand:     0.80,   // == lowerarm, deliberately. See below.
+  upperarm: 0.72,
+  lowerarm: 0.62,
+  hand:     0.62,   // == lowerarm, deliberately. See below.
 
-  thigh:    0.86,
-  calf:     0.78,
-  foot:     0.78,   // == calf
-  ball:     0.78,   // == foot
+  thigh:    0.82,
+  calf:     0.74,
+  foot:     0.74,   // == calf
+  ball:     0.74,   // == foot
 };
+
+/*
+ * Arms and legs came down again — 0.88/0.80 to 0.72/0.62 — when the supplied
+ * stylised characters arrived. A model authored at four heads tall has arms
+ * roughly half the length of a realistic skeleton's, and the re-bind maps its
+ * hand vertices onto whatever the rig says a hand is; too long a rig arm and
+ * a chunky forearm gets stretched into a flat sheet reaching for it. These
+ * numbers are the game's half of that agreement, and `tools/rebind-character.py`
+ * carries the same table as local factors under CHIBI_LOCAL. The two have to
+ * move together.
+ */
 
 /*
  * ══════════════════════════════════════════════════════════════════

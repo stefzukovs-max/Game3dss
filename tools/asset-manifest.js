@@ -238,9 +238,9 @@ export const LOCAL_MODELS = [
   {
     pack: 'people', slot: 'armored',
     file: 'models/people/armored.glb',
-    source: 'supplied', name: 'Armoured police officer',
+    source: 'supplied', name: 'Police Officer Redford (BitGem Proto Series)',
     use: 'every police character — a finished figure, so it wears no cut clothing',
-    note: 'supplied by the project owner; re-bound onto the game rig with tools/rebind-character.py',
+    note: 'supplied by the project owner; unrigged and posed, re-bound onto the game rig with tools/rebind-character.py --arm/--donor/--headcut/--despike',
   },
 
   /*

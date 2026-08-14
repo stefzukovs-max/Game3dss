@@ -263,7 +263,7 @@ from a clean clone.
 | `landmark:christ` | Hilltop statue | the summit landmark, in place of the plain cross |
 | `slums:kit` | Modular slum blocks | stacked hillside housing |
 | `people:crew` | Street vendor in a Flamengo shirt | every crew character — a finished figure, so it wears no cut clothing |
-| `people:armored` | Armoured police officer | every police character — a finished figure, so it wears no cut clothing |
+| `people:armored` | Police Officer Redford (BitGem Proto Series) | every police character — a finished figure, so it wears no cut clothing |
 | `guns:pistol` | Makarov PM | the sidearm |
 | `guns:smg` | Compact SMG | the submachine gun |
 | `guns:rifle` | AK-74 | the assault rifle |
@@ -274,7 +274,7 @@ from a clean clone.
 | `landmark:christ` | Hilltop statue | the summit landmark, in place of the plain cross |
 | `slums:kit` | Modular slum blocks | stacked hillside housing |
 | `people:crew` | Street vendor in a Flamengo shirt | every crew character — a finished figure, so it wears no cut clothing |
-| `people:armored` | Armoured police officer | every police character — a finished figure, so it wears no cut clothing |
+| `people:armored` | Police Officer Redford (BitGem Proto Series) | every police character — a finished figure, so it wears no cut clothing |
 | `guns:pistol` | Makarov PM | the sidearm |
 | `guns:smg` | Compact SMG | the submachine gun |
 | `guns:rifle` | AK-74 | the assault rifle |

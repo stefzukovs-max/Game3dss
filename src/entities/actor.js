@@ -416,7 +416,20 @@ export class SkinnedActor {
       (found, n) => found ?? this.body.getObjectByName(n), null));
     this.mixer.update(dt);
     if (spine && s.aiming) {
-      spine.rotation.x += clamp(s.pitch ?? 0, -0.9, 0.9) * 0.55;
+      /*
+       * The stylised build shortened the neck to 0.55 and the spine barely
+       * moved, which put the head far closer to the joint doing the nodding.
+       * The same 0.55 factor that used to swing the head ten centimetres along
+       * its own sightline moved it two, and aiming up or down stopped reading
+       * on the character at all — you could watch an ally track a target three
+       * terraces above them without their head leaving level.
+       *
+       * Rotation is angular and the check is a distance, so the factor has to
+       * grow as the lever shrinks. `npm run check:anim` measures the
+       * displacement, which is why this is a number that gets caught rather
+       * than a number that quietly stops doing anything.
+       */
+      spine.rotation.x += clamp(s.pitch ?? 0, -0.9, 0.9) * 1.5;
     }
 
     /*

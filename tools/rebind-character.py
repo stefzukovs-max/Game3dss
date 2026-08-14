@@ -263,26 +263,151 @@ whole thing backwards:
      the game, rather than something that only looks right until a clip fails
      to touch some bone.
 """
+"""
+`--arm=<down>,<forward>` states the pose instead of guessing it.
+
+The silhouette read below assumes an A-pose: in one, the widest point of the
+body between hip and chest really is the hand, so the outermost vertex gives
+the direction the arm hangs in, and nothing has to be typed.
+
+Plenty of models are not in an A-pose. BitGem's police officer ships as
+`cop_pose.fbx` and is exactly what that name says — a posed idle, upper arms
+hanging against the body and both elbows bent forward, holding a donut. The
+widest point in that band is his belt. The read came back asymmetric and
+nonsense (one "hand" at hip height on one side, mid-chest on the other), the
+transfer sampled the torso for both arms, and he exported with two flat
+sheets of geometry where his arms should be.
+
+So: two angles, in degrees, and a model that is not in an A-pose stops being
+a problem to be detected and becomes a parameter.
+
+    down     how far the upper arms are rotated from horizontal toward the
+             floor. 0 is a T-pose, 90 is arms flat against the sides.
+    forward  how far the forearms are then bent toward the front.
+
+Both are read off the model by eye in two or three iterations, which is
+faster and more honest than a cleverer heuristic that will fail differently
+on the next model.
+"""
+"""
+`--donor=chibi` reshapes the donor with the game's own stylised build.
+
+These are the *local* bone factors that `src/entities/chibi.js` derives from
+its world-scale table — they have to agree, because the whole point is that
+the transfer samples a donor shaped like the character the game will
+actually draw. There is no clean way to import a JS table into Blender, so
+they are duplicated here and `npm run proportions` prints the runtime side
+for comparison.
+"""
+CHIBI_LOCAL = {
+    'pelvis': 0.96, 'spine_01': 1.0625, 'spine_02': 1.0196, 'spine_03': 1.0192,
+    'neck_01': 0.5189, 'Head': 3.4909,
+    **{f'{b}_{s}': v for s in 'lr' for b, v in (
+        ('clavicle', 0.9434), ('upperarm', 0.7200), ('lowerarm', 0.8611),
+        ('thigh', 0.8542), ('calf', 0.9024))},
+}
+
+ARM = None
+DONOR = None
+HEADCUT = 0.0
+DESPIKE = 0.0
+for a in argv[3:]:
+    if a.startswith('--arm='):
+        ARM = [math.radians(float(x)) for x in a[6:].split(',')]
+    if a.startswith('--donor='):
+        DONOR = a[8:].split(',')
+    if a.startswith('--headcut='):
+        HEADCUT = float(a[10:])
+    if a.startswith('--despike='):
+        DESPIKE = float(a[10:])
+
 UNRIGGED = src_arm is None
 if UNRIGGED:
-    pts = [src_mesh.matrix_world @ v.co for v in src_mesh.data.vertices]
-    lo = min(p.z for p in pts)
-    hi = max(p.z for p in pts)
-    band = [p for p in pts if lo + (hi - lo) * 0.32 <= p.z <= lo + (hi - lo) * 0.62]
-    reach = {
-        'L': max(band, key=lambda p: p.x),
-        'R': min(band, key=lambda p: p.x),
-    }
-    print('A-POSE read from the silhouette:',
-          {k: tuple(round(c, 3) for c in v) for k, v in reach.items()})
+    # Blender is Z-up and the glTF importer maps three's forward (+Z) onto −Y,
+    # so "forward" for the elbow bend is −Y and "down" is −Z.
+    FWD = Vector((0, -1, 0))
+
+    reach = None
+    if ARM is None:
+        pts = [src_mesh.matrix_world @ v.co for v in src_mesh.data.vertices]
+        lo = min(p.z for p in pts)
+        hi = max(p.z for p in pts)
+        band = [p for p in pts if lo + (hi - lo) * 0.32 <= p.z <= lo + (hi - lo) * 0.62]
+        reach = {
+            'L': max(band, key=lambda p: p.x),
+            'R': min(band, key=lambda p: p.x),
+        }
+        print('A-POSE read from the silhouette:',
+              {k: tuple(round(c, 3) for c in v) for k, v in reach.items()})
+    else:
+        print('A-POSE given: down %.0f°, forward %.0f°'
+              % (math.degrees(ARM[0]), math.degrees(ARM[1])))
 
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.mode_set(mode='POSE')
+
+    """
+    `--donor=<head>,<limb>` reshapes the donor before the transfer.
+
+    The weight transfer works by nearest point on the donor's surface, and
+    that is only meaningful if the two figures are the same *shape*, not just
+    the same pose. The donor here is a realistic seven-and-a-half-heads
+    human. BitGem's police officer is about three and a half — his head
+    occupies exactly the volume where the donor's shoulders and upper arms
+    are, so every vertex in his face found the donor's arm as its nearest
+    surface, took arm weights, and the export had a head that fanned out
+    sideways into two flat sheets the moment anything moved.
+
+    Scaling the donor's bones to roughly the supplied model's proportions
+    fixes it at the source. The scale is applied *before* the arms are posed,
+    so the arm targets are measured on the reshaped skeleton, and it is
+    removed again before the un-skin — the supplied mesh arrived with its own
+    proportions and must keep them, so only the pose is undone.
+    """
+    if DONOR:
+        shaped = dict(CHIBI_LOCAL) if DONOR == ['chibi'] else {
+            'Head': float(DONOR[0]), 'neck_01': 0.52,
+            **{f'{b}_{s}': float(DONOR[1] if len(DONOR) > 1 else 1.0)
+               for s in 'lr' for b in ('upperarm', 'lowerarm', 'thigh', 'calf')},
+        }
+        for name, sc in shaped.items():
+            pb = arm.pose.bones.get(name)
+            if pb:
+                pb.scale = (sc, sc, sc)
+        bpy.context.view_layer.update()
+        print('DONOR reshaped:', {k: round(v, 3) for k, v in sorted(shaped.items())})
+
     for side in ('L', 'R'):
         s = side.lower()
         shoulder = arm.matrix_world @ arm.data.bones[f'upperarm_{s}'].head_local
         hand = arm.matrix_world @ arm.data.bones[f'hand_{s}'].head_local
         tip = arm.matrix_world @ arm.data.bones[f'middle_03_{s}'].tail_local
+
+        if ARM is not None:
+            # two values are symmetric; four give each arm its own pose, which
+            # Redford needs — one hand is up by his face and the other is down
+            # at his hip holding a donut, and a symmetric guess mangles one of
+            # them whichever way round it is set.
+            if len(ARM) >= 4:
+                down, fwd = (ARM[0], ARM[1]) if side == 'L' else (ARM[2], ARM[3])
+            else:
+                down, fwd = ARM[0], (ARM[1] if len(ARM) > 1 else 0.0)
+            sign = 1.0 if side == 'L' else -1.0
+            upper = Vector((sign * math.cos(down), 0.0, -math.sin(down)))
+            rotate_pose(arm.pose.bones[f'upperarm_{s}'], shoulder,
+                        hand - shoulder, upper)
+            if fwd:
+                # bend at the elbow about the axis perpendicular to the arm and
+                # to forward, so the forearm swings ahead rather than twisting
+                elbow = arm.matrix_world @ arm.pose.bones[f'lowerarm_{s}'].head
+                wrist = arm.matrix_world @ arm.pose.bones[f'hand_{s}'].head
+                axis = upper.cross(FWD)
+                if axis.length > 1e-6:
+                    target = Quaternion(axis.normalized(), fwd) @ upper
+                    rotate_pose(arm.pose.bones[f'lowerarm_{s}'], elbow,
+                                wrist - elbow, target)
+            continue
+
         # Aim at the *wrist*, not the fingertip. The silhouette gives the
         # outermost point of the arm, which is the end of the fingers; pointing
         # the rig's hand bone there parks it halfway down the model's forearm,
@@ -330,6 +455,94 @@ if UNRIGGED:
     # Un-skin: undo the A-pose on the mesh, using the weights it just gained.
     # Each vertex's skinning matrix at the current pose is built and inverted,
     # which is exactly the map from posed space back to rest space.
+    """
+    The donor's reshaping stays on through the un-skin, deliberately.
+
+    This is the decision that makes stylised models work at all in a game
+    with one shared skeleton, and it is worth stating plainly.
+
+    A supplied character has whatever proportions its artist gave it. The
+    police officer is about three and a half heads tall; the game's rig is
+    seven and a half. Bind the first to the second and the un-skin drops his
+    hand vertices onto the rig's hand bones, which are twice as far out as
+    his arms are long — his forearms stretch into two flat sheets and his
+    face fans out sideways with them. That is not a bug in the transfer, it
+    is two figures that are not the same animal.
+
+    So every supplied body is normalised onto the *realistic* rig here, and
+    the stylised proportions come back at runtime from a single table in
+    `src/entities/chibi.js`. One place decides what the cast looks like,
+    every body agrees with every other, and a model authored at any
+    proportion can be dropped in. The cost is that the artist's exact build
+    is not preserved — Redford comes out with the game's head-to-body ratio
+    rather than his own.
+    """
+    """
+    Take the arms off the head.
+
+    A nearest-surface transfer has no idea what a head is. On a stylised
+    character the head is enormous and the neck is barely there, so the jaw
+    and cheeks hang down *beside* the donor's shoulders and the nearest
+    polygon to them is an upper arm. Forty-six per cent of this model's head
+    vertices came back weighted to an arm, and enlarging the donor's head to
+    five times life size moved that number by four — the overlap is
+    geometric, not a matter of the donor being too small.
+
+    So it is corrected rather than avoided. Above the cut line nothing may be
+    driven by an arm: those weights are removed and what remains is
+    renormalised, and a vertex left with nothing at all is given to the head
+    outright. Below the cut line nothing is touched.
+
+    On a normally proportioned model this is a no-op, because vertices above
+    the neck already belong to the head.
+    """
+    if HEADCUT:
+        zs = [v.co.z for v in src_mesh.data.vertices]
+        cut = min(zs) + (max(zs) - min(zs)) * HEADCUT
+        gname = {g.index: g.name for g in src_mesh.vertex_groups}
+        arms = {i for i, n in gname.items()
+                if n.startswith(('upperarm', 'lowerarm', 'hand', 'clavicle'))
+                or n.split('_')[0] in ('index', 'middle', 'ring', 'pinky', 'thumb')}
+        head_g = src_mesh.vertex_groups.get('Head')
+        fixed = 0
+        for v in src_mesh.data.vertices:
+            if v.co.z < cut:
+                continue
+            wrong = [g for g in v.groups if g.group in arms and g.weight > 0]
+            if not wrong:
+                continue
+            fixed += 1
+            for g in wrong:
+                src_mesh.vertex_groups[gname[g.group]].remove([v.index])
+            keep = [(gname[g.group], g.weight) for g in v.groups
+                    if g.group not in arms and g.weight > 0]
+            total = sum(w for _, w in keep)
+            if total < 1e-5:
+                if head_g:
+                    head_g.add([v.index], 1.0, 'REPLACE')
+            else:
+                for n, w in keep:
+                    src_mesh.vertex_groups[n].add([v.index], w / total, 'REPLACE')
+        print(f'HEAD CLEANED {fixed} vertices above {HEADCUT:.0%} height taken off the arms')
+
+    # ── diagnostic: who owns the head? ──
+    # A stylised model's head sits where a realistic donor's shoulders are, so
+    # the failure mode of this whole step is head vertices taking arm weights
+    # and fanning out along ±X the moment the rest pose is restored. Counting
+    # it is the difference between "looks wrong" and knowing why.
+    zs = [v.co.z for v in src_mesh.data.vertices]
+    top = min(zs) + (max(zs) - min(zs)) * 0.78
+    gname = {g.index: g.name for g in src_mesh.vertex_groups}
+    bad = tot = 0
+    for v in src_mesh.data.vertices:
+        if v.co.z < top:
+            continue
+        tot += 1
+        if any(g.weight > 0.3 and gname.get(g.group, '').startswith(
+                ('upperarm', 'lowerarm', 'hand', 'clavicle')) for g in v.groups):
+            bad += 1
+    print(f'HEAD CHECK {bad}/{tot} vertices above 78% height are weighted to an arm')
+
     names = [g.name for g in src_mesh.vertex_groups]
     delta = {}
     for n in names:
@@ -359,6 +572,53 @@ if UNRIGGED:
             moved += 1
         except ValueError:
             pass                    # a degenerate blend; leave the vertex alone
+    """
+    Pull in the vertices the un-skin threw away.
+
+    Inverting a blended skinning matrix is exact for a vertex whose four
+    weights describe it well, and badly conditioned for one whose weights are
+    a compromise between two bones pointing in different directions. A
+    handful of vertices at a shoulder or a jaw come out metres from where
+    they belong, and because they are still connected to their neighbours the
+    result is a long thin triangle — the spike out of this model's left
+    shoulder that survived every arm angle tried against it.
+
+    They are outliers in the strict sense: a vertex whose distance from the
+    average of its own connected neighbours is many times the mesh's typical
+    edge length is not a modelling choice, it is a numerical failure. Two
+    passes of pulling only those back onto their neighbours' centroid removes
+    them and leaves every well-conditioned vertex untouched.
+    """
+    if DESPIKE:
+        import statistics
+        edges = src_mesh.data.edges
+        nbr = {}
+        lens = []
+        for e in edges:
+            a, b = e.vertices
+            nbr.setdefault(a, []).append(b)
+            nbr.setdefault(b, []).append(a)
+            lens.append((src_mesh.data.vertices[a].co
+                         - src_mesh.data.vertices[b].co).length)
+        typical = statistics.median(lens) if lens else 0.0
+        limit = typical * DESPIKE
+        pulled = 0
+        for _ in range(2):
+            for i, ns in nbr.items():
+                if not ns:
+                    continue
+                v = src_mesh.data.vertices[i]
+                mid = Vector((0, 0, 0))
+                for n in ns:
+                    mid += src_mesh.data.vertices[n].co
+                mid /= len(ns)
+                if (v.co - mid).length > limit:
+                    v.co = mid
+                    pulled += 1
+        src_mesh.data.update()
+        print(f'DESPIKED {pulled} vertices further than {limit:.3f} m '
+              f'({DESPIKE}× the median edge) from their neighbours')
+
     src_mesh.data.update()
     print(f'UN-SKINNED {moved}/{len(src_mesh.data.vertices)} vertices back to the rest pose')
 
@@ -439,7 +699,31 @@ if PER_MAT:
             'Metallic': (find(f'{prefix}_metal'.lower()), True),
         })
         print('MATERIAL', mat.name, '<-', prefix)
-else:
+"""
+`--albedo=`, `--rough=`, `--metal=` name the maps outright.
+
+The guesses below cover the naming conventions of the asset sites this
+project pulls from, and they are guesses. BitGem's police officer ships its
+base colour as `cop_blue.tga.png` — a perfectly reasonable name that contains
+none of "albedo", "basecolor", "diffuse" or "_t_", so the automatic path
+found nothing and bound an untextured grey man without complaining. A
+substring given on the command line beats a heuristic that fails silently.
+"""
+NAMED = {}
+for a in argv[3:]:
+    for flag, socket in (('--albedo=', 'Base Color'), ('--rough=', 'Roughness'),
+                         ('--metal=', 'Metallic'), ('--norm=', 'Normal')):
+        if a.startswith(flag):
+            NAMED[socket] = a[len(flag):]
+
+if NAMED:
+    src_mesh.data.materials.clear()
+    src_mesh.data.materials.append(build('Rebound', {
+        socket: (find(key.lower()), socket != 'Base Color')
+        for socket, key in NAMED.items()
+    }))
+    print('MATERIAL from explicit names', NAMED)
+elif not PER_MAT:
     src_mesh.data.materials.clear()
     src_mesh.data.materials.append(build('Rebound', {
         'Base Color': (find('_t_', 'albedo', 'basecolor', 'diffuse'), False),
