@@ -81,7 +81,18 @@ for a in argv[3:]:
     if a.startswith('--drop='):
         DROP |= {s for s in a[7:].split(',') if s}
 
-bpy.ops.import_scene.fbx(filepath=SRC)
+"""
+GLB in as readily as FBX.
+
+The two formats need different importers and nothing downstream cares which
+one ran. GLB is the better thing to be handed — one file, textures inside it,
+no external paths to fail to resolve, and none of FBX's unit-scale games — so
+it should not be the one that needs converting first.
+"""
+if SRC.lower().endswith(('.glb', '.gltf')):
+    bpy.ops.import_scene.gltf(filepath=SRC)
+else:
+    bpy.ops.import_scene.fbx(filepath=SRC)
 for o in list(bpy.data.objects):
     if o.type == 'MESH' and o.name in DROP:
         bpy.data.objects.remove(o, do_unlink=True)
@@ -502,6 +513,10 @@ if UNRIGGED:
     if HEADCUT:
         zs = [v.co.z for v in src_mesh.data.vertices]
         cut = min(zs) + (max(zs) - min(zs)) * HEADCUT
+        band = cut - (max(zs) - min(zs)) * 0.07     # the ramp below the line
+
+        def clamp01(x):
+            return 0.0 if x < 0.0 else (1.0 if x > 1.0 else x)
         gname = {g.index: g.name for g in src_mesh.vertex_groups}
         arms = {i for i, n in gname.items()
                 if n.startswith(('upperarm', 'lowerarm', 'hand', 'clavicle'))
@@ -509,7 +524,7 @@ if UNRIGGED:
         head_g = src_mesh.vertex_groups.get('Head')
         fixed = 0
         for v in src_mesh.data.vertices:
-            if v.co.z < cut:
+            if v.co.z < band:
                 continue
             """
             Read the whole vertex first, then edit it.
@@ -525,20 +540,35 @@ if UNRIGGED:
             Plain integers and floats copied out up front cannot go stale.
             """
             owned = [(g.group, g.weight) for g in v.groups if g.weight > 0]
-            wrong = [gi for gi, _ in owned if gi in arms]
-            if not wrong:
-                continue
+            """
+            Above the line the head is one rigid lump.
+
+            Stripping the arm weights and renormalising what was left sounded
+            more careful and was worse: a police cap came back shredded into
+            vertical strips, because its vertices had been sharing themselves
+            between the head and two bones that no longer applied, and
+            whatever survived the strip did not describe a hat.
+
+            A stylised character's head *is* rigid — there is no neck to
+            speak of and nothing above the jaw deforms — so everything above
+            the cut goes wholly to the head bone. The band just below it
+            ramps, otherwise the jawline creases every time the character
+            looks down.
+            """
             fixed += 1
-            for gi in wrong:
+            for gi, _ in owned:
                 src_mesh.vertex_groups[gname[gi]].remove([v.index])
-            keep = [(gname[gi], w) for gi, w in owned if gi not in arms]
-            total = sum(w for _, w in keep)
-            if total < 1e-5:
-                if head_g:
-                    head_g.add([v.index], 1.0, 'REPLACE')
-            else:
-                for n, w in keep:
-                    src_mesh.vertex_groups[n].add([v.index], w / total, 'REPLACE')
+            solid = clamp01((v.co.z - band) / max(cut - band, 1e-6))
+            if head_g:
+                head_g.add([v.index], solid, 'REPLACE')
+            if solid < 1.0:
+                rest = [(gname[gi], w) for gi, w in owned if gi not in arms]
+                total = sum(w for _, w in rest) or 1.0
+                for n, w in rest:
+                    if n == 'Head':
+                        continue
+                    src_mesh.vertex_groups[n].add(
+                        [v.index], (1.0 - solid) * w / total, 'REPLACE')
         print(f'HEAD CLEANED {fixed} vertices above {HEADCUT:.0%} height taken off the arms')
 
     # ── diagnostic: who owns the head? ──
