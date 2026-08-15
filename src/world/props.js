@@ -33,6 +33,51 @@ const _s = new THREE.Vector3(1, 1, 1);
 const _up = new THREE.Vector3(0, 1, 0);
 const _box = new THREE.Box3();
 const _size = new THREE.Vector3();
+const _one = new THREE.Vector3(1, 1, 1);
+
+/**
+ * A copy of a geometry whose positions can survive being transformed.
+ *
+ * ── the trap ──
+ *
+ * These props are optimised with gltf-transform's `quantize`, which stores
+ * positions as 16-bit integers flagged `normalized` — the attribute holds a
+ * value in [-1, 1] and the model's real size lives on the node above it as a
+ * dequantization scale. It is an excellent trade and three.js reads it back
+ * transparently, so nothing about it is visible until you write to it.
+ *
+ * `BufferGeometry.applyMatrix4` writes to it. It reads each vertex, transforms
+ * it, and stores it back through the same normalized encoding — which cannot
+ * represent anything outside [-1, 1]. Every vertex the transform pushes past
+ * the end of that range is silently clamped to it.
+ *
+ * Baking a prop's own scale into its geometry, which is what this file does to
+ * every prop before instancing it, is exactly such a transform. An electricity
+ * pole at dequantization scale 3 asked for ±3 and got back ±1: a six-metre
+ * pole flattened into a two-metre one, no error, no warning, correct-looking
+ * geometry of the wrong size. It is why so many unrelated props on this map
+ * measured almost exactly two metres tall — two metres is what ±1 comes out as
+ * — and why the ones whose scale happened to be *below* 1, like the manhole
+ * covers, came out right and hid the pattern.
+ *
+ * Dequantizing the positions to plain floats first costs about two megabytes
+ * across the whole prop set and removes the failure entirely. Normals are left
+ * as they are: they are unit vectors, so no transform of them can leave the
+ * range that clamps.
+ */
+function dequantized(geometry) {
+  const g = geometry.clone();
+  const pos = g.attributes.position;
+  if (!pos?.normalized) return g;
+  const out = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    out[i * 3] = pos.getX(i);
+    out[i * 3 + 1] = pos.getY(i);
+    out[i * 3 + 2] = pos.getZ(i);
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(out, 3));
+  return g;
+}
 
 /**
  * Collects placements per prop and bakes them into InstancedMeshes at the end.
@@ -102,6 +147,84 @@ class PropBatcher {
   }
 
   /**
+   * Every part of a multi-part assembly, standing at one point, keeping the
+   * parts where the author put them relative to each other.
+   *
+   * `stand` places one named part at one transform, and that is the right
+   * thing for a modular kit: a fence corner, a length of pipe, a shutter. The
+   * caller decides where each piece goes, so the piece's position inside the
+   * source file is irrelevant and discarding it is the point.
+   *
+   * An assembly is the opposite case. Poly Haven's pole kit ships three
+   * pre-built `preset_*` sets, but as loose top-level nodes rather than one
+   * group — a pole is twenty-seven separate nodes whose *relative offsets are
+   * the pole*. Running those through `stand` puts all twenty-seven origins on
+   * the same point, and the pole becomes a two-metre heap of transformers and
+   * nails sitting in the dirt with no shaft under it. Twenty-three of them
+   * stood on this map for the life of the project; nothing caught it, because
+   * every prop was still drawn, still instanced, still on the ground, and
+   * still inside its budget. It only reads as wrong to an eye that knows what
+   * a power pole looks like.
+   *
+   * So the assembly's parts are placed on one shared transform composed with
+   * each part's own offset. `y` means the foot of the whole thing and `x`/`z`
+   * its footprint centre, because that is what every caller here already
+   * assumes about a prop's origin — the parts' own origins are wherever the
+   * author's scene happened to put them, which for this kit is eight metres
+   * off in the ground plane.
+   *
+   * @returns {{placed:number, size:THREE.Vector3}|null} what went down and how
+   *   big it is, so the caller can size a collision box from the real
+   *   assembly rather than from a guess.
+   */
+  standAssembly(id, prefix, x, y, z, yaw = 0, scale = 1) {
+    const root = this.assets.props.get(id);
+    if (!root) return null;
+    const parts = root.children.filter((c) => c.name.startsWith(prefix));
+    if (!parts.length) return null;
+
+    root.updateMatrixWorld(true);
+    const toRoot = new THREE.Matrix4().copy(root.matrixWorld).invert();
+
+    /*
+     * The anchor is measured over the parts' *geometry*, not their origins. A
+     * transformer's origin can sit a metre below the box it draws, and
+     * anchoring on origins would bury the assembly or float it.
+     */
+    const bounds = new THREE.Box3();
+    for (const p of parts) {
+      _box.setFromObject(p);
+      if (!_box.isEmpty()) bounds.union(_box);
+    }
+    if (bounds.isEmpty()) return null;
+    bounds.applyMatrix4(toRoot);
+    const size = bounds.getSize(new THREE.Vector3()).multiplyScalar(scale);
+    const anchor = new THREE.Vector3(
+      (bounds.min.x + bounds.max.x) / 2, bounds.min.y, (bounds.min.z + bounds.max.z) / 2,
+    );
+
+    _q.setFromAxisAngle(_up, yaw);
+    const base = new THREE.Matrix4()
+      .compose(_v.set(x, y, z), _q, _s.set(scale, scale, scale))
+      .multiply(new THREE.Matrix4().makeTranslation(-anchor.x, -anchor.y, -anchor.z));
+
+    /*
+     * Position and rotation of each part within the assembly, and only those.
+     * The part's own scale is the dequantization factor and `build` already
+     * bakes it into the geometry — carrying it here as well would square it.
+     */
+    const m = new THREE.Matrix4();
+    const pp = new THREE.Vector3(), pq = new THREE.Quaternion(), ps = new THREE.Vector3();
+    let placed = 0;
+    for (const p of parts) {
+      m.multiplyMatrices(toRoot, p.matrixWorld).decompose(pp, pq, ps);
+      m.compose(pp, pq, _one).premultiply(base);
+      if (this.place(id, p.name, m)) placed++;
+    }
+    return placed ? { placed, size } : null;
+  }
+
+  /**
    * Flatten every queued placement into InstancedMeshes.
    *
    * See `chunk` below for why one prop can become several of them.
@@ -118,7 +241,34 @@ class PropBatcher {
 
     for (const [key, { source, matrices }] of this.queued) {
       source.updateMatrixWorld(true);
-      const inv = new THREE.Matrix4().copy(source.matrixWorld).invert();
+      /*
+       * ── the template's frame, but not its size ──
+       *
+       * Geometry is baked relative to the template so that placing it puts
+       * its own origin on the placement point, which means dividing out where
+       * the template sits in its source file. What must *not* be divided out
+       * is how big it is.
+       *
+       * That distinction was missed here for the life of the project, and the
+       * inverse of the full world matrix took the scale with it. It only bites
+       * when the template node itself carries a scale, which is invisible in
+       * a normal authored scene and universal in these assets: gltf-transform's
+       * `quantize` step stores positions as normalised integers in ±1 and puts
+       * the real size on the node as a dequantization scale. Cancel that and
+       * the geometry is drawn at the size quantize normalised it to — which is
+       * why so many unrelated props measured almost exactly two metres tall.
+       *
+       * Measured against their authored size, this was drawing manhole covers
+       * 2.83 m across instead of 0.69, air conditioners 1.51 m tall instead of
+       * 0.60, and roller shutters 2.00 m instead of 1.55.
+       *
+       * Props placed whole were never affected, because a GLB's root node has
+       * no scale of its own — the dequantization sits on the meshes inside it,
+       * where the traverse below picks it up correctly. Only part-level
+       * placement, which addresses the scaled node directly, lost it.
+       */
+      source.matrixWorld.decompose(_v, _q, _s);
+      const inv = new THREE.Matrix4().compose(_v, _q, _one).invert();
 
       /*
        * ── who casts a shadow ──
@@ -201,7 +351,7 @@ class PropBatcher {
           const id = mat?.uuid ?? 'none';
           let e = byMaterial.get(id);
           if (!e) byMaterial.set(id, (e = { material: mat, parts: [] }));
-          const g = o.geometry.clone();
+          const g = dequantized(o.geometry);
           g.applyMatrix4(local);
           // merging needs identical attribute sets; anything extra is noise
           // to an instanced draw and will refuse to merge if only some have it
@@ -238,7 +388,53 @@ class PropBatcher {
     }
 
     this.scene.add(root);
-    return { root, draws, placements: this.count };
+    return { root, draws, placements: this.count, collapsed: this.collapsedAssemblies() };
+  }
+
+  /**
+   * Prop ids where two different named parts were placed on exactly the same
+   * point — the signature of an assembly run through `stand` one part at a
+   * time.
+   *
+   * Worth a dedicated check because the failure is completely silent. The
+   * pole heap was drawn, instanced, lit, shadowed, collided with and inside
+   * budget for the life of the project; the only thing wrong with it was that
+   * a power pole does not look like that, and no assertion in the suite knew
+   * what a power pole looks like. Identical translations, though, are a fact
+   * about the placement rather than about the art, and two distinct parts of
+   * one prop landing on the same millimetre is never deliberate.
+   *
+   * The manhole cover is the near miss that sets the tolerance: its frame and
+   * lid are placed a centimetre apart on purpose, so the test is exact
+   * equality rather than proximity.
+   */
+  collapsedAssemblies() {
+    const byProp = new Map();
+    for (const [key, { matrices }] of this.queued) {
+      const hash = key.indexOf('#');
+      if (hash < 0) continue;                       // whole-prop placement, no parts to collapse
+      const id = key.slice(0, hash), part = key.slice(hash + 1);
+      let seen = byProp.get(id);
+      if (!seen) byProp.set(id, (seen = new Map()));
+      for (const m of matrices) {
+        const e = m.elements;
+        const at = `${e[12]},${e[13]},${e[14]}`;
+        let who = seen.get(at);
+        if (!who) seen.set(at, (who = new Set()));
+        who.add(part);
+      }
+    }
+    const bad = [];
+    for (const [id, seen] of byProp) {
+      let worst = 0, spots = 0;
+      for (const who of seen.values()) {
+        if (who.size < 2) continue;
+        spots++;
+        if (who.size > worst) worst = who.size;
+      }
+      if (spots) bad.push({ id, spots, parts: worst });
+    }
+    return bad;
   }
 }
 
@@ -390,7 +586,15 @@ export function scatterProps(scene, assets, world, opts = {}) {
     { id: 'Barrel_02', w: 12, r: 0.3, solid: true },
     { id: 'Barrel_01', w: 8, r: 0.34, solid: true },
     { id: 'old_tyre', w: 11, r: 0.36, solid: false },
-    { id: 'metal_trash_can', w: 8, r: 0.34, solid: true, part: 'metal_trash_can_rust' },
+    /*
+     * `assembly`, not `part`: the bin is four nodes — body, lid and two
+     * handles — and the lid is authored leaning against the bin rather than
+     * sitting on it, which is the whole character of the prop. Placing the
+     * body alone, as this did, put a lidless handleless drum against every
+     * other wall on the hill. The prefix picks the rusted variant only; the
+     * clean one is a separate set of four beside it in the source scene.
+     */
+    { id: 'metal_trash_can', w: 8, r: 0.34, solid: true, assembly: 'metal_trash_can_rust' },
     { id: 'cardboard_box_01', w: 8, r: 0.3, solid: false },
     { id: 'barrel_stove', w: 4, r: 0.34, solid: true },
     { id: 'SchoolChair_01', w: 6, r: 0.34, solid: false },
@@ -431,7 +635,11 @@ export function scatterProps(scene, assets, world, opts = {}) {
     const y = ground(x, z, h.y);
     if (y == null) continue;
 
-    if (B.stand(c.id, c.part, x, y, z, rng() * Math.PI * 2) && c.solid) {
+    const yaw = rng() * Math.PI * 2;
+    const put = c.assembly
+      ? B.standAssembly(c.id, c.assembly, x, y, z, yaw)
+      : B.stand(c.id, c.part, x, y, z, yaw);
+    if (put && c.solid) {
       collision.addBox(x, y + 0.45, z, c.r * 2, 0.9, c.r * 2, 'prop');
     }
   }
@@ -473,28 +681,24 @@ export function scatterProps(scene, assets, world, opts = {}) {
    * Poly Haven ships the pole kit as loose components plus three assembled
    * `preset_*` sets, but the presets are separate top-level nodes rather than
    * one group — so a "pole" here means every node sharing a preset prefix,
-   * placed on the same transform.
+   * and it has to go down through `standAssembly`, which keeps the parts where
+   * the author put them. See the long note there for what happens otherwise.
+   *
+   * The collision box is sized from what actually went down rather than from
+   * the six metres this used to assume, because the two disagreed by four.
    */
-  const poleParts = [];
-  const poleRoot = assets.props.get('modular_electricity_poles');
-  if (poleRoot) {
-    for (const child of poleRoot.children) {
-      if (/^preset_01/.test(child.name)) poleParts.push(child.name);
-    }
-  }
-
   const LANE_X = [-46, -22, 4, 28, 52];
-  if (poleParts.length) {
-    for (const lx of LANE_X) {
-      for (let z = 58; z > -66; z -= rng.range(15, 24)) {
-        const x = lx + rng.range(-2.5, 2.5);
-        if (inClimb(x, z) || !free(x, z, 1.4)) continue;
-        const y = surface(x, z, 60);
-        if (y == null) continue;
-        const yaw = rng() * Math.PI * 2;
-        for (const part of poleParts) B.stand('modular_electricity_poles', part, x, y, z, yaw);
-        collision.addBox(x, y + 3, z, 0.4, 6, 0.4, 'prop');
-      }
+  for (const lx of LANE_X) {
+    for (let z = 58; z > -66; z -= rng.range(15, 24)) {
+      const x = lx + rng.range(-2.5, 2.5);
+      if (inClimb(x, z) || !free(x, z, 1.4)) continue;
+      const y = surface(x, z, 60);
+      if (y == null) continue;
+      const yaw = rng() * Math.PI * 2;
+      const pole = B.standAssembly('modular_electricity_poles', 'preset_01', x, y, z, yaw);
+      if (!pole) break;
+      // the shaft, not the crossarms — you should be able to walk under the wires
+      collision.addBox(x, y + pole.size.y / 2, z, 0.4, pole.size.y, 0.4, 'prop');
     }
   }
 
