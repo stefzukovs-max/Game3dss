@@ -68,6 +68,32 @@ WebP and vertex-quantized into a single `.glb`.
 | [Wooden Ladder](https://polyhaven.com/a/wooden_ladder) | Miroslav Turura | ladders against the roof edges (timber) |
 | [School Chair 01](https://polyhaven.com/a/SchoolChair_01) | Ethan Place | plastic chairs outside the bar |
 
+## Character rig and animation — Quaternius
+
+<https://quaternius.com/packs/universalanimationlibrary.html> · licence: CC0 1.0,
+stated in `assets/models/rig/LICENSE-quaternius.txt`
+
+`assets/models/rig/universal.glb` is the Universal Animation Library
+[Standard], downloaded from the author's mirror on OpenGameArt:
+<https://opengameart.org/content/universal-animation-library>
+
+One file carries the skeleton, forty-six clips and a rigged Mannequin. That
+matters more than the animation count. Everything the characters in this game
+looked wrong about came from a seam — a body from one pack re-bound onto a
+skeleton from another by a Blender script — and the defects it produced were
+invisible in the bind pose and only appeared once something moved: vertices
+weighted to bones on the far side of the body, hands welded to hips by the
+mesh reduction, a scale track that inflated one shoulder three and a half
+times and threw the weapon arm over the character's head.
+
+Here the mesh and the clips were bound together by the person who made them,
+so there is nothing to retarget and nothing to re-bind. The figure is authored
+in metres and stands 1.779 m with its feet at exactly zero, so it needs no
+unit correction either — the previous rig ran at 45% of its intended size for
+the life of the project because it did.
+
+`npm run check:rig` asserts all of it against the shipped file.
+
 ## Weapons and vehicles — Quaternius
 
 <https://quaternius.com> · licence: CC0 1.0, stated in each pack's

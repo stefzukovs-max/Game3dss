@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>harness</title>
+<!--
+  A bare page on the game's own origin, with the game's own importmap.
+
+  The check harnesses that ask a question about one file — is this rig well
+  formed, does this clip drive anything — do not need the game, and loading it
+  costs a couple of minutes of asset fetching before it will answer. They get
+  this instead. The importmap has to match index.html or the addon loaders,
+  which import "three" by bare specifier, cannot resolve.
+-->
+<script type="importmap">
+{
+  "imports": {
+    "three": "/vendor/three.module.min.js",
+    "three/addons/": "/vendor/addons/"
+  }
+}
+</script>
+<body></body>
