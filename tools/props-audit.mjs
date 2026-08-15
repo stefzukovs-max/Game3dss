@@ -69,16 +69,22 @@ const out = await page.evaluate(async () => {
    * off the source models, because the whole point is to catch a prop that
    * came out of placement a different shape from the one it went in as.
    *
-   * Instances of the same prop are grouped by their translation. An assembly
-   * places several parts at several different points around one spot, so the
-   * grouping is by proximity — a metre and a half, wide enough to gather a
-   * pole's crossarms and narrow enough that two bins against the same wall
-   * stay separate.
+   * One placement becomes several InstancedMeshes — one per material after
+   * the merge, and one per named part for an assembly — so they have to be
+   * gathered back together before anything can be measured. Instance *index*
+   * does that exactly: every chunk of a prop is built from the same list of
+   * placement matrices in the same order, so index i is the same object in
+   * all of them.
+   *
+   * Grouping by proximity instead, which is what this did first, splits a
+   * palm into two: the trunk lands one cluster and the frond crown another,
+   * because a crown's bounding box centre is metres from the trunk. The crown
+   * cluster then has no trunk in it, sits two metres above the ground by
+   * definition, and gets reported as a floating tree.
    */
   const m = new THREE.Matrix4();
   const box = new THREE.Box3();
-  const spots = new Map();     // prop id → array of { x, z, box }
-  const NEAR = 1.5;
+  const spots = new Map();     // prop id → index → { box, feet[] }
 
   for (const inst of g.props.root.children) {
     if (!inst.isInstancedMesh) continue;
@@ -87,22 +93,20 @@ const out = await page.evaluate(async () => {
     if (!inst.geometry.boundingBox) inst.geometry.computeBoundingBox();
     const gb = inst.geometry.boundingBox;
     if (!gb) continue;
-    let list = spots.get(id);
-    if (!list) spots.set(id, (list = []));
+    let byIndex = spots.get(id);
+    if (!byIndex) spots.set(id, (byIndex = new Map()));
     for (let i = 0; i < inst.count; i++) {
       inst.getMatrixAt(i, m);
       box.copy(gb).applyMatrix4(m);
       if (box.isEmpty()) continue;
       const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
-      let hit = null;
-      for (const s of list) {
-        if ((s.x - cx) ** 2 + (s.z - cz) ** 2 < NEAR * NEAR) { hit = s; break; }
-      }
-      if (hit) { hit.box.union(box); hit.n++; hit.feet.push({ cx, cz, y: box.min.y }); } else {
-        list.push({ x: cx, z: cz, box: box.clone(), n: 1, feet: [{ cx, cz, y: box.min.y }] });
+      const s = byIndex.get(i);
+      if (s) { s.box.union(box); s.feet.push({ cx, cz, y: box.min.y }); } else {
+        byIndex.set(i, { x: cx, z: cz, box: box.clone(), feet: [{ cx, cz, y: box.min.y }] });
       }
     }
   }
+  for (const [id, byIndex] of spots) spots.set(id, [...byIndex.values()]);
 
   /*
    * Where the thing touches down, which is not where its bounding box is

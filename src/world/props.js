@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeRNG } from '../core/utils.js';
-import { MONUMENT_H } from './favela.js';
+import { MONUMENT_H, TERRACES } from './favela.js';
 import { dressSlums } from './slums.js';
 
 /**
@@ -88,6 +88,7 @@ class PropBatcher {
     this.scene = scene;
     this.collision = collision;
     this.queued = new Map();     // key → { source: Object3D, matrices: Matrix4[] }
+    this._feet = new Map();      // key → foot offset, measured once
     this.count = 0;
   }
 
@@ -144,6 +145,42 @@ class PropBatcher {
   stand(id, part, x, y, z, yaw = 0, scale = 1) {
     _q.setFromAxisAngle(_up, yaw);
     return this.place(id, part, _m.compose(_v.set(x, y, z), _q, _s.set(scale, scale, scale)));
+  }
+
+  /**
+   * How far a template's lowest geometry sits from its own origin.
+   *
+   * `stand` puts the origin on the point it is given, which is the same thing
+   * as the foot for most of these props and not for all of them — a ladder
+   * section's origin is a metre and a half under the rungs, so standing one on
+   * a roof left it hanging in the air over the roof. Measured in the frame
+   * `place` bakes geometry into, so it is directly comparable to the placement
+   * point.
+   */
+  footOffset(id, part) {
+    const t = this.template(id, part);
+    if (!t) return 0;
+    t.updateMatrixWorld(true);
+    t.matrixWorld.decompose(_v, _q, _s);
+    const inv = new THREE.Matrix4().compose(_v, _q, _one).invert();
+    const local = new THREE.Matrix4();
+    const span = new THREE.Box3();
+    t.traverse((o) => {
+      if (!o.isMesh || !o.geometry) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      if (!o.geometry.boundingBox) return;
+      local.multiplyMatrices(inv, o.matrixWorld);
+      span.union(_box.copy(o.geometry.boundingBox).applyMatrix4(local));
+    });
+    return span.isEmpty() ? 0 : span.min.y;
+  }
+
+  /** `stand`, but `y` is the floor the prop rests on rather than its origin. */
+  seat(id, part, x, y, z, yaw = 0, scale = 1) {
+    const key = part ? `${id}#${part}` : id;
+    let drop = this._feet.get(key);
+    if (drop === undefined) this._feet.set(key, (drop = this.footOffset(id, part)));
+    return this.stand(id, part, x, y - drop * scale, z, yaw, scale);
   }
 
   /**
@@ -548,6 +585,28 @@ export function scatterProps(scene, assets, world, opts = {}) {
   /** Claim ground unconditionally — for a footprint bigger than its test. */
   const claim = (x, z, r) => { taken.push({ x, z, r }); };
 
+  /**
+   * Ground that holds the same height right across a footprint, or null.
+   *
+   * `surface` samples one point. That is fine for something the size of a gas
+   * bottle and wrong for anything with a spread, because half a metre from the
+   * sample can be the edge of a terrace — which is where a palm ends up
+   * standing on thin air over a two-metre drop with its trunk in space.
+   *
+   * The tolerance has to stay loose: this is a hillside and the whole point of
+   * the vegetation is to plant it on the slopes and terrace lips. It rejects a
+   * step, not a gradient.
+   */
+  const flatGround = (x, z, r, from, tol = 0.8) => {
+    const y = surface(x, z, from);
+    if (y == null) return null;
+    for (const [dx, dz] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
+      const s = surface(x + dx, z + dz, from);
+      if (s == null || Math.abs(s - y) > tol) return null;
+    }
+    return y;
+  };
+
   /*
    * Nothing solid goes in the mouth of a climb.
    *
@@ -686,13 +745,20 @@ export function scatterProps(scene, assets, world, opts = {}) {
    *
    * The collision box is sized from what actually went down rather than from
    * the six metres this used to assume, because the two disagreed by four.
+   *
+   * The ground is sampled against the terrace the lane is on, not from the
+   * sky. Sampling from sixty metres up takes the *highest* surface, which on
+   * this map is regularly a roof — and a power pole standing on somebody's
+   * laje, wires and all, is the sort of thing that looks like a bug because
+   * it is one.
    */
   const LANE_X = [-46, -22, 4, 28, 52];
   for (const lx of LANE_X) {
     for (let z = 58; z > -66; z -= rng.range(15, 24)) {
       const x = lx + rng.range(-2.5, 2.5);
       if (inClimb(x, z) || !free(x, z, 1.4)) continue;
-      const y = surface(x, z, 60);
+      const terr = TERRACES.find((t) => z >= t.z0 && z <= t.z1);
+      const y = terr ? ground(x, z, terr.y, 1.6) : surface(x, z, 60);
       if (y == null) continue;
       const yaw = rng() * Math.PI * 2;
       const pole = B.standAssembly('modular_electricity_poles', 'preset_01', x, y, z, yaw);
@@ -737,7 +803,8 @@ export function scatterProps(scene, assets, world, opts = {}) {
       const c = rng.chance(0.42) ? { id: 'old_tyre' }
         : rng.chance(0.5) ? { id: 'cardboard_box_01' }
           : rng.chance(0.5) ? { id: 'Barrel_02' } : { id: 'ladder_sectioned_01', part: 'ladder_section_01' };
-      B.stand(c.id, c.part, x, y, z, rng() * Math.PI * 2);
+      // seat, not stand: the ladder section's origin is well below its rungs
+      B.seat(c.id, c.part, x, y, z, rng() * Math.PI * 2);
     }
   }
 
@@ -854,7 +921,7 @@ export function scatterProps(scene, assets, world, opts = {}) {
     const x = edge ? (rng.chance(0.5) ? -1 : 1) * rng.range(58, 74) : rng.range(-70, 70);
     const z = edge ? rng.range(-74, 74) : (rng.chance(0.5) ? -1 : 1) * rng.range(56, 74);
     if (!free(x, z, 1.6)) continue;
-    const y = surface(x, z, 40);
+    const y = flatGround(x, z, 0.9, 40);
     if (y == null) continue;
     const palm = rng.chance(0.42);
     plant(palm ? PALMS[rng.int(0, 2)] : SCRUB[rng.int(0, SCRUB.length - 1)],
@@ -864,8 +931,9 @@ export function scatterProps(scene, assets, world, opts = {}) {
   // the terrace-lip spots the map picked out
   for (const f of meta.foliage ?? []) {
     if (!free(f.x, f.z, 1.2)) continue;
-    const y = ground(f.x, f.z, f.y, 2.2);
-    if (y == null) continue;
+    // the map's own lip spots still have to be flat enough to stand a trunk on
+    const y = flatGround(f.x, f.z, 0.9, f.y + 4);
+    if (y == null || Math.abs(y - f.y) > 2.2) continue;
     const palm = f.seed < 0.38;
     plant(palm ? PALMS[(f.seed * 97 | 0) % 3] : SCRUB[(f.seed * 131 | 0) % SCRUB.length],
       f.x, y, f.z, f.seed * 44, palm ? 0.85 + f.seed : 0.6 + f.seed * 0.8);
