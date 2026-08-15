@@ -31,7 +31,8 @@
     "check:audio": "node tools/audio-check.mjs",
     "proportions": "node tools/proportions.mjs",
     "look": "node tools/look.mjs",
-    "check:props": "node tools/props-audit.mjs"
+    "check:props": "node tools/props-audit.mjs",
+    "check:skin": "node tools/skin-check.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.4.2",

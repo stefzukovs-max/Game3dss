@@ -4,6 +4,7 @@ import { damp, clamp, angleDelta } from '../core/utils.js';
 import { dress, reshapeBody } from './outfit.js';
 import { chibify } from './chibi.js';
 import { solveTwoBone } from './twobone.js';
+import { repairModelWeights } from './weights.js';
 
 /**
  * ══════════════════════════════════════════════════════════════════
@@ -72,6 +73,30 @@ export function setActorSource(assets) {
    * leave every barrel pointing somewhere it was not calibrated for.
    */
   for (const b of Object.values(bodies)) chibify(b, assets.clips);
+
+  /*
+   * Repair the skinning, after the build and before anything is cloned.
+   *
+   * This is where the police model's pale shards came from — vertices re-bound
+   * to bones on the far side of the body, and hands, thighs and head stitched
+   * to each other by the model reduction's weld. Both are invisible in the
+   * bind pose and tear metre-long triangles out of the figure the moment the
+   * skeleton moves. See weights.js.
+   *
+   * After `chibify`, deliberately: the build's bone scales are part of what
+   * tears the mesh — a head bone at 1.92 throws anything wrongly weighted to
+   * it half a metre — so the repair has to see the skeleton the game will
+   * actually animate, not the one the pack shipped.
+   *
+   * Runs on every body, not just the one that was noticed, so the next
+   * re-bound character gets checked without anyone remembering to.
+   */
+  const repairs = [];
+  for (const [kind, b] of Object.entries(bodies)) {
+    const r = repairModelWeights(b);
+    if (r?.length) repairs.push({ kind, meshes: r });
+  }
+  if (typeof window !== 'undefined') window.__weightRepairs = repairs;
 
   /*
    * ── an upper-body-only copy of the aim pose ──
@@ -256,6 +281,28 @@ const WEAPON_SCALE = 0.5;
  * It is still gated on reach rather than forced: see the fade in `_offHand`.
  */
 const OFF_HAND_IK = true;
+
+/**
+ * Outward swing at the shoulder, in radians. See `_splayArms`.
+ *
+ * Tuned against `npm run check:skin`, which measures the closest approach
+ * between arm surface and torso surface across every pose the game plays:
+ * at 0 the gang body touches itself in all nine, and this is the smallest
+ * value that clears them all with room to spare. Larger reads as a swagger
+ * and starts to fight the aim pose.
+ */
+const SPLAY = 0.12;
+
+const _splayQ = new THREE.Quaternion();
+const _splayQ2 = new THREE.Quaternion();
+const _splayP = new THREE.Quaternion();
+const _splayRot = new THREE.Quaternion();
+const _splayA = new THREE.Vector3();
+const _splayB = new THREE.Vector3();
+const _splayDir = new THREE.Vector3();
+const _splayWant = new THREE.Vector3();
+const _splayOut = new THREE.Vector3();
+const _splayFwd = new THREE.Vector3();
 
 const _ws = new THREE.Vector3();
 const _ikTarget = new THREE.Vector3();
@@ -534,8 +581,86 @@ export class SkinnedActor {
     }
 
     this._holdWeaponSize();
+    this._splayArms();
     this._sway(dt, s);
     this._offHand(dt, s);
+  }
+
+  /**
+   * Swing the upper arms clear of the ribs.
+   *
+   * The stylised build widens the chest and shortens the limbs, and the
+   * animation library was authored for neither. On a realistic figure the arms
+   * hang a comfortable few centimetres off the body; on this one, measured
+   * across every pose the game plays, the closest approach between arm surface
+   * and torso surface was two to eight millimetres — touching. There is no
+   * daylight under a gang member's arm in any pose, which is exactly what
+   * "the arms are stuck to the body" describes.
+   *
+   * A few degrees of outward swing at the shoulder is enough to open it, and
+   * is what an animator would do rather than re-authoring forty-three clips
+   * against a body shape that did not exist when they were made.
+   *
+   * Done as a world-space rotation of the shoulder-to-elbow direction away
+   * from the body's centreline, for the same reason `twobone.js` works that
+   * way: this rig's bone axes are not documented anywhere and guessing which
+   * local axis is "outward" has been wrong twice. Rotating a direction the
+   * character can be *measured* to have needs no convention at all.
+   *
+   * After the mixer, because the mixer overwrites bone rotations outright and
+   * anything set before it is simply gone. Before `_offHand`, so the two-bone
+   * solver can still put the support hand exactly on the foregrip — the splay
+   * is a starting posture, not a constraint.
+   */
+  _splayArms() {
+    if (!SPLAY) return;
+    const arms = (this._splayBones ??= ['l', 'r'].map((side) => ({
+      up: this.body.getObjectByName(`upperarm_${side}`),
+      low: this.body.getObjectByName(`lowerarm_${side}`),
+      sign: side === 'l' ? 1 : -1,
+    })).filter((a) => a.up && a.low));
+    if (!arms.length) return;
+
+    // the character's own axes, so this works whichever way they are facing
+    this.root.getWorldQuaternion(_splayQ);
+    _splayOut.set(1, 0, 0).applyQuaternion(_splayQ);      // their left
+    _splayFwd.set(0, 0, 1).applyQuaternion(_splayQ);      // their forward
+
+    for (const arm of arms) {
+      arm.up.getWorldPosition(_splayA);
+      arm.low.getWorldPosition(_splayB);
+      _splayDir.subVectors(_splayB, _splayA);
+      const len = _splayDir.length();
+      if (len < 1e-4) continue;
+      _splayDir.divideScalar(len);
+
+      /*
+       * Lean the arm's direction outwards by adding a sideways component,
+       * rather than rotating it about an axis.
+       *
+       * The axis version is the obvious one and it degenerates exactly where
+       * it is needed most. Rotating about the character's forward axis needs a
+       * sign — which way is "out" — and the only thing available to derive it
+       * from is the arm's current direction. For an arm hanging straight down
+       * that direction has almost no sideways component at all, so the sign
+       * came from rounding noise and flipped between frames and between poses.
+       * Idle, the pose most in need of daylight under the arm, was the one it
+       * could not decide about.
+       *
+       * Adding a fixed sideways nudge and re-normalising has no such case: the
+       * left arm always gains a component to the character's left and the
+       * right to its right, whatever the arm is doing, and the size of the
+       * resulting angle is largest when the arm hangs closest to the body,
+       * which is the right way round.
+       */
+      _splayWant.copy(_splayDir).addScaledVector(_splayOut, arm.sign * SPLAY).normalize();
+      _splayRot.setFromUnitVectors(_splayDir, _splayWant);
+
+      arm.up.getWorldQuaternion(_splayQ2).premultiply(_splayRot);
+      arm.up.parent.getWorldQuaternion(_splayP).invert();
+      arm.up.quaternion.copy(_splayP.multiply(_splayQ2));
+      arm.up.updateMatrixWorld(true);
+    }
   }
 
   /**
