@@ -3,6 +3,7 @@ import { clamp, now, damp, advanceClock } from './core/utils.js';
 import { Input, IS_TOUCH } from './core/input.js';
 import { audio } from './core/audio.js';
 import { buildFavela, WORLD, TERRACES, zoneAt } from './world/favela.js';
+import { cullProps } from './world/props.js';
 import { NavGraph } from './world/navgraph.js';
 import { CombatSystem } from './systems/combat.js';
 import { AbilitySystem } from './systems/abilities.js';
@@ -1205,6 +1206,20 @@ class Game {
 
   /** Single render entry point, so tools and the game agree on the pipeline. */
   renderFrame(dt = 0.016) {
+    /*
+     * Distance-cull the prop chunks here rather than in `_tick`, because
+     * anything that draws should get it — the budget tool and the look
+     * harness render without simulating, and culling that only happens on a
+     * tick is culling that no measurement ever sees.
+     *
+     * Four times a second is plenty: the thresholds are tens of metres and
+     * the player moves at five metres a second.
+     */
+    this._cullTick = (this._cullTick ?? 0) - dt;
+    if (this._cullTick <= 0) {
+      this._cullTick = 0.25;
+      if (this.props?.root) cullProps(this.props.root, this.camera);
+    }
     this.post.render(dt);
   }
 
@@ -1251,6 +1266,11 @@ class Game {
     this._updateSun();
     this._updateReveal();
     this._updateAimTarget();
+    /*
+     * Distance-cull the prop chunks. Four times a second is plenty: the
+     * thresholds are tens of metres and the player moves at five metres a
+     * second, so a chunk cannot cross one between checks.
+     */
     this._updateAudio(dt);
 
     this.hud.update(dt, this);

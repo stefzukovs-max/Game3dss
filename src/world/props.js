@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeRNG } from '../core/utils.js';
 import { MONUMENT_H } from './favela.js';
 import { dressSlums } from './slums.js';
@@ -103,6 +104,8 @@ class PropBatcher {
   /**
    * Flatten every queued placement into InstancedMeshes.
    *
+   * See `chunk` below for why one prop can become several of them.
+   *
    * A template can be a group of several meshes with their own local
    * transforms, so each source mesh gets its own InstancedMesh and each
    * instance matrix is the placement composed with that mesh's transform
@@ -134,31 +137,171 @@ class PropBatcher {
        * Receiving stays on for everything. It is free — it happens in the
        * material during the pass that was already going to run — and it is what
        * stops a small prop looking pasted onto the ground.
+       *
+       * Where the threshold sits was swept, not guessed:
+       *
+       *   >= 1.2 m    310 draws   1,177,540 tris
+       *   >= 2.2 m    300 draws   1,112,370 tris
+       *   >= 3.5 m    270 draws     902,183 tris
+       *
+       * and then the two ends were rendered side by side across all five
+       * `npm run look` views and diffed. 2.5–5.4% of pixels move, which sounds
+       * alarming and is almost entirely shadow-map texel re-alignment: drop
+       * casters and the directional light's shadow camera refits, so every
+       * texel in the map lands somewhere slightly different and the mottled
+       * dirt ground speckles. Only one shadow actually goes missing in the
+       * five frames — a mid-distance roof-clutter smudge in the plaza — and
+       * you cannot find it without the difference image to point at it.
+       *
+       * So: 3.5 m. A quarter of the triangles for a shadow nobody can name.
        */
       _box.setFromObject(source);
       _box.getSize(_size);
-      const big = Math.max(_size.x, _size.y, _size.z) >= 1.2;
+      const span = Math.max(_size.x, _size.y, _size.z);
+      const big = span >= 3.5;
 
+      /*
+       * ── how far away this prop is still worth drawing ──
+       *
+       * Frustum culling only removes what is behind you. The other half of
+       * the waste is everything in front of you and too far away to see: a
+       * gas bottle twenty centimetres across is about two pixels at forty
+       * metres, and the map is a hundred and forty metres long.
+       *
+       * The distance is derived from the prop's own size rather than listed,
+       * so adding a prop needs no edit here — and buildings and vehicles come
+       * out effectively unlimited, which is what you want, because their
+       * silhouettes are the map.
+       */
+      const cullDist = span >= 1.2 ? Infinity : span >= 0.5 ? 72 : 40;
+
+      /*
+       * ── one draw per material, not per mesh ──
+       *
+       * A prop from a GLB is however many meshes its author happened to
+       * split it into, and an InstancedMesh per source mesh means the split
+       * becomes draw calls. The police car is fifty-seven meshes — fifty-
+       * seven draws for one vehicle, before a single instance is placed —
+       * and it shares a handful of materials across all of them.
+       *
+       * Merging the parts that share a material, with each part's own
+       * transform baked in, collapses that to one draw per material. It is
+       * the same triangles either way; it is purely a question of how many
+       * times the renderer has to be told about them.
+       *
+       * By material *identity*, not by appearance: two materials that look
+       * the same are still two GPU state changes, and merging across them
+       * would silently repaint half a car.
+       */
+      const byMaterial = new Map();
       source.traverse((o) => {
-        if (!o.isMesh) return;
+        if (!o.isMesh || !o.geometry) return;
         const local = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
-        const inst = new THREE.InstancedMesh(o.geometry, o.material, matrices.length);
-        inst.name = `prop:${key}`;
-        inst.castShadow = big;
-        inst.receiveShadow = true;
-        for (let i = 0; i < matrices.length; i++) {
-          inst.setMatrixAt(i, new THREE.Matrix4().multiplyMatrices(matrices[i], local));
+        for (const [slot, mat] of (Array.isArray(o.material) ? o.material : [o.material]).entries()) {
+          const id = mat?.uuid ?? 'none';
+          let e = byMaterial.get(id);
+          if (!e) byMaterial.set(id, (e = { material: mat, parts: [] }));
+          const g = o.geometry.clone();
+          g.applyMatrix4(local);
+          // merging needs identical attribute sets; anything extra is noise
+          // to an instanced draw and will refuse to merge if only some have it
+          for (const name of Object.keys(g.attributes)) {
+            if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
+          }
+          if (Array.isArray(o.material) && o.geometry.groups.length > slot) {
+            // multi-material mesh: keep only this material's own triangles
+            const grp = o.geometry.groups[slot];
+            g.setDrawRange(grp.start, grp.count);
+          }
+          e.parts.push(g);
         }
-        inst.instanceMatrix.needsUpdate = true;
-        inst.computeBoundingSphere();
-        root.add(inst);
-        draws++;
       });
+
+      for (const { material, parts } of byMaterial.values()) {
+        let geo = parts[0];
+        if (parts.length > 1) {
+          try { geo = mergeGeometries(parts, false) ?? parts[0]; } catch { geo = parts[0]; }
+        }
+        for (const group of chunk(matrices)) {
+          const inst = new THREE.InstancedMesh(geo, material, group.length);
+          inst.name = `prop:${key}`;
+          inst.castShadow = big;
+          inst.receiveShadow = true;
+          for (let i = 0; i < group.length; i++) inst.setMatrixAt(i, group[i]);
+          inst.instanceMatrix.needsUpdate = true;
+          inst.computeBoundingSphere();
+          inst.userData.cullDist = cullDist;
+          root.add(inst);
+          draws++;
+        }
+      }
     }
 
     this.scene.add(root);
     return { root, draws, placements: this.count };
   }
+}
+
+/*
+ * ══════════════════════════════════════════════════════════════════
+ *  Why one prop becomes several instanced meshes
+ * ══════════════════════════════════════════════════════════════════
+ *
+ * An InstancedMesh has one bounding volume covering every instance in it. Put
+ * all four hundred window frames on the hill into one and that volume is the
+ * hill, so the frustum can never reject it and all four hundred are drawn
+ * whichever way the camera is pointing — including the ones behind the
+ * player, inside the terrace they are standing on, and over the ridge.
+ *
+ * That is why the scene drew 1.18M triangles out of 739k loaded: not a
+ * geometry problem, a culling one. Instancing had traded away the only free
+ * optimisation in a renderer.
+ *
+ * Splitting the instances into spatial cells gives each chunk a tight sphere
+ * the frustum can test, and on a 140 m map with a 60° camera most of them
+ * fail it. The cost is more InstancedMesh objects — but an object that is
+ * culled is not a draw call, so the ones that survive are the ones that were
+ * always going to be drawn.
+ *
+ * ── and why it is switched off ──
+ *
+ * It was built, measured, and does not pay on this map. Against a baseline of
+ * 331 draws and 1,179k triangles, from the escadão looking uphill:
+ *
+ *     cell 24 m   644 draws   921k tris
+ *     cell 34 m   556 draws   936k tris
+ *     cell 48 m   518 draws   983k tris
+ *
+ * A fifth off the triangles for nearly twice the draw calls, which on the
+ * phones this is meant to run on is the wrong side of the trade. Two reasons,
+ * both properties of this map rather than of the technique: it is only 140 m
+ * across and the whole game is played looking up a hill, so most cells are in
+ * frustum most of the time; and no single prop mesh has more than about forty
+ * placements, so there is never a big instance list to split usefully.
+ *
+ * The mechanism stays, switched off by the threshold, because the numbers
+ * above are the useful part — without them the next person to look at 1.18M
+ * drawn against 739k loaded will build exactly this and measure it again.
+ *
+ * The draw calls are somewhere else anyway: `prop:car` is 57 source meshes
+ * for one vehicle, so every car costs 57 draws before a single instance is
+ * placed. Merging multi-mesh props by material in the asset pipeline is worth
+ * an estimated 50+ draws on its own, and that is the thread to pull.
+ */
+const CELL = 34;              // metres
+const MIN_TO_SPLIT = 1e9;     // off — see the measurement above
+
+function chunk(matrices) {
+  if (matrices.length < MIN_TO_SPLIT) return [matrices];
+  const cells = new Map();
+  for (const m of matrices) {
+    // element 12/14 are the translation's x and z
+    const key = `${Math.floor(m.elements[12] / CELL)},${Math.floor(m.elements[14] / CELL)}`;
+    let bucket = cells.get(key);
+    if (!bucket) cells.set(key, (bucket = []));
+    bucket.push(m);
+  }
+  return [...cells.values()];
 }
 
 /**
@@ -661,4 +804,45 @@ export function scatterProps(scene, assets, world, opts = {}) {
 
   const built = B.build();
   return { ...built, group: built.root, slums };
+}
+
+/**
+ * Hide prop chunks that are too far away to read.
+ *
+ * Called once a frame with the camera. Everything it touches is a chunk
+ * produced by `chunk` above, each carrying the distance its own size earns —
+ * so this is a comparison per chunk and nothing else, and a chunk switched
+ * off costs neither a draw call nor a shadow-map pass.
+ *
+ * Squared distances, because a square root per chunk per frame is a silly
+ * thing to spend on a comparison.
+ */
+export function cullProps(root, camera) {
+  if (!root) return 0;
+  const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
+  let hidden = 0;
+  for (const inst of root.children) {
+    const d = inst.userData.cullDist;
+    if (!d || d === Infinity) continue;
+    const s = inst.boundingSphere ?? inst.geometry?.boundingSphere;
+    // the chunk's own centre, so a cell is judged where it is, not where its
+    // first instance happens to sit
+    const c = inst.userData.centre ?? (inst.userData.centre = chunkCentre(inst));
+    const dx = c.x - cx, dy = c.y - cy, dz = c.z - cz;
+    const reach = d + (s ? s.radius : 0);
+    const vis = dx * dx + dy * dy + dz * dz < reach * reach;
+    if (inst.visible !== vis) inst.visible = vis;
+    if (!vis) hidden++;
+  }
+  return hidden;
+}
+
+function chunkCentre(inst) {
+  const c = new THREE.Vector3();
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < inst.count; i++) {
+    inst.getMatrixAt(i, m);
+    c.x += m.elements[12]; c.y += m.elements[13]; c.z += m.elements[14];
+  }
+  return c.divideScalar(Math.max(1, inst.count));
 }
