@@ -92,7 +92,9 @@ export class Agent {
     const outfit = makeOutfit(faction, archetype.rank, this.rng);
     outfit.frame = archetype.health >= 150 ? 'heavy' : 'normal';
     this.model = makeCharacter(outfit);
-    this.model.root.scale.setScalar(archetype.rank === 'elite' ? 1.05 : 1);
+    const sizeK = archetype.rank === 'elite' ? 1.05 : 1;
+    if (this.model.setSize) this.model.setSize(sizeK);
+    else this.model.root.scale.setScalar(sizeK);
     this.model.setPosition(spawn.x, spawn.y, spawn.z);
     game.scene.add(this.model.root);
     attachWeapon(this.model, archetype.weapon);

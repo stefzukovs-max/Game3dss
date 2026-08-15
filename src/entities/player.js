@@ -114,7 +114,13 @@ export class Player {
     // operators get their own cached build so they never share a body with a grunt
     outfit.preset += ':op:' + char.id;
     this.model = makeCharacter(outfit);
-    this.model.root.scale.setScalar(b.frame === 'heavy' ? 1.06 : b.frame === 'light' ? 0.96 : 1);
+    const frameK = b.frame === 'heavy' ? 1.06 : b.frame === 'light' ? 0.96 : 1;
+    /*
+     * `setSize` on a nullish-coalescing chain was a trap: it returns undefined,
+     * so `a?.() ?? b()` runs BOTH and the fallback overwrote the correction.
+     */
+    if (this.model.setSize) this.model.setSize(frameK);
+    else this.model.root.scale.setScalar(frameK);
     game.scene.add(this.model.root);
     attachWeapon(this.model, this.weaponId);
   }

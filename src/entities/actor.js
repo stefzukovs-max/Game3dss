@@ -179,6 +179,44 @@ const AIM_UPPER = 'Aim_Upper';
 const HAND_BONE = 'hand_r';
 
 /*
+ * ══════════════════════════════════════════════════════════════════
+ *  The rig is 45% of the size the rest of the game thinks it is
+ * ══════════════════════════════════════════════════════════════════
+ *
+ * Every clip in the animation library writes 0.4495 to the `root` bone's
+ * scale. It is the pack's own unit conversion; it is in all forty-three
+ * clips; and because the mixer writes scale every frame it lands the instant
+ * anything plays. Measured on a standing player: foot bone to head bone,
+ * 52 centimetres. The whole arm, shoulder to wrist, 23.
+ *
+ * Nothing caught it for the life of the project because everything that
+ * measured a character measured the *source* model in bind space, where the
+ * clips have not run and the figure is a correct 1.82 m.
+ *
+ * It explains a run of separate-looking bugs that were each chased on their
+ * own terms: the submachine gun that "looked like a black stick" was
+ * correctly sized in metres beside a man half a metre tall; the off hand
+ * could not reach the weapon's foregrip because there is only 23 cm of arm
+ * to reach with; and worst of all the collision capsule, the camera height
+ * and every hitbox are written against 1.82 m, so the head you could see and
+ * the head you could shoot were not in the same place.
+ *
+ * Fixing it in the clips would be tidier and does not work — dividing the
+ * root track's values leaves them at 0.4495 no matter that the loop runs and
+ * the guard flag is set, which is worth returning to. Scaling the actor's
+ * own root undoes it where it can be seen.
+ *
+ * The number is 2.379 rather than 1/0.4495 = 2.225 because undoing the pack's
+ * factor is not the goal — standing 1.82 m is, and this build has short chibi
+ * legs that lose the difference. It was measured, not derived: skinning
+ * applied on the CPU with `applyBoneTransform`, which is the only way to see
+ * a skinned mesh's real size. `Box3.setFromObject` reads bind-space geometry
+ * and is blind to every bone transform, which is precisely how a rig at 45%
+ * of its intended size survived this long unnoticed.
+ */
+export const RIG_UNIT_FIX = 2.379;
+
+/*
  * How big a gun reads, as a multiplier on its real-world length.
  *
  * It was 1.35, which was right when the build still had realistic arms and
@@ -200,26 +238,24 @@ const HAND_BONE = 'hand_r';
 const WEAPON_SCALE = 0.5;
 
 /*
- * ── the off-hand grip, currently off ──
+ * ── the off-hand grip ──
  *
  * The solver in `twobone.js` works and the plumbing is in place: the weapon
  * carries a foregrip node, the actor reaches for it after everything else in
  * the frame, and the reach fades out rather than clamping. What does not add
  * up yet is the geometry it is reaching across.
  *
- * Measured on the built figure while aiming, the left shoulder sits 0.93 m
- * from the right hand, and each arm is 0.27 m from shoulder to wrist. Those
- * two numbers cannot both be true of a 1.82 m person, so something upstream
- * — most likely the interaction between the build's bone scales and the
- * scale tracks the clips carry — is placing the arms much further apart than
- * the skeleton says. Until that is understood, forcing the solve produces an
- * arm stretched across the chest toward a gun it never reaches, which is
- * worse than the free arm it replaces.
+ * It was switched off for a while because the arm could not reach: measured
+ * while aiming, the off shoulder sat 0.93 m from the weapon hand and each arm
+ * was 0.27 m long. Those two numbers cannot both be true of a 1.82 m person,
+ * and the reason they were is `RIG_UNIT_FIX` above — the whole skeleton was
+ * running at 45% scale, so the arms were less than a third of the length the
+ * geometry around them assumed. With that corrected the arm is 0.55 m and the
+ * reach is ordinary.
  *
- * So it stays off, and `npm run check:anim` keeps printing the numbers that
- * will say when it can come back on.
+ * It is still gated on reach rather than forced: see the fade in `_offHand`.
  */
-const OFF_HAND_IK = false;
+const OFF_HAND_IK = true;
 
 const _ws = new THREE.Vector3();
 const _ikTarget = new THREE.Vector3();
@@ -303,9 +339,17 @@ export class SkinnedActor {
     // the mount is already oriented; the legacy pose is for the capsule rig
     this.weaponPose = { position: new THREE.Vector3(0, 0, 0), rotation: new THREE.Euler(0, 0, 0) };
 
+    /*
+     * Undo the pack's root scale. Callers set their own size on top of this
+     * — an elite is 1.05, a light frame 0.96 — so `setSize` multiplies
+     * rather than assigns, and nobody outside has to know the fix exists.
+     */
+    this.root.scale.setScalar(RIG_UNIT_FIX);
+
     this.mixer = new THREE.AnimationMixer(body);
     this._actions = new Map();
     this._play(LOCO.idle, 0);
+    this._footDrop = this._measureFootDrop(kind);
   }
 
   /**
@@ -511,6 +555,11 @@ export class SkinnedActor {
    * divided straight back out, so the rig can be restyled freely and the
    * weapon stays where the art direction put it.
    */
+  /** Size this character, on top of the rig's unit correction. */
+  setSize(k = 1) {
+    this.root.scale.setScalar(RIG_UNIT_FIX * k);
+  }
+
   _holdWeaponSize() {
     const bone = this._handBone;
     if (!bone) return;
@@ -661,7 +710,54 @@ export class SkinnedActor {
     this.root.rotation.y += angleDelta(this.root.rotation.y, yaw) * (1 - Math.exp(-rate * dt));
   }
 
-  setPosition(x, y, z) { this.root.position.set(x, y, z); }
+  /**
+   * Stand the character *on* the ground rather than near it.
+   *
+   * The root is placed at the player's feet, but the rig's soles are not at
+   * its own origin — with the unit correction applied they sit 21 centimetres
+   * above it, so every character in the game hovered. It was easy to miss at
+   * the old scale, where the same offset was under nine centimetres and read
+   * as the model being slightly small.
+   *
+   * The drop is measured once per body from the actual skinned mesh, because
+   * a foot bone is at the ankle and what has to touch the floor is the sole.
+   */
+  setPosition(x, y, z) { this.root.position.set(x, y - this._footDrop, z); }
+
+  /**
+   * How far below its own origin this rig's lowest vertex sits, in metres,
+   * at unit scale. Measured once per body kind and cached — it is four
+   * thousand CPU skinning evaluations, which is nothing once and far too
+   * much per spawn.
+   */
+  static _footDrop = new Map();
+
+  _measureFootDrop(kind) {
+    const cached = SkinnedActor._footDrop.get(kind);
+    if (cached !== undefined) return cached * this.root.scale.y;
+
+    this.mixer.update(0);
+    this.root.updateMatrixWorld(true);
+    let mesh = null;
+    this.root.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o; });
+    let lo = 0;
+    if (mesh?.applyBoneTransform) {
+      const pos = mesh.geometry.attributes.position;
+      const v = new THREE.Vector3();
+      const step = Math.max(1, Math.floor(pos.count / 3000));
+      lo = Infinity;
+      for (let i = 0; i < pos.count; i += step) {
+        v.fromBufferAttribute(pos, i);
+        mesh.applyBoneTransform(i, v);
+        mesh.localToWorld(v);
+        if (v.y < lo) lo = v.y;
+      }
+      lo = (lo - this.root.position.y) / (this.root.scale.y || 1);
+    }
+    if (!Number.isFinite(lo)) lo = 0;
+    SkinnedActor._footDrop.set(kind, lo);
+    return lo * this.root.scale.y;
+  }
 
   flash() {
     if (this._flashing) return;

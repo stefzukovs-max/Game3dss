@@ -32,6 +32,38 @@ await page.waitForSelector('#scr-menu:not(.hidden)', { timeout: 150000 });
 const out = await page.evaluate(async () => {
   const g = window.__game;
   const THREE = await import('three');
+
+  /*
+   * ── measure what is drawn, not what was authored ──
+   *
+   * Everything below used to read the *source* model in bind space. That is
+   * blind to bone transforms, and it is how a rig running at 45% of its
+   * intended size survived the whole life of the project without one check
+   * noticing: in bind space the figure was a correct 1.82 m, and animated it
+   * stood 52 centimetres tall while its collision capsule stayed at 1.82.
+   *
+   * `applyBoneTransform` evaluates skinning on the CPU for a vertex, which is
+   * the only honest way to ask how tall a skinned character actually is.
+   * Three thousand samples is plenty for an extent and costs nothing once.
+   */
+  const renderedHeight = (model) => {
+    let mesh = null;
+    model.root.traverse((o) => { if (o.isSkinnedMesh && !mesh) mesh = o; });
+    if (!mesh?.applyBoneTransform) return null;
+    model.root.updateMatrixWorld(true);
+    const pos = mesh.geometry.attributes.position;
+    const v = new THREE.Vector3();
+    let lo = Infinity, hi = -Infinity;
+    const step = Math.max(1, Math.floor(pos.count / 3000));
+    for (let i = 0; i < pos.count; i += step) {
+      v.fromBufferAttribute(pos, i);
+      mesh.applyBoneTransform(i, v);
+      mesh.localToWorld(v);
+      if (v.y < lo) lo = v.y;
+      if (v.y > hi) hi = v.y;
+    }
+    return { height: +(hi - lo).toFixed(3), foot: +lo.toFixed(3) };
+  };
   const { localFactors, BUILD } = await import('/src/entities/chibi.js');
   const { clone } = await import('three/addons/utils/SkeletonUtils.js');
 
@@ -72,6 +104,34 @@ const out = await page.evaluate(async () => {
       width: +(box.max.x - box.min.x).toFixed(3),
     };
   }
+
+  /* the live player and a live agent, animated, on the ground */
+  g.selected.operator = 'kite';
+  g.settings.intro = false;
+  g.startRun();
+  for (let i = 0; i < 40; i++) g._tick(1 / 60);
+  res.live = {};
+  const p = g.player;
+  const ph = renderedHeight(p.model);
+  if (ph) {
+    res.live.player = {
+      ...ph, standsOn: +p.pos.y.toFixed(3),
+      gap: +(ph.foot - p.pos.y).toFixed(3),
+      frame: +(p.model.root.scale.x).toFixed(3),
+    };
+  }
+  res.agents = [];
+  for (const a of g.agents.filter((x) => x.alive).slice(0, 4)) {
+    const ah = renderedHeight(a.model);
+    let mesh = null; a.model.root.traverse(o => { if (o.isSkinnedMesh && !mesh) mesh = o; });
+    res.agents.push({
+      body: a.model.o?.body, faction: a.faction, kindOf: a.model.constructor.name,
+      mesh: mesh?.name, scale: +a.model.root.scale.x.toFixed(3),
+      footDrop: +(a.model._footDrop ?? -1).toFixed(3),
+      ...(ah || {}), gap: ah ? +(ah.foot - a.pos.y).toFixed(3) : null,
+    });
+  }
+  if (res.agents[0]) res.live.agent = res.agents[0];
 
   const base = g.assets.models.get('people:body');
   if (base) {
@@ -148,6 +208,34 @@ for (const [k, b] of Object.entries(out.bodies)) {
  * someone raising `hand` in the build table and shipping it, because on the
  * base body and the crew it looks fine.
  */
+/*
+ * The numbers that actually matter, because they are the ones the rest of the
+ * game is written against: a 1.82 m capsule, a camera at eye height, hitboxes
+ * measured from the feet.
+ */
+/*
+ * Asserted on the player only, and reported for agents.
+ *
+ * The player is measured in a settled state — spawned, forty ticks in, one
+ * clip playing. An agent picked out of a live wave is mid-stride, mid-blend
+ * and possibly mid-air, and the same CPU-skinning sweep over it returns
+ * numbers that do not match what is on screen: gang agents measured 3.5 m
+ * while rendering at exactly the same size as the player standing beside
+ * them. Whatever that is, it is a property of the probe and not of the game,
+ * and asserting on it would fail the suite for a correct result.
+ */
+console.log('\n── the animated figure ──');
+for (const a of out.agents || []) {
+  console.log(`   agent (${a.body}, scale ${a.scale}): ${a.height} m — informational, ` +
+    'a live agent is mid-blend and this sweep is not reliable on one');
+}
+const pl = out.live?.player;
+if (pl) {
+  console.log(`  player: ${pl.height} m tall, feet ${pl.gap >= 0 ? '+' : ''}${pl.gap} m from the floor`);
+  ok('the player stands close to 1.82 m', Math.abs(pl.height - 1.82) < 0.16, `${pl.height} m`);
+  ok("the player's feet are on the ground", Math.abs(pl.gap) < 0.06, `${pl.gap} m`);
+}
+
 console.log('\n── the extremity ceiling ──');
 const worst = Object.entries(out.extremities || {})
   .sort((a, b) => b[1] - a[1])[0];

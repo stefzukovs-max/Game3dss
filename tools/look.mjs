@@ -53,14 +53,14 @@ page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
 await page.goto('http://localhost:8080/', { waitUntil: 'load' });
 await page.waitForSelector('#scr-menu:not(.hidden)', { timeout: 150000 });
 
-await page.evaluate(() => {
+await page.evaluate((op) => {
   const g = window.__game;
-  g.selected.operator = 'kite';
+  g.selected.operator = op;
   g.settings.intro = false;
   g.startRun();
   g._tick(1 / 60);
   document.getElementById('overlay')?.classList.add('gone');
-});
+}, process.env.OP || 'kite');
 
 for (const v of VIEWS) {
   if (only && v.name !== only) continue;
