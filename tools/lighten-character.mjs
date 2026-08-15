@@ -86,6 +86,36 @@ for (const mat of root.listMaterials()) {
   }
   mat.setRoughnessFactor(0.82);
   mat.setMetallicFactor(0.0);
+  /*
+   * Opaque, always.
+   *
+   * Generators habitually export characters with alphaMode BLEND and an
+   * alpha channel they never use, and the reduced police officer came out
+   * looking like a ghost — you could see the background through him, most
+   * visibly on the body where the mesh is single-layered. A person is not
+   * transparent, and a blended material is also sorted per-draw at runtime,
+   * which costs more than it has any business costing for a solid object.
+   */
+  mat.setAlphaMode('OPAQUE');
+  const c = mat.getBaseColorFactor();
+  if (c && c[3] !== 1) mat.setBaseColorFactor([c[0], c[1], c[2], 1]);
+
+  /*
+   * Zero the emissive factor, and do it *because* the texture was dropped.
+   *
+   * A factor and a map multiply. Meshy ships characters with emissiveFactor
+   * [1,1,1] held in check by an emissive texture that is entirely black —
+   * perfectly valid, and it means nothing glows. Remove the map and the
+   * factor is suddenly acting alone on every pixel, so the whole character
+   * emits full white and renders as a ghost: all the detail still there,
+   * every bit of it washed out to near-paper.
+   *
+   * This cost an hour, twice — the same shape of mistake as the van that
+   * lost its livery when a metallic-roughness map was dropped and left its
+   * factor behind. Dropping a map means inheriting its factor's full effect,
+   * every time.
+   */
+  mat.setEmissiveFactor([0, 0, 0]);
 }
 
 await doc.transform(

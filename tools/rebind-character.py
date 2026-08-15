@@ -182,21 +182,91 @@ print('GAME RIG', len(arm.data.bones), 'bones; donor', body.name,
       len(body.data.vertices), 'verts; hands', {k: tuple(round(c, 3) for c in v)
                                                 for k, v in TARGET.items()})
 
+"""
+Find the arm bones whatever the rigger called them.
+
+This block used to name Rigify bones outright — `DEF-upper_arm.L` and
+friends — because the first supplied character came from Rigify. The next
+rigged one came out of Meshy with `LeftArm`, `LeftForeArm`, `LeftHand`, and
+the whole rigged path silently did nothing: `abone()` returned None, the
+`continue` fired for both sides, and the model went through un-T-posed as
+though it had no skeleton at all. Nothing failed, it was just quietly worse.
+
+Four conventions cover essentially everything in circulation, and they only
+differ in decoration. Normalising away the prefixes, separators and side
+tokens leaves a handful of core words, and those are worth matching exactly
+rather than by substring: "arm" is inside "forearm", so a substring test maps
+the upper arm onto the elbow and folds the character in half.
+"""
+SIDE_WORDS = {'L': ('left', 'l'), 'R': ('right', 'r')}
+CORE = {
+    'upperarm': ('upperarm', 'arm', 'upperarm1', 'shoulder2'),
+    'forearm': ('forearm', 'lowerarm', 'elbow'),
+    'hand': ('hand', 'wrist'),
+}
+
+
+def _norm(name):
+    n = name.lower()
+    for junk in ('mixamorig:', 'mixamorig', 'def-', 'def_', 'bip01', 'bone_'):
+        n = n.replace(junk, '')
+    return ''.join(ch for ch in n if ch.isalnum())
+
+
+def src_arm_bone(kind, side):
+    """The supplied rig's bone for this joint and side, or None."""
+    if not src_arm:
+        return None
+    for b in src_arm.data.bones:
+        n = _norm(b.name)
+        for word in SIDE_WORDS[side]:
+            core = None
+            if n.startswith(word):
+                core = n[len(word):]
+            elif n.endswith(word):
+                core = n[:-len(word)]
+            if core and core in CORE[kind]:
+                return b.name
+    return None
+
+
 if src_arm:
+    names = {(k, s): src_arm_bone(k, s) for k in CORE for s in ('L', 'R')}
+    print('SOURCE ARM BONES', {f'{k}.{s}': v for (k, s), v in names.items()})
     bpy.context.view_layer.objects.active = src_arm
     bpy.ops.object.mode_set(mode='POSE')
     for side in ('L', 'R'):
-        shoulder, hand = abone(f'DEF-upper_arm.{side}'), abone(f'DEF-hand.{side}')
-        if not shoulder or not hand:
+        up, fore, hnd = (names[('upperarm', side)], names[('forearm', side)],
+                         names[('hand', side)])
+        if not (up and fore and hnd):
+            print(f'T-POSE {side}: no arm chain found, leaving it alone')
             continue
-        out = TARGET[side] - shoulder
-        rotate_pose(src_arm.pose.bones[f'DEF-upper_arm.{side}'], shoulder, hand - shoulder, out)
+        shoulder, hand = abone(up), abone(hnd)
+        """
+        Aim along a *direction*, never at a point.
+
+        The game rig's hand positions are in metres. A supplied rig is in
+        whatever units its author used, and this one arrives a hundred and
+        ninety-four times life size, so subtracting a shoulder at x=10 from a
+        target at x=0.7 gives a vector pointing back through the character's
+        own chest. The arms folded inward and the whole body collapsed into a
+        wedge — which looked like a weighting failure and was a units failure.
+        The scale match happens later, and moving it earlier would break the
+        un-skin's requirement that mesh and armature share a space.
+        
+        `rotate_pose` normalises both vectors, so only the direction ever
+        mattered. Taking it from the game rig's own shoulder-to-hand axis is
+        scale-free and says what is actually meant: put the arm where this
+        skeleton keeps its arms.
+        """
+        gsh = arm.matrix_world @ arm.data.bones[f'upperarm_{side.lower()}'].head_local
+        gdir = (TARGET[side] - gsh).normalized()
+        rotate_pose(src_arm.pose.bones[up], shoulder, hand - shoulder, gdir)
         # re-read: the shoulder turn moved everything below it
-        elbow = src_arm.matrix_world @ src_arm.pose.bones[f'DEF-forearm.{side}'].head
-        hand = src_arm.matrix_world @ src_arm.pose.bones[f'DEF-hand.{side}'].head
-        rotate_pose(src_arm.pose.bones[f'DEF-forearm.{side}'], elbow, hand - elbow,
-                    TARGET[side] - elbow)
-        hand = src_arm.matrix_world @ src_arm.pose.bones[f'DEF-hand.{side}'].head
+        elbow = src_arm.matrix_world @ src_arm.pose.bones[fore].head
+        hand = src_arm.matrix_world @ src_arm.pose.bones[hnd].head
+        rotate_pose(src_arm.pose.bones[fore], elbow, hand - elbow, gdir)
+        hand = src_arm.matrix_world @ src_arm.pose.bones[hnd].head
         print(f'T-POSE {side} hand -> {tuple(round(v, 3) for v in hand)}')
     bpy.ops.object.mode_set(mode='OBJECT')
 
