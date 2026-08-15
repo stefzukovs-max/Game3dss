@@ -87,6 +87,61 @@ const out = await page.evaluate(async () => {
     res.hitstopOnHit = +(g._hitstop || 0).toFixed(3);
   }
 
+  /*
+   * ── the two forgivenesses ──
+   *
+   * Coyote time and jump buffering are invisible when they work and read as
+   * a broken jump button when they do not, which makes them exactly the kind
+   * of thing that gets removed by an unrelated refactor and never noticed.
+   */
+  const jumpFrom = (setup) => {
+    p.alive = true; p.health = 1e6;
+    const spot = p.pos.clone(); spot.y += 0.2;
+    p.spawnAt(spot);
+    p.vel.set(0, 0, 0);
+    g.input.keys.delete('Space');
+    for (let i = 0; i < 20; i++) g._tick(1 / 60);   // settle on the ground
+    return setup();
+  };
+
+  // walk off an edge, then press jump a couple of frames late
+  res.coyote = jumpFrom(() => {
+    p.onGround = false;                 // as if we had just left a step
+    p._coyote = undefined;
+    g._tick(1 / 60);
+    g._tick(1 / 60);
+    const before = p.vel.y;
+    /*
+     * `pressed` is an edge set that the DOM handler fills and `endFrame`
+     * clears — putting a code into `keys` marks it held, not newly pressed,
+     * so a jump driven that way never fires. The harness has to poke the same
+     * set the keydown handler does.
+     */
+    g.input._pressed.add('Space');
+    g._tick(1 / 60);
+    g.input._pressed.clear();
+    return +(p.vel.y - before).toFixed(3);
+  });
+
+  // press jump while still in the air, shortly before touching down
+  res.buffered = jumpFrom(() => {
+    p.vel.y = -3; p.onGround = false;
+    g.input._pressed.add('Space');
+    g._tick(1 / 60);
+    g.input._pressed.clear();
+    let peak = 0;
+    for (let i = 0; i < 30; i++) { g._tick(1 / 60); peak = Math.max(peak, p.vel.y); }
+    return +peak.toFixed(3);
+  });
+
+  /* ── landing has weight ── */
+  res.landDip = jumpFrom(() => {
+    p.fallStart = p.pos.y + 6;
+    p.vel.y = -8; p.onGround = false;
+    for (let i = 0; i < 30; i++) { g._tick(1 / 60); if (p.onGround) break; }
+    return +(p.landDip ?? 0).toFixed(4);
+  });
+
   /* ── the weapon is not welded to the hand ── */
   const m = p.model.weaponModel;
   if (m) {
@@ -114,6 +169,13 @@ ok('masonry does not', out.sparksConcrete === 0, `${out.sparksConcrete} sparks`)
 
 console.log('\n── contact ──');
 ok('a non-fatal hit hitches the frame', out.hitstopOnHit > 0, `${out.hitstopOnHit}s`);
+
+console.log('\n── moving ──');
+ok('a jump still comes out just after leaving an edge', out.coyote > 3,
+  `+${out.coyote} m/s upward`);
+ok('a jump pressed before landing is remembered', out.buffered > 3,
+  `peak +${out.buffered} m/s`);
+ok('landing dips the camera', out.landDip > 0.02, `${out.landDip} m`);
 
 console.log('\n── the weapon in the hand ──');
 ok('the weapon sways rather than sitting welded', out.swayStates > 10,

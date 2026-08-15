@@ -21,6 +21,24 @@ const CROUCH_MUL = 0.5;
 const ADS_MUL = 0.56;
 const AIR_CONTROL = 0.32;
 const JUMP_V = 7.4;
+
+/*
+ * How long after leaving an edge a jump still counts, and how long before
+ * landing one is remembered. Both in seconds. A tenth of a second is roughly
+ * the size of a human timing error and is well under the threshold where a
+ * player notices the game being generous.
+ */
+const COYOTE_TIME = 0.11;
+const JUMP_BUFFER = 0.12;
+
+/*
+ * Landing. `LAND_DIP` is how far the camera drops on a hard landing, in
+ * metres, and `LAND_RECOVER` how fast it comes back. The dip is what makes a
+ * drop read as weight rather than as teleportation — the fall damage numbers
+ * were already there, and the body arriving was not.
+ */
+const LAND_DIP = 0.085;
+const LAND_RECOVER = 9;
 const STAND_H = 1.82;
 const CROUCH_H = 1.25;
 const EYE = 1.62;
@@ -273,11 +291,36 @@ export class Player {
       this.vel.z = damp(this.vel.z, 0, 16, dt);
     }
 
-    // jump
+    /*
+     * ── jumping, with the two forgivenesses every platformer has ──
+     *
+     * This map is nine hundred concrete steps, low walls and rooftops, so the
+     * player is at an edge more or less constantly and a jump that does not
+     * come out reads as the game being broken rather than as the player being
+     * late.
+     *
+     *   COYOTE   you may still jump for a moment after walking off an edge.
+     *            Nobody has ever pressed jump on the exact frame they left
+     *            the floor, and without this a run off a step becomes a fall.
+     *
+     *   BUFFER   a jump pressed just before landing fires on landing rather
+     *            than being dropped. This is what makes repeated hops down a
+     *            staircase feel continuous instead of stuttering.
+     *
+     * Both are short enough to be invisible and long enough to matter — a
+     * tenth of a second is about two frames' worth of human timing error.
+     */
     const jumpMul = this.char.passive.id === 'rooftops' ? 1.4 : 1;
-    if (input.pressed('Space') && this.onGround) {
+    if (this.onGround) this._coyote = COYOTE_TIME;
+    else this._coyote = Math.max(0, (this._coyote ?? 0) - dt);
+    if (input.pressed('Space')) this._jumpBuffer = JUMP_BUFFER;
+    else this._jumpBuffer = Math.max(0, (this._jumpBuffer ?? 0) - dt);
+
+    if (this._jumpBuffer > 0 && this._coyote > 0) {
       this.vel.y = JUMP_V * Math.sqrt(jumpMul);
       this.onGround = false;
+      this._jumpBuffer = 0;
+      this._coyote = 0;
       audio.footstep(this.pos, true);
     }
 
@@ -293,6 +336,14 @@ export class Player {
       if (wasAir && this.fallStart != null) {
         const drop = this.fallStart - this.pos.y;
         const free = this.char.passive.id === 'rooftops' ? 9.5 : 6.5;
+        /*
+         * Arriving. The camera dips on landing, scaled by the drop and capped
+         * so that stepping off a kerb is a twitch and coming off a roof is a
+         * proper knee bend. Fall *damage* already existed; the body having
+         * weight when it lands did not, and one number told the player they
+         * had fallen while their eyes said they had teleported.
+         */
+        this.landDip = Math.min(1, drop / 5) * LAND_DIP;
         if (drop > free) this.damage((drop - free) * 8.5, null, 'the fall');
         if (drop > 1.5) audio.footstep(this.pos, true);
       }
@@ -560,12 +611,19 @@ export class Player {
      * Crouching is exempt on purpose — dropping into cover should read as a
      * fast, deliberate move, not a slow sink.
      */
+    /*
+     * The landing dip rides on top of the eye height rather than being damped
+     * with it: it has to arrive in one frame to read as an impact, and then
+     * recover slowly. Folding it into `camEyeY` before the damp would smear
+     * the arrival across eighty milliseconds and lose the whole effect.
+     */
+    this.landDip = damp(this.landDip ?? 0, 0, LAND_RECOVER, dt);
     const eye = this.pos.y + lerp(this.eyeHeight, this.eyeHeight + 0.06, aim);
     if (this.camEyeY == null || Math.abs(eye - this.camEyeY) > 1.6) this.camEyeY = eye;
     else this.camEyeY = damp(this.camEyeY, eye, this.crouching !== this._camCrouch ? 26 : 13, dt);
     this._camCrouch = this.crouching;
 
-    const pivot = _p.set(this.pos.x, this.camEyeY, this.pos.z);
+    const pivot = _p.set(this.pos.x, this.camEyeY - this.landDip, this.pos.z);
 
     const pitch = clamp(this.pitch + this.recoilPitch, -1.35, 1.28);
     const yaw = this.yaw + this.recoilYaw;

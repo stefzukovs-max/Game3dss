@@ -42,6 +42,13 @@ const VIEWS = [
   { name: 'alley',  x: -44, z: 2,   yaw: 0,              crowd: 0 },
   { name: 'summit', x: 2,   z: -52, yaw: 0,              crowd: 0 },
   { name: 'crowd',  x: 6,   z: 44,  yaw: 0,              crowd: 5 },
+  /*
+   * Close on the player. Character work — proportions, the weapon in the
+   * hand, whether anything is poking through a shoulder — cannot be judged
+   * from a gameplay camera eight metres back, and cropping a gameplay shot
+   * gives you eight pixels of face.
+   */
+  { name: 'hero',   x: 6,   z: 50,  yaw: 0,   crowd: 0, close: true },
 ];
 
 const browser = await chromium.launch({
@@ -109,6 +116,15 @@ for (const v of VIEWS) {
     for (let i = 0; i < 40; i++) {
       p.updateCamera(g.camera, 1 / 60, g.world.collision);
       for (const a of g.agents) a.model.update(1 / 60, { speed: 0, aiming: false, crouching: false, pitch: 0, dead: false });
+    }
+    if (view.close) {
+      const head = new V();
+      let hb = null; p.model.root.traverse((o) => { if (o.name === 'Head') hb = o; });
+      p.model.root.updateMatrixWorld(true);
+      if (hb) hb.getWorldPosition(head); else head.copy(p.pos).setY(p.pos.y + 1.5);
+      g.camera.position.set(head.x + 1.9, head.y - 0.15, head.z + 1.9);
+      g.camera.lookAt(head.x, head.y - 0.55, head.z);
+      g.camera.fov = 34; g.camera.updateProjectionMatrix();
     }
     g._updateSun();
     if (g.skyDome) g.skyDome.position.copy(g.camera.position);
